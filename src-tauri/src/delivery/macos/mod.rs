@@ -16,6 +16,7 @@ mod keylayout;
 mod paste;
 mod pasteboard;
 mod registry;
+mod snapshot_probe;
 mod typing;
 mod web_ax;
 mod web_ctx;

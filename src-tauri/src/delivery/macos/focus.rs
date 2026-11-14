@@ -3,10 +3,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::ax::*;
-use super::{host, registry, web_ax};
+use super::{host, registry, snapshot_probe, web_ax};
 use crate::delivery::decide::element_token;
 use crate::delivery::decide::known_terminal::flag_terminal;
 use crate::delivery::decide::paste_role::{classify_target, EditFacts};
+use crate::delivery::decide::snapshot_diag;
 use crate::delivery::types::TargetSnapshotDto;
 
 pub fn now_ms() -> i64 {
@@ -125,19 +126,12 @@ pub fn build_snapshot(
 /// unavailable snapshots (no AX focus or permission), where a terminal is the
 /// likeliest reason for Copy and the app pid is not known from AX.
 pub fn snapshot_at(stage: &str, register: bool) -> TargetSnapshotDto {
-    flag_terminal(
-        snapshot_unflagged(stage, register),
-        host::frontmost_pid,
-        host::terminal_flags,
-    )
-}
-
-fn snapshot_unflagged(stage: &str, register: bool) -> TargetSnapshotDto {
+    let flag = |snap| flag_terminal(snap, host::frontmost_pid, host::terminal_flags);
     if unsafe { AXIsProcessTrusted() } == 0 {
-        return TargetSnapshotDto::unavailable(
+        return flag(TargetSnapshotDto::unavailable(
             &format!("Accessibility permission denied at {stage} — insert skipped"),
             now_ms(),
-        );
+        ));
     }
     if register {
         // Every completion (= insert attempt) re-asserts the Chromium/Electron
@@ -148,21 +142,29 @@ fn snapshot_unflagged(stage: &str, register: bool) -> TargetSnapshotDto {
         let front = host::frontmost_pid();
         web_ax::reassert(front);
         let focus = web_ax::settle_focus(stage, front, focused_ui_element_once(stage));
-        return snapshot_from_focus(focus, true);
+        return snapshot_from_focus(focus, true, flag);
     }
-    snapshot_from_focus(focused_ui_element(stage), false)
+    snapshot_from_focus(focused_ui_element(stage), false, flag)
 }
 
+/// `register` marks the completion snapshot (once per delivery): only that
+/// one may print the BUS-232 `[snapshot]` diagnostic, after the terminal
+/// flags are known and before the element is released. Diagnostic only; the
+/// returned snapshot is the same either way.
 fn snapshot_from_focus(
     focus: Result<(AXUIElementRef, Option<String>), String>,
     register: bool,
+    flag: impl FnOnce(TargetSnapshotDto) -> TargetSnapshotDto,
 ) -> TargetSnapshotDto {
     match focus {
         Ok((element, app_name)) => {
-            let snap = build_snapshot(element, app_name, register);
+            let snap = flag(build_snapshot(element, app_name, register));
+            if register && snapshot_diag::should_log(&snap) {
+                snapshot_probe::log_snapshot(element, &snap);
+            }
             release(element as CFTypeRef);
             snap
         }
-        Err(msg) => TargetSnapshotDto::unavailable(&msg, now_ms()),
+        Err(msg) => flag(TargetSnapshotDto::unavailable(&msg, now_ms())),
     }
 }

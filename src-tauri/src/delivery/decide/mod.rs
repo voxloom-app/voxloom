@@ -12,6 +12,7 @@ pub mod paste_role;
 pub mod paste_target;
 pub mod report;
 pub mod retry;
+pub mod snapshot_diag;
 pub mod target;
 pub mod terminal;
 pub mod text;

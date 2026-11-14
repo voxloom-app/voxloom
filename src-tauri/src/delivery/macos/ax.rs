@@ -49,6 +49,11 @@ extern "C" {
     fn CFRelease(cf: CFTypeRef);
     pub fn CFRetain(cf: CFTypeRef) -> CFTypeRef;
     pub fn CFEqual(a: CFTypeRef, b: CFTypeRef) -> u8;
+    fn CFBooleanGetTypeID() -> usize;
+    fn CFBooleanGetValue(b: CFTypeRef) -> u8;
+    fn CFArrayGetTypeID() -> usize;
+    fn CFArrayGetCount(array: CFTypeRef) -> isize;
+    fn CFArrayGetValueAtIndex(array: CFTypeRef, index: isize) -> CFTypeRef;
     static kCFBooleanTrue: CFTypeRef;
 }
 
@@ -144,6 +149,38 @@ pub fn is_settable(element: AXUIElementRef, attr: &str) -> bool {
     let err = unsafe { AXUIElementIsAttributeSettable(element, name, &mut settable) };
     release(name);
     err == AX_OK && settable != 0
+}
+
+/// A CFBoolean attribute (BUS-232 diagnostics); None on error or other type.
+pub fn copy_bool_attr(element: AXUIElementRef, attr: &str) -> Option<bool> {
+    let value = copy_attr(element, attr).ok()?;
+    let result = unsafe {
+        (CFGetTypeID(value) == CFBooleanGetTypeID()).then(|| CFBooleanGetValue(value) != 0)
+    };
+    release(value);
+    result
+}
+
+/// Up to `limit` AXChildren, each retained (caller releases every one).
+pub fn copy_children(element: AXUIElementRef, limit: usize) -> Vec<AXUIElementRef> {
+    let Ok(array) = copy_attr(element, "AXChildren") else {
+        return Vec::new();
+    };
+    let mut kids = Vec::new();
+    unsafe {
+        if CFGetTypeID(array) == CFArrayGetTypeID() {
+            let count = CFArrayGetCount(array).max(0) as usize;
+            for i in 0..count.min(limit) {
+                // Get rule: the array owns its values until we retain them.
+                let kid = CFArrayGetValueAtIndex(array, i as isize);
+                if !kid.is_null() {
+                    kids.push(CFRetain(kid) as AXUIElementRef);
+                }
+            }
+        }
+    }
+    release(array);
+    kids
 }
 
 pub fn element_pid(element: AXUIElementRef) -> Option<i32> {
