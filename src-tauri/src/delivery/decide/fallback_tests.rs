@@ -491,3 +491,115 @@ fn the_delivery_log_line_never_holds_text_or_field_contents() {
         assert!(line.contains(field), "{field}: {line}");
     }
 }
+
+/// The AX path end to end, as `ax_insert::insert_selected` then
+/// `paste_after_refusal` run it: `after_ax`, then `refused_when_unknown`,
+/// then the ⌘V gate. Returns the outcome and whether ⌘V was posted.
+fn h4_delivery(write: Result<(), i32>, before: ValueStatus, read: ValueStatus) -> (AfterAx, bool) {
+    let ax = write.map_err(|code| format!("AX set AXSelectedText failed (error {code})"));
+    let after = poll_readback(&before, || read.clone(), |_| {});
+    let attempt = AxAttempt {
+        writes: vec![write],
+        ..Default::default()
+    };
+    let before_text = before.text().unwrap_or_default();
+    let outcome = after_ax(false, ax.clone(), before_text, after.as_deref(), "hi");
+    let outcome = refused_when_unknown(outcome, &ax, after.as_deref(), &attempt);
+    let result = match &outcome {
+        AfterAx::Failed(err) => Err(err.clone()),
+        _ => Ok(InsertReport {
+            unverified: true,
+            ..Default::default()
+        }),
+    };
+    let facts = PasteFacts {
+        attempt,
+        field_unchanged: field_unchanged(&before, &read),
+        ..facts()
+    };
+    let ok = target("insertable", Some(42), Some("42:AXTextArea:#1"));
+    let mut pasted = false;
+    let mut diag = DeliveryDiag::default();
+    let _ = after_ax_refusal(
+        result,
+        may_paste(&ok, &facts, "hi"),
+        |_| {
+            pasted = true;
+            Ok(restored())
+        },
+        || false,
+        &mut diag,
+    );
+    (outcome, pasted)
+}
+
+#[test]
+fn h4_a_write_free_error_with_an_unreadable_readback_is_a_refusal_that_pastes() {
+    // Journal: AXSelectedText refused, AXValue unreadable before and after.
+    for code in WRITE_FREE_AX_ERRORS {
+        let unreadable = ValueStatus::Unreadable(Some(-25205));
+        let (outcome, pasted) = h4_delivery(Err(*code), unreadable.clone(), unreadable);
+        assert!(matches!(outcome, AfterAx::Failed(_)), "{code}: {outcome:?}");
+        assert!(pasted, "{code}");
+    }
+}
+
+#[test]
+fn h4_a_write_free_error_with_no_value_before_and_after_is_a_refusal_that_pastes() {
+    for code in WRITE_FREE_AX_ERRORS {
+        let (outcome, pasted) = h4_delivery(Err(*code), ValueStatus::NoValue, ValueStatus::NoValue);
+        assert!(matches!(outcome, AfterAx::Failed(_)), "{code}: {outcome:?}");
+        assert!(pasted, "{code}");
+    }
+}
+
+#[test]
+fn h4_an_ok_write_with_an_unknown_readback_stays_unverified_and_never_pastes() {
+    let unreadable = ValueStatus::Unreadable(Some(-25204));
+    for (before, read) in [
+        (unreadable.clone(), unreadable),
+        (ValueStatus::NoValue, ValueStatus::NoValue),
+    ] {
+        let (outcome, pasted) = h4_delivery(Ok(()), before, read);
+        assert_eq!(outcome, AfterAx::Unverified);
+        assert!(!pasted);
+    }
+}
+
+#[test]
+fn h4_an_error_that_may_have_applied_with_an_unknown_readback_never_pastes() {
+    let unreadable = ValueStatus::Unreadable(Some(-25204));
+    for code in [-25204, -25200, -25212, -25203] {
+        for (before, read) in [
+            (unreadable.clone(), unreadable.clone()),
+            (ValueStatus::NoValue, ValueStatus::NoValue),
+        ] {
+            let (outcome, pasted) = h4_delivery(Err(code), before, read);
+            assert_eq!(outcome, AfterAx::Unverified, "{code}");
+            assert!(!pasted, "{code}");
+        }
+    }
+}
+
+#[test]
+fn h4_a_known_readback_is_never_overridden() {
+    let refused = || Err("AX set AXSelectedText failed (error -25205)".to_string());
+    let attempt = AxAttempt {
+        writes: vec![Err(-25205)],
+        ..Default::default()
+    };
+    // Changed but not proof: still Unverified, whatever the error.
+    assert_eq!(
+        refused_when_unknown(AfterAx::Unverified, &refused(), Some("aX"), &attempt),
+        AfterAx::Unverified
+    );
+    for outcome in [
+        AfterAx::Inserted,
+        AfterAx::TypeFallback,
+        AfterAx::Failed("e".into()),
+    ] {
+        let expected = format!("{outcome:?}");
+        let got = refused_when_unknown(outcome, &refused(), None, &attempt);
+        assert_eq!(format!("{got:?}"), expected);
+    }
+}

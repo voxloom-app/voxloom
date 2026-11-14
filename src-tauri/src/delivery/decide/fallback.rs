@@ -11,7 +11,7 @@ use super::diag::DeliveryDiag;
 use super::report::{InsertReport, PasteReport};
 use super::retry::{RETRY_READBACK_POLLS, RETRY_READBACK_POLL_MS};
 use super::text::check_typing_text;
-use super::verify::same_ax_text;
+use super::verify::{same_ax_text, AfterAx};
 use crate::delivery::types::TargetSnapshotDto;
 
 /// kAXErrorNoValue: the attribute exists but has no value (an empty field).
@@ -64,8 +64,8 @@ impl ValueStatus {
 
 /// Read-back evidence after the AX write. A field that never exposed a value
 /// (no value before and after) proves nothing, whatever the write returned:
-/// the text may have landed unseen (an AX error does not prove it did not),
-/// so it reads as unknown (no paste, no double insert).
+/// the text may have landed unseen, so it reads as unknown. Only a write-free
+/// AX error turns that unknown into a refusal (`refused_when_unknown`).
 pub fn readback_text(before: &ValueStatus, after: &ValueStatus) -> Option<String> {
     if *before == ValueStatus::NoValue && *after == ValueStatus::NoValue {
         return None;
@@ -96,6 +96,26 @@ impl AxAttempt {
             Ok(()) => true,
             Err(code) => WRITE_FREE_AX_ERRORS.contains(code),
         })
+    }
+}
+
+/// H4 (Journal): the AX write returned an error and the read-back proves
+/// nothing (`after` is None: unreadable, or NoValue -> NoValue), which
+/// `after_ax` reports as Unverified. When every write was write-free, nothing
+/// can have landed unseen: that is a refusal (`Failed`), so `may_paste`
+/// decides on ⌘V. An Ok write, or any other AX error, with an unknown
+/// read-back stays Unverified (it may have landed: no paste).
+pub fn refused_when_unknown(
+    outcome: AfterAx,
+    ax: &Result<(), String>,
+    after: Option<&str>,
+    attempt: &AxAttempt,
+) -> AfterAx {
+    match (outcome, ax) {
+        (AfterAx::Unverified, Err(err)) if after.is_none() && attempt.write_free() => {
+            AfterAx::Failed(err.clone())
+        }
+        (outcome, _) => outcome,
     }
 }
 

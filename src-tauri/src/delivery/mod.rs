@@ -109,7 +109,8 @@ mod insert_contract_tests {
         )
         .expect("a partial write must not be Err");
         assert!(partial.unverified && partial.typed);
-        // AX path: Failed (→ Err) only when the read-back shows the field unchanged.
+        // AX path: Failed (→ Err) only when the read-back shows the field unchanged,
+        // or (H4, `fallback::refused_when_unknown`) a write-free AX error left it unknown.
         assert!(matches!(
             after_ax(false, Err("e".into()), "a", Some("a"), "b"),
             AfterAx::Failed(_)

@@ -7,7 +7,9 @@ use std::cell::RefCell;
 use super::ax::{ancestor_roles, copy_string_attr, read_value, set_ax_string, AXUIElementRef};
 use super::{focus_still_matches, host, typing, web_ax};
 use crate::delivery::decide::diag::{readback_label, DeliveryDiag};
-use crate::delivery::decide::fallback::{poll_readback, AxAttempt, ValueStatus};
+use crate::delivery::decide::fallback::{
+    poll_readback, refused_when_unknown, AxAttempt, ValueStatus,
+};
 use crate::delivery::decide::retry::{reprobe_decision, retry_eligible, retry_once, RetryIo};
 use crate::delivery::decide::{
     after_ax, is_web_content_field, value_confirms_insert, AfterAx, InsertReport,
@@ -109,6 +111,8 @@ pub fn insert_selected(
     }
     diag.readback = readback_label(&outcome);
     attempt.writes = writes.take();
+    // H4: a write-free AX error with an unknown read-back is a refusal.
+    let outcome = refused_when_unknown(outcome, &ax, after.as_deref(), attempt);
     match outcome {
         AfterAx::Inserted => Ok(InsertReport::default()),
         AfterAx::Failed(err) => Err(err),
