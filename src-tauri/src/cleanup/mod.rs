@@ -14,7 +14,7 @@ pub mod protocol;
 #[cfg(all(test, unix))]
 mod state_tests;
 pub mod supervisor;
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod test_support;
 mod worker_path;
 mod worker_process;
