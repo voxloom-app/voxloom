@@ -74,3 +74,48 @@ jobs:
       # This proves neither model provisioning nor inference. No weights are
       # downloaded, no app is launched, and no installer is published here.
       - run: cargo build --manifest-path src-tauri/Cargo.toml --locked --release --features whisper --target x86_64-pc-windows-msvc
+      - name: Diagnose native test loader failures
+        if: failure()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Get-ChildItem 'src-tauri/target/x86_64-pc-windows-msvc/debug' -Filter 'voxloom_lib-*.exe' -Recurse |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (!$exe) { Write-Output 'No native test executable was produced.'; exit 0 }
+          $readobj = Join-Path $env:LIBCLANG_PATH 'llvm-readobj.exe'
+          if (!(Test-Path $readobj)) { throw 'LLVM import inspection tool is unavailable.' }
+          $imports = & $readobj --coff-imports $exe.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Native import inspection failed.' }
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.Runtime.InteropServices;
+          public static class LoaderProbe {
+            [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+            public static extern IntPtr LoadLibrary(string name);
+            [DllImport("kernel32.dll", CharSet = CharSet.Ansi, ExactSpelling = true, SetLastError = true)]
+            public static extern IntPtr GetProcAddress(IntPtr module, string name);
+            [DllImport("kernel32.dll")]
+            public static extern bool FreeLibrary(IntPtr module);
+          }
+          '@
+          $modules = @{}
+          $dll = $null
+          foreach ($line in $imports) {
+            if ($line -match '^\s+Name: (\S+\.dll)$') {
+              $dll = $Matches[1]
+              $handle = [LoaderProbe]::LoadLibrary($dll)
+              $modules[$dll] = $handle
+              if ($handle -eq [IntPtr]::Zero) {
+                Write-Output "Dependency load failed: $dll; error=$([Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+              }
+            } elseif ($dll -and $line -match '^\s+Symbol: (\S+)') {
+              $symbol = $Matches[1]
+              $handle = $modules[$dll]
+              if ($handle -ne [IntPtr]::Zero -and [LoaderProbe]::GetProcAddress($handle, $symbol) -eq [IntPtr]::Zero) {
+                Write-Output "Missing imported entry point: $dll!$symbol"
+              }
+            }
+          }
+          foreach ($handle in $modules.Values) {
+            if ($handle -ne [IntPtr]::Zero) { [void][LoaderProbe]::FreeLibrary($handle) }
+          }
+          Write-Output 'Direct import inspection complete; no application or model was launched.'
