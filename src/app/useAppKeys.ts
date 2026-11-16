@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import type { Screen } from '../domain/types';
+import { isMacPlatform } from '../components/KeyCombo';
 import { hasOpenModal } from './modalState';
 import { screenForAltDigit } from './shell/screens';
 
@@ -9,7 +10,7 @@ type Options = {
   onNavigate: (screen: Screen) => void;
 };
 
-/** "?" opens shortcuts; ⌥1–3 navigate; ⌥4 and ⌘, open Settings. Suppressed under modals. */
+/** "?" opens shortcuts; Alt+1–3 navigate; Alt+4 and Cmd/Ctrl+, open Settings. Suppressed under modals. */
 export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -20,7 +21,9 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
         onHelp(target);
         return;
       }
-      if (event.metaKey && event.key === ',') {
+      const mac = isMacPlatform();
+      const settingsModifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (settingsModifier && event.key === ',' && !event.altKey && !event.shiftKey && !event.isComposing) {
         event.preventDefault();
         onNavigate('settings');
         return;
