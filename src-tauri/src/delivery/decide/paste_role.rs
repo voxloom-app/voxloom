@@ -136,6 +136,48 @@ pub fn classify_target(
     facts: impl FnOnce() -> EditFacts,
     ancestors: impl FnOnce() -> Vec<String>,
 ) -> (&'static str, bool, Option<&'static str>) {
+    classify_with(
+        role,
+        subrole,
+        |container| {
+            let facts = facts();
+            facts.caret() && (container || facts.text_value)
+        },
+        ancestors,
+    )
+}
+
+/// BUS-232 (C), only for the gated apps (`container_gate`): one editability
+/// signal AND one caret signal (DESIGN.md §1 C). An unknown custom role also
+/// needs a text AXValue or a readable range. All other exclusions are
+/// `classify_target`'s, in the same order.
+pub fn classify_gated_target(
+    role: &str,
+    subrole: Option<&str>,
+    facts: impl FnOnce() -> WideFacts,
+    ancestors: impl FnOnce() -> Vec<String>,
+) -> (&'static str, bool, Option<&'static str>) {
+    classify_with(
+        role,
+        subrole,
+        |container| {
+            let facts = facts();
+            facts.editable()
+                && facts.caret()
+                && (container || facts.edit.text_value || facts.range_readable)
+        },
+        ancestors,
+    )
+}
+
+/// Shared exclusions. `evidence(is_container)` is asked only for a
+/// container or an unknown custom role, before any ancestor walk.
+fn classify_with(
+    role: &str,
+    subrole: Option<&str>,
+    evidence: impl FnOnce(bool) -> bool,
+    ancestors: impl FnOnce() -> Vec<String>,
+) -> (&'static str, bool, Option<&'static str>) {
     let base = classify_role(effective_role(role, subrole));
     // "unknown": the AXRole itself could not be read (`build_snapshot`).
     if base.0 != "unsupported" || role == "unknown" {
@@ -147,17 +189,58 @@ pub fn classify_target(
     if NEVER_PASTE_ROLES.contains(&role) {
         return base;
     }
-    let facts = facts();
-    if !facts.caret() {
-        return base;
-    }
-    if !PASTE_ONLY_CONTAINERS.contains(&role) && !facts.text_value {
+    if !evidence(PASTE_ONLY_CONTAINERS.contains(&role)) {
         return base;
     }
     if is_grid_selection(role, &ancestors()) {
         return ("unsupported", false, Some(GRID_REASON));
     }
     ("insertable", true, None)
+}
+
+/// A container or an unknown/custom role (unreadable included): not
+/// AX-insertable, not secure, not a grid, not a never-paste control. Only
+/// these take the BUS-232 gate (`container_gate`).
+pub fn container_or_custom(role: &str, subrole: Option<&str>) -> bool {
+    classify_role(effective_role(role, subrole)).0 == "unsupported"
+        && !GRID_ROLES.contains(&role)
+        && !NEVER_PASTE_ROLES.contains(&role)
+}
+
+/// BUS-232 (C) evidence for the gated apps: `EditFacts` plus presence and
+/// settable bits of the WebKit/Office caret attributes. Never contents.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WideFacts {
+    pub edit: EditFacts,
+    /// AXEditableAncestor present (WebKit/Chromium contenteditable).
+    pub editable_ancestor: bool,
+    /// AXSelectedTextMarkerRange settable (WebKit text markers).
+    pub marker_settable: bool,
+    /// AXSelectedTextRange reads as a CFRange.
+    pub range_readable: bool,
+    /// AXInsertionPointLineNumber reads without error.
+    pub insertion_line: bool,
+    /// AXSelectedTextMarkerRange reads without error.
+    pub marker_readable: bool,
+    /// AXNumberOfCharacters reads without error.
+    pub char_count: bool,
+}
+
+impl WideFacts {
+    /// The element accepts text edits.
+    pub fn editable(&self) -> bool {
+        self.edit.selected_text
+            || self.edit.selected_range
+            || (self.edit.value && self.edit.text_value)
+            || self.editable_ancestor
+            || self.marker_settable
+    }
+
+    /// A caret or selection is exposed. A read-only web area has one too,
+    /// so this never qualifies without `editable`.
+    pub fn caret(&self) -> bool {
+        self.range_readable || self.insertion_line || self.marker_readable || self.char_count
+    }
 }
 
 #[cfg(test)]

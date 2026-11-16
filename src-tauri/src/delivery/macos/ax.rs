@@ -36,6 +36,8 @@ extern "C" {
         settable: *mut u8,
     ) -> AXError;
     fn AXUIElementGetPid(element: AXUIElementRef, pid: *mut pid_t) -> AXError;
+    fn AXValueGetTypeID() -> usize;
+    fn AXValueGetType(value: CFTypeRef) -> u32;
     pub fn AXIsProcessTrusted() -> u8;
 
     fn CFStringCreateWithCString(alloc: CFTypeRef, c_str: *const i8, encoding: u32) -> CFStringRef;
@@ -149,6 +151,27 @@ pub fn is_settable(element: AXUIElementRef, attr: &str) -> bool {
     let err = unsafe { AXUIElementIsAttributeSettable(element, name, &mut settable) };
     release(name);
     err == AX_OK && settable != 0
+}
+
+/// Whether `attr` can be copied (BUS-232 C). The value is released unread.
+pub fn is_readable(element: AXUIElementRef, attr: &str) -> bool {
+    copy_attr(element, attr).map(release).is_ok()
+}
+
+/// kAXValueCFRangeType.
+const AX_VALUE_CF_RANGE: u32 = 4;
+
+/// Whether `attr` reads as an AXValue holding a CFRange (BUS-232 C). Only
+/// the type is checked; the range itself is never read.
+pub fn reads_range(element: AXUIElementRef, attr: &str) -> bool {
+    let Ok(value) = copy_attr(element, attr) else {
+        return false;
+    };
+    let range = unsafe {
+        CFGetTypeID(value) == AXValueGetTypeID() && AXValueGetType(value) == AX_VALUE_CF_RANGE
+    };
+    release(value);
+    range
 }
 
 /// A CFBoolean attribute (BUS-232 diagnostics); None on error or other type.

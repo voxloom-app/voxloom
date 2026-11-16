@@ -3,11 +3,13 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::ax::*;
+use super::focus_refine::refine_below;
 use super::{host, registry, snapshot_probe, web_ax};
+use crate::delivery::decide::container_gate::{decide, Class, GateLine, Path};
 use crate::delivery::decide::element_token;
 use crate::delivery::decide::known_terminal::flag_terminal;
-use crate::delivery::decide::paste_role::{classify_target, EditFacts};
-use crate::delivery::decide::snapshot_diag;
+use crate::delivery::decide::paste_role::{EditFacts, WideFacts};
+use crate::delivery::decide::snapshot_diag::{self, AxName};
 use crate::delivery::types::TargetSnapshotDto;
 
 pub fn now_ms() -> i64 {
@@ -82,20 +84,84 @@ pub fn edit_facts(element: AXUIElementRef) -> EditFacts {
     }
 }
 
-pub fn build_snapshot(
+/// BUS-232 (C) evidence, read only for a container/unknown role in a gated
+/// app. Settable bits and readability only; no value is converted to text
+/// beyond `edit_facts`' existing AXValue read.
+fn wide_facts(element: AXUIElementRef) -> WideFacts {
+    WideFacts {
+        edit: edit_facts(element),
+        editable_ancestor: is_readable(element, "AXEditableAncestor"),
+        marker_settable: is_settable(element, "AXSelectedTextMarkerRange"),
+        range_readable: reads_range(element, "AXSelectedTextRange"),
+        insertion_line: is_readable(element, "AXInsertionPointLineNumber"),
+        marker_readable: is_readable(element, "AXSelectedTextMarkerRange"),
+        char_count: is_readable(element, "AXNumberOfCharacters"),
+    }
+}
+
+/// The element to act on, its snapshot, and the BUS-232 path for a
+/// container/unknown role (None otherwise). Takes ownership of `element`
+/// and returns an owned element: the focused one, or (B, gated apps only)
+/// its one focused text child, which is then registered and compared by
+/// CFEqual exactly like a directly focused field. Every caller that
+/// snapshots focus goes through here, so identity checks see the same
+/// refined element. Prints one `[bus232]` line per container/unknown-role
+/// decision.
+pub fn resolve_focus(
     element: AXUIElementRef,
     app_name: Option<String>,
     register: bool,
-) -> TargetSnapshotDto {
+) -> (AXUIElementRef, TargetSnapshotDto, Option<Path>) {
     let role = copy_string_attr(element, "AXRole").unwrap_or_else(|| "unknown".into());
     let pid = element_pid(element);
     let subrole = copy_string_attr(element, "AXSubrole");
-    let (kind, insertable, reason) = classify_target(
+    let mut refine_label = None;
+    let mut refine_ms = 0;
+    let decision = decide(
         &role,
         subrole.as_deref(),
+        || pid.and_then(host::bundle_id),
         || edit_facts(element),
+        || wide_facts(element),
         || ancestor_roles(element),
+        || {
+            let (found, ms) = refine_below(element, pid);
+            refine_label = Some(found.label());
+            refine_ms = ms;
+            found.target.map(|(node, _, _)| node.retained())
+        },
     );
+    let line = |path: Path, kind: &str| {
+        let mut line = GateLine::new(path, path != Path::Old, register, kind);
+        line.bundle = decision.bundle.as_deref().map(AxName::new);
+        line.pid = pid;
+        line.role = AxName::new(&role);
+        line.subrole = subrole.as_deref().map(AxName::new);
+        line.refine = refine_label.clone();
+        line.refine_ms = refine_ms;
+        eprintln!("{}", line.line());
+    };
+    if let Some(child) = decision.refined {
+        release(element as CFTypeRef);
+        let (child, snap, _) = resolve_focus(child, app_name, register);
+        line(Path::Refine, &snap.kind);
+        return (child, snap, Some(Path::Refine));
+    }
+    let snap = build_snapshot(element, app_name, register, &role, pid, decision.class);
+    if let Some(path) = decision.path {
+        line(path, &snap.kind);
+    }
+    (element, snap, decision.path)
+}
+
+fn build_snapshot(
+    element: AXUIElementRef,
+    app_name: Option<String>,
+    register: bool,
+    role: &str,
+    pid: Option<i32>,
+    (kind, insertable, reason): Class,
+) -> TargetSnapshotDto {
     let generation = if register {
         registry::register(element)
     } else {
@@ -105,8 +171,8 @@ pub fn build_snapshot(
         app_name,
         app_pid: pid,
         captured_at: now_ms(),
-        element_id: Some(element_token(pid, &role, generation)),
-        element_role: Some(role),
+        element_id: Some(element_token(pid, role, generation)),
+        element_role: Some(role.to_string()),
         insertable,
         kind: kind.into(),
         known_terminal: false,
@@ -149,8 +215,9 @@ pub fn snapshot_at(stage: &str, register: bool) -> TargetSnapshotDto {
 
 /// `register` marks the completion snapshot (once per delivery): only that
 /// one may print the BUS-232 `[snapshot]` diagnostic, after the terminal
-/// flags are known and before the element is released. Diagnostic only; the
-/// returned snapshot is the same either way.
+/// flags are known and before the element is released: on every Copy
+/// fallback (all apps), and for a gated app's paste-only (C) target.
+/// Diagnostic only; the returned snapshot is the same either way.
 fn snapshot_from_focus(
     focus: Result<(AXUIElementRef, Option<String>), String>,
     register: bool,
@@ -158,9 +225,14 @@ fn snapshot_from_focus(
 ) -> TargetSnapshotDto {
     match focus {
         Ok((element, app_name)) => {
-            let snap = flag(build_snapshot(element, app_name, register));
-            if register && snapshot_diag::should_log(&snap) {
-                snapshot_probe::log_snapshot(element, &snap);
+            let (element, snap, path) = resolve_focus(element, app_name, register);
+            let snap = flag(snap);
+            if register {
+                if snapshot_diag::should_log(&snap) {
+                    snapshot_probe::log_snapshot(element, &snap, "not-insertable");
+                } else if path == Some(Path::Paste) {
+                    snapshot_probe::log_snapshot(element, &snap, "paste-only");
+                }
             }
             release(element as CFTypeRef);
             snap

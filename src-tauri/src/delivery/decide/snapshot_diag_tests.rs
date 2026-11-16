@@ -60,6 +60,7 @@ fn never() -> bool {
 
 fn sample(children: ChildScan) -> SnapshotDiag {
     SnapshotDiag {
+        head: "not-insertable",
         bundle_id: Some(AxName::new("com.microsoft.Word")),
         pid: Some(4242),
         role: AxName::new("AXGroup"),
@@ -263,6 +264,12 @@ fn line_has_every_field_and_presence_is_never_a_value() {
     diag.presence[0].1 = AttrRead::Present;
     diag.ancestors = (0..10).map(|_| AxName::new("AXGroup")).collect();
     let line = diag.line();
+    assert!(
+        line.starts_with("[snapshot] not-insertable bundle="),
+        "{line}"
+    );
+    diag.head = "paste-only";
+    assert!(diag.line().starts_with("[snapshot] paste-only bundle="));
     for field in [
         "bundle=com.microsoft.Word",
         "pid=4242",

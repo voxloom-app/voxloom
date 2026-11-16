@@ -219,6 +219,8 @@ fn enqueue<N: ScanNode>(
 /// Everything the `[snapshot]` line may contain. No field takes free text.
 #[derive(Clone, Debug)]
 pub struct SnapshotDiag {
+    /// `not-insertable` (the Copy path) or `paste-only` (BUS-232 C).
+    pub head: &'static str,
     pub bundle_id: Option<AxName>,
     pub pid: Option<i32>,
     pub role: AxName,
@@ -318,9 +320,10 @@ impl SnapshotDiag {
             AppFocus::Unreadable => "unreadable",
         };
         format!(
-            "[snapshot] not-insertable bundle={} pid={} role={} subrole={} kind={} reason={:?} \
+            "[snapshot] {} bundle={} pid={} role={} subrole={} kind={} reason={:?} \
              settable=[{}] attrs=[{}] flags=[{}] in_web_content={} grid_ancestor={} \
              ancestors=[{}{}] app_focus={} children={} probe_ms={}",
+            self.head,
             opt_name(&self.bundle_id),
             self.pid.map_or_else(|| "-".to_string(), |p| p.to_string()),
             self.role.as_str(),

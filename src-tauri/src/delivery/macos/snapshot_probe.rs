@@ -94,8 +94,9 @@ fn app_focus(element: AXUIElementRef, pid: Option<i32>) -> AppFocus {
 }
 
 /// Probe the (still retained) completion-time element and print one
-/// `[snapshot]` line. The caller decides when (`snapshot_diag::should_log`).
-pub fn log_snapshot(element: AXUIElementRef, snap: &TargetSnapshotDto) {
+/// `[snapshot] <head>` line. The caller decides when
+/// (`snapshot_diag::should_log`, or a BUS-232 paste-only target).
+pub fn log_snapshot(element: AXUIElementRef, snap: &TargetSnapshotDto, head: &'static str) {
     let started = Instant::now();
     let pid = element_pid(element);
     let ancestors = ancestor_roles(element);
@@ -106,6 +107,7 @@ pub fn log_snapshot(element: AXUIElementRef, snap: &TargetSnapshotDto) {
         root_pid: pid,
     };
     let mut diag = SnapshotDiag {
+        head,
         bundle_id: pid.and_then(host::bundle_id).map(|b| AxName::new(&b)),
         pid,
         role: AxName::new(role),

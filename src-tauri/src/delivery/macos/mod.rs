@@ -11,6 +11,7 @@
 mod ax;
 mod ax_insert;
 mod focus;
+mod focus_refine;
 mod host;
 mod keylayout;
 mod paste;
@@ -24,7 +25,7 @@ mod web_ctx;
 use std::sync::Mutex;
 
 use ax::{copy_string_attr, release, AXIsProcessTrusted, CFTypeRef};
-use focus::{build_snapshot, edit_facts, focused_ui_element, snapshot_at};
+use focus::{edit_facts, focused_ui_element, resolve_focus, snapshot_at};
 
 use super::decide::diag::DeliveryDiag;
 use super::decide::fallback::{
@@ -56,7 +57,8 @@ pub fn validate_target(intended: TargetSnapshotDto) -> Result<TargetSnapshotDto,
 fn focus_still_matches(intended: &TargetSnapshotDto) -> Result<(), String> {
     let (element, app_name) =
         focused_ui_element("typing").map_err(|e| format!("typing aborted — {e}"))?;
-    let checked = validate_snapshots(intended, build_snapshot(element, app_name, false));
+    let (element, current, _) = resolve_focus(element, app_name, false);
+    let checked = validate_snapshots(intended, current);
     release(element as CFTypeRef);
     if checked.insertable && checked.kind == "insertable" {
         return Ok(());
@@ -123,7 +125,8 @@ pub fn insert_text(
     // Validate the same element handle we will mutate, not a prior focus read.
     let (element, app_name) =
         focused_ui_element("insert").map_err(|e| format!("insert aborted — {e}"))?;
-    let validated = validate_snapshots(intended, build_snapshot(element, app_name, false));
+    let (element, current, _) = resolve_focus(element, app_name, false);
+    let validated = validate_snapshots(intended, current);
     let before = ax::read_value(element);
     let terminal = validated.app_pid.and_then(host::apple_terminal_identity);
     let mut diag = DeliveryDiag {
