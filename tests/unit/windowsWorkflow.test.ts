@@ -30,6 +30,17 @@ const workflow = (parse(source) ?? {}) as Workflow;
 const native = workflow.jobs?.['windows-x64'];
 
 describe('Windows native build foundation', () => {
+  it('links the Common Controls v6 manifest into native test artifacts', () => {
+    const build = readFileSync(resolve(root, 'src-tauri/build.rs'), 'utf8');
+    expect(build).toContain('cargo:rustc-link-arg=/MANIFEST:EMBED');
+    expect(build).toContain('cargo:rustc-link-arg=/MANIFESTINPUT:');
+    expect(build).toContain('WindowsAttributes::new_without_app_manifest()');
+    expect(build).toContain('.app_manifest(tauri_build::AppManifest::new().commands(COMMANDS))');
+    const manifest = readFileSync(resolve(root, 'src-tauri/windows-app-manifest.xml'), 'utf8');
+    expect(manifest).toContain('name="Microsoft.Windows.Common-Controls"');
+    expect(manifest).toContain('version="6.0.0.0"');
+    expect(build).not.toContain('__TAURI_WORKSPACE__');
+  });
   it('retains tamper-before-spawn policy on Windows, not only its Unix script fixture', () => {
     const ownership = readFileSync(resolve(root, 'src-tauri/src/cleanup/ownership/tests.rs'), 'utf8').replace(/\r\n/g, '\n');
     expect(ownership).not.toContain('#[cfg(unix)]\n#[test]\nfn tampering_after_admission_is_rejected_before_worker_spawn');
