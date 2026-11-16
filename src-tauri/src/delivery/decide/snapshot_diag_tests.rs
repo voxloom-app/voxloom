@@ -115,7 +115,10 @@ fn values_and_titles_in_the_source_never_reach_the_line() {
     diag.subrole = Some(AxName::new(SECRET_TITLE));
     let line = diag.line();
     assert!(line.starts_with("[snapshot] not-insertable "), "{line}");
-    for secret in [
+    // The failure message names the fixture by index only, so a test
+    // failure never echoes fixture text into CI logs (CodeQL
+    // rust/cleartext-logging).
+    for (i, needle) in [
         SECRET_VALUE,
         SECRET_TITLE,
         SECRET_WORD,
@@ -123,8 +126,11 @@ fn values_and_titles_in_the_source_never_reach_the_line() {
         "4711",
         "CONFIDENTIAL",
         "Dear",
-    ] {
-        assert!(!line.contains(secret), "{secret} leaked: {line}");
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        assert!(!line.contains(needle), "fixture #{i} leaked into the line");
     }
     assert!(line.contains("d2 AXTextArea s1110 f1 x1"), "{line}");
     assert!(line.contains("<invalid>"), "{line}");
