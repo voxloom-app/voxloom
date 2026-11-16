@@ -1,6 +1,6 @@
 //! BUS-232 first cut: the B (focus refinement) and C (editable-caret ⌘V)
-//! paths for container and unknown/custom roles run ONLY for these five
-//! apps, matched by exact bundle id. Every other app takes the pre-BUS-232
+//! paths for container and unknown/custom roles run ONLY for five apps
+//! (Word, PowerPoint, Mail, Pages, Numbers), matched by exact bundle id. Every other app takes the pre-BUS-232
 //! decision unchanged (`path=old`), so the shared delivery path stays the
 //! one #182 was reviewed on. Widening to every app once `[snapshot]` and
 //! `[bus232]` evidence is in: BUS-234.
@@ -13,12 +13,15 @@ use super::snapshot_diag::{kind_label, AxName};
 
 /// Exact bundle ids (case-sensitive string equality, never a prefix: Excel,
 /// Keynote and other Office/iWork apps stay on the old path).
-pub const GATED_BUNDLES: [&str; 5] = [
+/// Pages and Numbers: current App Store ids plus the legacy iWork ids.
+pub const GATED_BUNDLES: [&str; 7] = [
     "com.microsoft.Word",
     "com.microsoft.Powerpoint",
     "com.apple.mail",
-    "com.apple.iWork.Numbers",
+    "com.apple.Pages",
+    "com.apple.Numbers",
     "com.apple.iWork.Pages",
+    "com.apple.iWork.Numbers",
 ];
 
 pub fn gated(bundle: Option<&str>) -> bool {

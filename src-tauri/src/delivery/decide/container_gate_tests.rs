@@ -1,5 +1,139 @@
 use super::*;
 
+/// `paste_role`'s classification exactly as at #184 head b422add
+/// (b422addb0971c42a635058c33cacaf687666009a), copied verbatim and frozen:
+/// non-gated apps must keep this decision. Only the imports are new
+/// (`EditFacts`, `classify_role` and `effective_role` are unchanged since
+/// b422add).
+#[allow(dead_code)]
+mod b422add_oracle {
+    use crate::delivery::decide::paste_role::EditFacts;
+    use crate::delivery::decide::target::{classify_role, effective_role};
+
+    /// Containers that hold a document's caret (Word/Pages body, WebKit
+    /// compose, web editors): paste-only with caret evidence.
+    const PASTE_ONLY_CONTAINERS: &[&str] = &["AXWebArea", "AXGroup", "AXScrollArea", "AXDocument"];
+
+    /// Spreadsheet grids and tables: a ⌘V into a selected cell (not in edit
+    /// mode) replaces it, so these stay Copy.
+    const GRID_ROLES: &[&str] = &[
+        "AXTable",
+        "AXGrid",
+        "AXCell",
+        "AXLayoutArea",
+        "AXLayoutItem",
+        "AXOutline",
+        "AXRow",
+        "AXColumn",
+        "AXList",
+        "AXBrowser",
+    ];
+
+    /// Standard roles never edited by pasting, whatever they report settable.
+    /// Any role not listed here, in `GRID_ROLES` or in `PASTE_ONLY_CONTAINERS`
+    /// is an unknown custom role.
+    const NEVER_PASTE_ROLES: &[&str] = &[
+        // Code review list (CR round 1).
+        "AXScrollBar",
+        "AXIncrementor",
+        "AXDisclosureTriangle",
+        "AXSplitter",
+        "AXColorWell",
+        "AXDateField",
+        "AXTimeField",
+        "AXValueIndicator",
+        "AXLevelIndicator",
+        "AXRadioGroup",
+        "AXTabGroup",
+        "AXMenuButton",
+        "AXLink",
+        "AXSlider",
+        "AXPopUpButton",
+        "AXCheckBox",
+        "AXButton",
+        "AXList",
+        "AXTable",
+        "AXOutline",
+        "AXRow",
+        "AXCell",
+        // Other standard non-text roles.
+        "AXStaticText",
+        "AXImage",
+        "AXToolbar",
+        "AXMenu",
+        "AXMenuBar",
+        "AXMenuBarItem",
+        "AXMenuItem",
+        "AXRadioButton",
+        "AXProgressIndicator",
+        "AXBusyIndicator",
+        "AXRelevanceIndicator",
+        "AXHandle",
+        "AXRuler",
+        "AXRulerMarker",
+        "AXGrowArea",
+        "AXMatte",
+        "AXHelpTag",
+        "AXDockItem",
+        "AXHeading",
+        "AXPopover",
+        "AXSplitGroup",
+        "AXSheet",
+        "AXDrawer",
+        "AXWindow",
+        "AXApplication",
+        "AXSystemWide",
+    ];
+
+    /// A grid/table selection without editable text focus. A cell editor in
+    /// edit mode is an allowlisted text role and stays an AX target, even inside
+    /// a grid; `may_paste` still refuses its ⌘V (`fallback::under_grid`).
+    pub fn is_grid_selection<S: AsRef<str>>(role: &str, ancestors: &[S]) -> bool {
+        if GRID_ROLES.contains(&role) {
+            return true;
+        }
+        classify_role(role).0 != "insertable"
+            && ancestors.iter().any(|r| GRID_ROLES.contains(&r.as_ref()))
+    }
+
+    pub const GRID_REASON: &str =
+        "spreadsheet grid or table selection (no cell in edit mode) — insert skipped";
+
+    /// `classify_role`, plus paste-only targets: one of `PASTE_ONLY_CONTAINERS`
+    /// with caret evidence, or an unknown custom role with caret evidence and a
+    /// text AXValue; never under a grid. `facts` and `ancestors` are only read
+    /// for such roles.
+    pub fn classify_target(
+        role: &str,
+        subrole: Option<&str>,
+        facts: impl FnOnce() -> EditFacts,
+        ancestors: impl FnOnce() -> Vec<String>,
+    ) -> (&'static str, bool, Option<&'static str>) {
+        let base = classify_role(effective_role(role, subrole));
+        // "unknown": the AXRole itself could not be read (`build_snapshot`).
+        if base.0 != "unsupported" || role == "unknown" {
+            return base;
+        }
+        if GRID_ROLES.contains(&role) {
+            return ("unsupported", false, Some(GRID_REASON));
+        }
+        if NEVER_PASTE_ROLES.contains(&role) {
+            return base;
+        }
+        let facts = facts();
+        if !facts.caret() {
+            return base;
+        }
+        if !PASTE_ONLY_CONTAINERS.contains(&role) && !facts.text_value {
+            return base;
+        }
+        if is_grid_selection(role, &ancestors()) {
+            return ("unsupported", false, Some(GRID_REASON));
+        }
+        ("insertable", true, None)
+    }
+}
+
 const CONTAINERS: [&str; 4] = ["AXWebArea", "AXGroup", "AXScrollArea", "AXDocument"];
 const CUSTOM: [&str; 3] = ["AXUnknown", "MSOfficeTextCanvas", "unknown"];
 
@@ -40,42 +174,52 @@ fn ancestor_sets() -> Vec<Vec<String>> {
     ]
 }
 
+/// Other apps, Keynote, lookalikes, case variants and whitespace.
+const NOT_GATED: [&str; 22] = [
+    "com.microsoft.Excel",
+    "com.microsoft.Outlook",
+    "com.microsoft.onenote.mac",
+    "com.apple.Keynote",
+    "com.apple.iWork.Keynote",
+    "com.apple.TextEdit",
+    "com.apple.Notes",
+    "com.brave.Browser",
+    "com.microsoft",
+    "com.microsoft.Word.extra",
+    "com.microsoft.word",
+    "com.microsoft.PowerPoint.extra",
+    "com.apple.pages",
+    "com.apple.numbers",
+    "com.apple.Mail",
+    "com.apple.iwork.pages",
+    "com.apple.iWork",
+    " com.apple.mail",
+    "com.apple.mail ",
+    "com.apple.Pages\n",
+    "com.apple.Numbers.helper",
+    "",
+];
+
 #[test]
-fn only_the_five_exact_bundle_ids_are_gated() {
+fn only_the_seven_exact_bundle_ids_are_gated() {
+    assert_eq!(GATED_BUNDLES.len(), 7);
     for id in GATED_BUNDLES {
         assert!(gated(Some(id)), "{id}");
     }
-    for id in [
-        "com.microsoft.Excel",
-        "com.apple.iWork.Keynote",
-        "com.microsoft.Outlook",
-        "com.microsoft.onenote.mac",
-        "com.microsoft",
-        "com.microsoft.Word.helper",
-        "com.microsoft.word",
-        "com.apple.iWork",
-        "com.apple.Mail",
-        "com.apple.TextEdit",
-        "com.apple.Notes",
-        "",
-    ] {
-        assert!(!gated(Some(id)), "{id}");
+    for id in NOT_GATED {
+        assert!(!gated(Some(id)), "{id:?}");
     }
     assert!(!gated(None));
 }
 
 #[test]
 fn non_gated_bundles_get_the_unchanged_decision_for_container_and_unknown_roles() {
-    for id in [
-        "com.microsoft.Excel",
-        "com.apple.iWork.Keynote",
-        "com.apple.TextEdit",
-        "com.brave.Browser",
-    ] {
+    for id in NOT_GATED {
         for role in CONTAINERS.iter().chain(CUSTOM.iter()) {
             for facts in all_edit_facts() {
                 for ancestors in ancestor_sets() {
-                    let before = classify_target(role, None, || facts, || ancestors.clone());
+                    let before =
+                        b422add_oracle::classify_target(role, None, || facts, || ancestors.clone());
                     let got = decide(
                         role,
                         None,
@@ -122,7 +266,7 @@ fn roles_outside_the_gate_never_look_up_the_bundle_and_classify_as_before() {
         "AXStaticText",
     ] {
         for facts in all_edit_facts() {
-            let before = classify_target(role, None, || facts, Vec::new);
+            let before = b422add_oracle::classify_target(role, None, || facts, Vec::new);
             let got = decide(
                 role,
                 None,

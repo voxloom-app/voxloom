@@ -107,7 +107,8 @@ pub fn frontmost_pid() -> Option<i32> {
     })
 }
 
-/// CFBundleIdentifier of the running app `pid`, for the delivery log only.
+/// CFBundleIdentifier of the running app `pid`: for the delivery logs and
+/// the BUS-232 bundle gate (`decide::container_gate`).
 pub fn bundle_id(pid: i32) -> Option<String> {
     use objc2::{class, msg_send, runtime::AnyObject};
     objc2::rc::autoreleasepool(|_| unsafe {

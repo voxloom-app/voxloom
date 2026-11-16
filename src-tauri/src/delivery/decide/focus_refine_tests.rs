@@ -216,3 +216,26 @@ fn the_label_never_carries_contents() {
         "{label}"
     );
 }
+
+#[test]
+fn an_incomplete_walk_never_chooses_even_one_candidate() {
+    // Truncated: the one candidate seen comes first, 70 more nodes follow.
+    let mut kids = vec![focused("AXTextArea")];
+    kids.extend((0..70).map(|_| node("AXStaticText", vec![])));
+    let found = refine(&node("AXGroup", kids), never);
+    assert_eq!((found.candidates, found.truncated), (1, true));
+    assert!(found.target.is_none());
+    assert!(found.label().starts_with("none candidates:1"));
+    // Out of time right after the one candidate.
+    let root = node(
+        "AXGroup",
+        vec![focused("AXTextArea"), node("AXGroup", vec![])],
+    );
+    let ticks = Cell::new(0);
+    let found = refine(&root, || {
+        ticks.set(ticks.get() + 1);
+        ticks.get() > 1
+    });
+    assert_eq!((found.candidates, found.out_of_time), (1, true));
+    assert!(found.target.is_none());
+}

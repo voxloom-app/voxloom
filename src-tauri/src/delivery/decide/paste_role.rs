@@ -214,7 +214,9 @@ pub struct WideFacts {
     pub edit: EditFacts,
     /// AXEditableAncestor present (WebKit/Chromium contenteditable).
     pub editable_ancestor: bool,
-    /// AXSelectedTextMarkerRange settable (WebKit text markers).
+    /// AXSelectedTextMarkerRange settable (WebKit text markers). Never an
+    /// editability signal on its own: WebKit reports it settable on every
+    /// element, read-only message viewers included (CR on #185).
     pub marker_settable: bool,
     /// AXSelectedTextRange reads as a CFRange.
     pub range_readable: bool,
@@ -227,13 +229,13 @@ pub struct WideFacts {
 }
 
 impl WideFacts {
-    /// The element accepts text edits.
+    /// The element accepts text edits. `marker_settable` counts only with
+    /// another (non-marker) signal, so on its own it never qualifies.
     pub fn editable(&self) -> bool {
         self.edit.selected_text
             || self.edit.selected_range
             || (self.edit.value && self.edit.text_value)
             || self.editable_ancestor
-            || self.marker_settable
     }
 
     /// A caret or selection is exposed. A read-only web area has one too,

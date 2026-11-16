@@ -25,7 +25,8 @@ pub trait RefineNode: Sized {
     fn focused(&self) -> bool;
 }
 
-/// Outcome of one walk. `target` is set only for exactly one candidate.
+/// Outcome of one walk. `target` is set only for exactly one candidate in a
+/// complete walk (not truncated, not out of time).
 #[derive(Debug)]
 pub struct Refinement<N> {
     /// The chosen child, its depth and its effective role.
@@ -88,7 +89,8 @@ pub fn refine<N: RefineNode>(root: &N, mut out_of_time: impl FnMut() -> bool) ->
             enqueue(&mut queue, &mut found, &node, depth + 1);
         }
     }
-    if found.candidates != 1 {
+    // An incomplete walk may have missed a second candidate: never choose.
+    if found.candidates != 1 || found.truncated || found.out_of_time {
         found.target = None;
     }
     found

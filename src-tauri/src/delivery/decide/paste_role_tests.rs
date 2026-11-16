@@ -193,7 +193,7 @@ fn wide(f: impl Fn(&mut WideFacts)) -> WideFacts {
 #[test]
 fn bus232_editability_and_caret_signals_are_both_required() {
     let none: fn() -> Vec<String> = Vec::new;
-    let editability: [fn(&mut WideFacts); 5] = [
+    let editability: [fn(&mut WideFacts); 4] = [
         |f| f.edit.selected_text = true,
         |f| f.edit.selected_range = true,
         |f| {
@@ -201,7 +201,6 @@ fn bus232_editability_and_caret_signals_are_both_required() {
             f.edit.text_value = true;
         },
         |f| f.editable_ancestor = true,
-        |f| f.marker_settable = true,
     ];
     let caret: [fn(&mut WideFacts); 4] = [
         |f| f.range_readable = true,
@@ -244,15 +243,48 @@ fn bus232_editability_and_caret_signals_are_both_required() {
 }
 
 #[test]
+fn bus232_a_settable_marker_range_alone_is_never_editability() {
+    // WebKit reports AXSelectedTextMarkerRange settable on every element: a
+    // read-only Mail message viewer (AXWebArea) must stay Copy (CR on #185).
+    let none: fn() -> Vec<String> = Vec::new;
+    let read_only_viewer = wide(|f| {
+        f.marker_settable = true;
+        f.marker_readable = true;
+        f.range_readable = true;
+        f.char_count = true;
+    });
+    assert!(!read_only_viewer.editable());
+    for role in [
+        "AXWebArea",
+        "AXGroup",
+        "AXScrollArea",
+        "AXDocument",
+        "MSOfficeTextCanvas",
+    ] {
+        let (kind, insertable, _) = classify_gated_target(role, None, || read_only_viewer, none);
+        assert_eq!((kind, insertable), ("unsupported", false), "{role}");
+    }
+    // Compose: the same markers plus AXEditableAncestor still paste.
+    let compose = WideFacts {
+        editable_ancestor: true,
+        ..read_only_viewer
+    };
+    assert_eq!(
+        classify_gated_target("AXWebArea", None, || compose, none),
+        ("insertable", true, None)
+    );
+}
+
+#[test]
 fn bus232_unknown_custom_roles_also_need_a_text_value_or_a_readable_range() {
     let none: fn() -> Vec<String> = Vec::new;
-    let marker = wide(|f| {
-        f.marker_settable = true;
+    let no_range = wide(|f| {
+        f.editable_ancestor = true;
         f.insertion_line = true;
     });
-    assert!(!classify_gated_target("MSOfficeTextCanvas", None, || marker, none).1);
+    assert!(!classify_gated_target("MSOfficeTextCanvas", None, || no_range, none).1);
     let ranged = wide(|f| {
-        f.marker_settable = true;
+        f.editable_ancestor = true;
         f.range_readable = true;
     });
     assert!(classify_gated_target("MSOfficeTextCanvas", None, || ranged, none).1);
