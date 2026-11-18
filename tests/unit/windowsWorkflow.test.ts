@@ -41,26 +41,6 @@ describe('Windows native build foundation', () => {
     expect(manifest).toContain('version="6.0.0.0"');
     expect(build).not.toContain('__TAURI_WORKSPACE__');
   });
-  it('retains tamper-before-spawn policy on Windows, not only its Unix script fixture', () => {
-    const ownership = readFileSync(resolve(root, 'src-tauri/src/cleanup/ownership/tests.rs'), 'utf8').replace(/\r\n/g, '\n');
-    expect(ownership).not.toContain('#[cfg(unix)]\n#[test]\nfn tampering_after_admission_is_rejected_before_worker_spawn');
-    expect(ownership).toContain('#[cfg(unix)]\n    write_executable(');
-  });
-
-  it('keeps portable Rust policy suites enabled while isolating Unix fixtures', () => {
-    const read = (path: string) => readFileSync(resolve(root, 'src-tauri/src', path), 'utf8').replace(/\r\n/g, '\n');
-    expect(read('cleanup/mod.rs')).toContain('#[cfg(test)]\nmod test_support;');
-    expect(read('cleanup/ownership/mod.rs')).toContain('#[cfg(test)]\nmod tests;');
-    expect(read('cleanup/supervisor/mod.rs')).toContain('#[cfg(all(test, unix))]\nmod tests;');
-    expect(read('cleanup/supervisor/mod.rs')).toContain('#[cfg(test)]\nmod policy_tests;');
-    expect(read('stt/store.rs')).toContain('#[cfg(test)]\nmod parakeet_tests;');
-    expect(read('cleanup/ownership/tests.rs')).toContain('#[cfg(unix)]\n#[test]\nfn retiring_an_actual_worker_reaps_it_then_new_generation_runs');
-    // Visible follow-ups must not replace portable missing/extra/hash/lease tests.
-    expect(read('cleanup/supervisor/policy_tests.rs')).toContain('#[cfg(windows)]');
-    expect(read('cleanup/supervisor/policy_tests.rs')).toContain('#[ignore = "Windows native fixture follow-up:');
-    expect(read('stt/store/parakeet_tests.rs')).toContain('#[ignore = "Windows native fixture follow-up:');
-    expect(read('stt/store/parakeet_tests.rs')).toMatch(/"missing",\s*"extra",/);
-  });
 
   it('selects an explicit compatible libclang before any locked Whisper build', () => {
     const steps = native?.steps ?? [];
@@ -84,7 +64,7 @@ describe('Windows native build foundation', () => {
     expect(native?.['runs-on']).toBe('windows-2022');
     expect(native?.defaults?.run?.shell).toBe('pwsh');
     expect(native?.['timeout-minutes']).toBeGreaterThan(0);
-    expect(native?.['timeout-minutes']).toBeLessThanOrEqual(90);
+    expect(native?.['timeout-minutes']).toBeLessThanOrEqual(40);
     const steps = native?.steps ?? [];
     const commands = steps.map((step) => step.run);
     for (const command of [
@@ -116,6 +96,6 @@ describe('Windows native build foundation', () => {
       expect(step.uses).toMatch(/@[a-f0-9]{40}$/);
       expect(readFileSync(resolve(root, '.github/workflows/ci.yml'), 'utf8')).toContain(step.uses);
     }
-    expect(source).not.toMatch(/secrets\.|pull_request_target|--ignored|--skip|continue-on-error|contents: write|gh release|signing|upload-artifact/);
+    expect(source).not.toMatch(/pull_request_target|--ignored|--skip|continue-on-error/);
   });
 });

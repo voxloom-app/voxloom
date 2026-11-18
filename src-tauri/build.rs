@@ -69,6 +69,9 @@ fn main() {
         // tauri-build's resource is linked into app binaries, not the lib's
         // unit-test executable. Both need Common Controls v6 for TaskDialogIndirect.
         // Use the same manifest for every artifact rather than disabling native tests.
+        // windows-app-manifest.xml is a copy of tauri-build 2.6.3's default
+        // manifest (src/windows-app-manifest.xml in that crate). Re-check it
+        // against the new default whenever tauri-build is bumped.
         let manifest = std::path::PathBuf::from(
             std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is required"),
         )
