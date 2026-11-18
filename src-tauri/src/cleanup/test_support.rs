@@ -1,12 +1,17 @@
 //! Test-only helpers shared by the cleanup worker tests (BUS-98).
 
 use std::fs;
+#[cfg(unix)]
 use std::io;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
 use std::process::Command;
 use std::sync::OnceLock;
+#[cfg(unix)]
 use std::thread;
+#[cfg(unix)]
 use std::time::{Duration, Instant};
 
 const ROOT_PREFIX: &str = "voxloom-test-";
@@ -18,6 +23,9 @@ pub fn test_root() -> &'static Path {
     static ROOT: OnceLock<PathBuf> = OnceLock::new();
     ROOT.get_or_init(|| {
         let temp = std::env::temp_dir();
+        // Windows has no Unix kill(0) probe. Never guess which other test
+        // processes are dead or remove their roots; keep this run isolated.
+        #[cfg(unix)]
         remove_dead_roots(&temp);
         let root = temp.join(format!("{ROOT_PREFIX}{}", std::process::id()));
         fs::create_dir_all(&root).unwrap();
@@ -25,6 +33,7 @@ pub fn test_root() -> &'static Path {
     })
 }
 
+#[cfg(unix)]
 fn remove_dead_roots(temp: &Path) {
     let Ok(entries) = fs::read_dir(temp) else {
         return;
@@ -43,6 +52,7 @@ fn remove_dead_roots(temp: &Path) {
 }
 
 /// Whether `pid` names a process (running or not yet reaped).
+#[cfg(unix)]
 pub fn process_exists(pid: libc::pid_t) -> bool {
     // SAFETY: signal 0 only checks the process; it does not signal it.
     let signalled = unsafe { libc::kill(pid, 0) } == 0;
@@ -50,6 +60,7 @@ pub fn process_exists(pid: libc::pid_t) -> bool {
 }
 
 /// Polls `condition` every 10 ms until it holds or `timeout` passes.
+#[cfg(unix)]
 pub fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> bool {
     let deadline = Instant::now() + timeout;
     loop {
@@ -63,6 +74,7 @@ pub fn wait_until(timeout: Duration, mut condition: impl FnMut() -> bool) -> boo
     }
 }
 
+#[cfg(unix)]
 const ENV_PYTHON: &str = "#!/usr/bin/env python3\n";
 
 /// Workers start with an empty environment (env_clear), so `/usr/bin/env`
@@ -70,6 +82,7 @@ const ENV_PYTHON: &str = "#!/usr/bin/env python3\n";
 /// On macOS that finds the /usr/bin/python3 Xcode shim, which is slow to
 /// start without HOME/TMPDIR and trips the short test timeouts. Pin the
 /// interpreter this test process would run instead.
+#[cfg(unix)]
 fn with_python_path(contents: &str) -> String {
     let Some(body) = contents.strip_prefix(ENV_PYTHON) else {
         return contents.to_owned();
@@ -77,6 +90,7 @@ fn with_python_path(contents: &str) -> String {
     format!("#!{}\n{body}", python3().display())
 }
 
+#[cfg(unix)]
 fn python3() -> &'static Path {
     static PYTHON: OnceLock<PathBuf> = OnceLock::new();
     PYTHON.get_or_init(|| {
@@ -95,6 +109,7 @@ fn python3() -> &'static Path {
 /// file that is open for writing fails with ETXTBSY. So the text goes to a
 /// side file that is never executed, a separate `cp` process writes the
 /// executable copy, and a rename puts it in place.
+#[cfg(unix)]
 pub fn write_executable(path: &Path, contents: &str) {
     let source = path.with_extension("source");
     let staged = path.with_extension("staged");

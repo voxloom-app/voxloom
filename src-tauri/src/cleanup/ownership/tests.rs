@@ -1,10 +1,13 @@
 use super::*;
-use crate::cleanup::test_support::{process_exists, test_root, wait_until, write_executable};
+use crate::cleanup::test_support::test_root;
+#[cfg(unix)]
+use crate::cleanup::test_support::{process_exists, wait_until, write_executable};
 use crate::cleanup::{
     artifact::ArtifactSpec,
     model_store::{CleanupModelStore, MODEL_ID},
 };
 use sha2::{Digest, Sha256};
+#[cfg(unix)]
 use std::time::Duration;
 use std::{fs, path::PathBuf, sync::Arc};
 
@@ -143,6 +146,9 @@ fn tampering_after_admission_is_rejected_before_worker_spawn() {
     let root = source.parent().unwrap();
     let marker = root.join("unexpected-spawn");
     let worker = root.join("worker.sh");
+    // The tamper policy is portable; only Unix can execute this marker script.
+    // Windows must still reject the damaged descriptor before worker readiness.
+    #[cfg(unix)]
     write_executable(
         &worker,
         &format!(
@@ -157,7 +163,9 @@ fn tampering_after_admission_is_rejected_before_worker_spawn() {
     let error = registry
         .start_run(owner, "tampered", MODEL_ID)
         .unwrap()
-        .run("synthetic prompt".into())
+        .run_with_attempt("synthetic prompt".into(), |_| {
+            panic!("tampered models cannot become an attempt")
+        })
         .unwrap_err();
     assert_eq!(error.code, "model-missing");
     assert!(error.attempt.is_none());
@@ -166,6 +174,7 @@ fn tampering_after_admission_is_rejected_before_worker_spawn() {
     assert!(store.install_fixture(&source, spec).is_ok());
 }
 
+#[cfg(unix)]
 #[test]
 fn retiring_an_actual_worker_reaps_it_then_new_generation_runs() {
     let (_, store, source, spec) = fixture("worker-retirement");
@@ -241,7 +250,7 @@ sys.stdout.buffer.flush()
 }
 
 #[test]
-fn attempt_identity_requires_verified_descriptor_and_successful_spawn() {
+fn preflight_failure_is_not_an_attempt() {
     let (_, store, source, spec) = fixture("attempt-evidence");
     let path = source.parent().unwrap().join("worker.sh");
     let registry = RequestRegistry::new(Arc::new(WorkerSupervisor::new(path.clone())));
@@ -259,6 +268,15 @@ fn attempt_identity_requires_verified_descriptor_and_successful_spawn() {
         assert_eq!(error.code, expected_code);
         assert!(error.attempt.is_none());
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn attempt_identity_requires_verified_descriptor_and_successful_spawn() {
+    let (_, store, source, spec) = fixture("attempt-spawn-evidence");
+    let path = source.parent().unwrap().join("worker.sh");
+    let registry = RequestRegistry::new(Arc::new(WorkerSupervisor::new(path.clone())));
+    let (owner, _) = registry.open_session();
     // Executable, but exec itself fails: still no attempt.
     write_executable(&path, "#!/missing/interpreter\n");
     acquire(&registry, &store, spec, owner, "spawn-failure");

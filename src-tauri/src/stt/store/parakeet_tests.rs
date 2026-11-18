@@ -182,7 +182,16 @@ fn parakeet_unverified_complete_set_is_usable_until_full_verification_detects_ha
 
 #[test]
 fn parakeet_incomplete_extra_or_symlinked_sets_are_damaged_not_silently_repaired() {
-    for damage in ["missing", "extra", "directory-symlink", "root-symlink"] {
+    // Missing/extra inventory policy runs everywhere. Only link creation
+    // depends on Unix; Windows reparse fixtures are tracked below.
+    for damage in [
+        "missing",
+        "extra",
+        #[cfg(unix)]
+        "directory-symlink",
+        #[cfg(unix)]
+        "root-symlink",
+    ] {
         let (store, dir) = temp_store("parakeet-structure");
         let (spec, bodies) = fixture(0);
         let installed = dir.join(spec.id);
@@ -202,12 +211,14 @@ fn parakeet_incomplete_extra_or_symlinked_sets_are_damaged_not_silently_repaired
                 )
                 .unwrap();
             }
+            #[cfg(unix)]
             "directory-symlink" => {
                 let original = installed.join("Encoder.mlmodelc");
                 let target = dir.join("encoder-external");
                 fs::rename(&original, &target).unwrap();
                 std::os::unix::fs::symlink(&target, &original).unwrap();
             }
+            #[cfg(unix)]
             "root-symlink" => {
                 let target = dir.join("external-set");
                 fs::rename(&installed, &target).unwrap();
@@ -469,7 +480,9 @@ fn parakeet_startup_removes_orphaned_staging_and_backups_but_nothing_else() {
         fs::create_dir_all(dir.join(orphan).join("Encoder.mlmodelc")).unwrap();
         fs::write(dir.join(orphan).join("Encoder.mlmodelc/weight.bin"), b"x").unwrap();
     }
+    #[cfg(unix)]
     let symlinked = format!(".{live}.previous-9-9");
+    #[cfg(unix)]
     std::os::unix::fs::symlink(&outside, dir.join(&symlinked)).unwrap();
     let kept = [
         live.to_owned(),
@@ -502,6 +515,7 @@ fn parakeet_startup_removes_orphaned_staging_and_backups_but_nothing_else() {
             "{orphan} remains"
         );
     }
+    #[cfg(unix)]
     assert!(fs::symlink_metadata(dir.join(&symlinked)).is_err());
     assert_eq!(fs::read(outside.join("keep")).unwrap(), b"symlink target");
     for name in &kept {
@@ -535,4 +549,11 @@ fn parakeet_models_are_listed_missing_without_network_and_cancel_is_idle_safe() 
         !dir.exists(),
         "listing and cancellation must not create directories"
     );
+}
+
+#[cfg(windows)]
+#[test]
+#[ignore = "Windows native fixture follow-up: reject directory/root symlinks and junctions; sweep only the orphan link, not its target"]
+fn windows_parakeet_reparse_point_fixtures() {
+    panic!("Requires Windows reparse-point fixtures without changing host privileges");
 }

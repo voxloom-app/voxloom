@@ -20,6 +20,9 @@ pub use prewarm::LowPowerMode;
 pub use reservation::WorkerReservation;
 
 #[cfg(test)]
+mod policy_tests;
+// These fixtures execute shebang scripts and inherit Unix model descriptors.
+#[cfg(all(test, unix))]
 mod tests;
 
 /// A backstop behind the renderer's budget (BUS-16 3c-2c, budget.rs).
