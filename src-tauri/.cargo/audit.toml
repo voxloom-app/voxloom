@@ -15,4 +15,10 @@ ignore = [
   "RUSTSEC-2025-0081",
   "RUSTSEC-2025-0098",
   "RUSTSEC-2025-0100",
+  # BUS-248: RUSTSEC-2026-0543
+  # (https://rustsec.org/advisories/RUSTSEC-2026-0543.html) is an INFO
+  # Unmaintained notice, not a vulnerability. chrono 0.4.45 is locked only
+  # as an unused optional dependency of serde_with (via tauri-utils); the
+  # app does not depend on it directly. Replace chrono later.
+  "RUSTSEC-2026-0543",
 ]

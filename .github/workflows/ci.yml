@@ -198,10 +198,15 @@ jobs:
           if [ "$(cargo audit --version 2>/dev/null)" != "cargo-audit-audit 0.22.2" ]; then
             cargo install cargo-audit --locked --version 0.22.2
           fi
-      - run: cargo audit -D warnings
+      - name: Audit src-tauri lock
+        run: cargo audit -D warnings
       # The cleanup worker's own lock (BUS-16 3c-2b). No ignore list: it
       # runs in src-tauri/worker, away from src-tauri/.cargo/audit.toml.
-      - run: cargo audit -D warnings
+      # if: !cancelled() keeps this running when the app lock fails, so
+      # worker advisories are not hidden by an earlier failure.
+      - name: Audit src-tauri/worker lock
+        if: ${{ !cancelled() }}
+        run: cargo audit -D warnings
         working-directory: src-tauri/worker
 
   rust-macos:
