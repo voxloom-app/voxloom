@@ -100,3 +100,66 @@ describe('platform Settings shortcut', () => {
     expect(onNavigate).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('platform Settings shortcut: modifiers and keys', () => {
+  function opensSettings(platform: string, options: KeyboardEventInit) {
+    vi.spyOn(navigator, 'platform', 'get').mockReturnValue(platform);
+    const onNavigate = vi.fn();
+    const { unmount } = renderHook(() => useAppKeys({ blocked: false, onHelp: vi.fn(), onNavigate }));
+    const event = press(options);
+    unmount();
+    // Handled means navigated and consumed; anything else must do neither.
+    expect(event.defaultPrevented).toBe(onNavigate.mock.calls.length === 1);
+    return onNavigate.mock.calls.length === 1;
+  }
+
+  it.each([
+    ['Cmd+Ctrl', { metaKey: true, ctrlKey: true }],
+    ['Cmd+Alt', { metaKey: true, altKey: true }],
+    ['Cmd+Shift', { metaKey: true, shiftKey: true }],
+    ['Cmd during IME composition', { metaKey: true, isComposing: true }],
+    ['Ctrl alone', { ctrlKey: true }],
+  ] as const)('does not open Settings on Mac with %s', (_, modifiers) => {
+    expect(opensSettings('MacIntel', modifiers)).toBe(false);
+  });
+
+  it('opens Settings on Mac with Cmd+, and on Linux with Ctrl+, but not Meta+,', () => {
+    expect(opensSettings('MacIntel', { metaKey: true })).toBe(true);
+    expect(opensSettings('Linux x86_64', { ctrlKey: true })).toBe(true);
+    expect(opensSettings('Linux x86_64', { metaKey: true })).toBe(false);
+  });
+
+  it.each(['MacIntel', 'Win32'])('ignores other keys with the primary modifier on %s', (platform) => {
+    const modifier = platform === 'MacIntel' ? { metaKey: true } : { ctrlKey: true };
+    expect(opensSettings(platform, { ...modifier, key: '.', code: 'Period' })).toBe(false);
+    expect(opensSettings(platform, { ...modifier, key: 'a', code: 'KeyA' })).toBe(false);
+  });
+
+  describe('physical comma key (code Comma)', () => {
+    it('opens Settings where the layout puts a non-Latin letter on the comma key', () => {
+      // Russian: the comma itself needs Shift, so Ctrl+, never reports key ",".
+      expect(opensSettings('Win32', { ctrlKey: true, key: 'б', code: 'Comma' })).toBe(true);
+      expect(opensSettings('MacIntel', { metaKey: true, key: 'б', code: 'Comma' })).toBe(true);
+    });
+
+    it.each([
+      ['Shift', { shiftKey: true }],
+      ['Alt/AltGr', { altKey: true }],
+      ['IME composition', { isComposing: true }],
+    ] as const)('still rejects %s', (_, extra) => {
+      expect(opensSettings('Win32', { ctrlKey: true, key: 'б', code: 'Comma', ...extra })).toBe(false);
+    });
+
+    it('does not consume the other platform modifier', () => {
+      expect(opensSettings('Win32', { metaKey: true, key: 'б', code: 'Comma' })).toBe(false);
+      expect(opensSettings('MacIntel', { ctrlKey: true, key: 'б', code: 'Comma' })).toBe(false);
+    });
+
+    it.each([
+      ['Dvorak, where the physical comma key is W', 'w'],
+      ['AZERTY, where the physical comma key is ;', ';'],
+    ])('leaves Latin layouts alone: %s', (_, key) => {
+      expect(opensSettings('Win32', { ctrlKey: true, key, code: 'Comma' })).toBe(false);
+    });
+  });
+});

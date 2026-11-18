@@ -23,7 +23,7 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
       }
       const mac = isMacPlatform();
       const settingsModifier = mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
-      if (settingsModifier && event.key === ',' && !event.altKey && !event.shiftKey && !event.isComposing) {
+      if (settingsModifier && isCommaKey(event) && !event.altKey && !event.shiftKey && !event.isComposing) {
         event.preventDefault();
         onNavigate('settings');
         return;
@@ -40,6 +40,17 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [blocked, onHelp, onNavigate]);
+}
+
+/**
+ * The comma key. Layouts whose comma needs Shift or AltGr (Russian) put a
+ * letter such as "б" on the physical comma key, so match that key by code when
+ * it types a non-ASCII character. ASCII layouts keep matching "," only: on
+ * Dvorak or AZERTY the physical comma key types another character, and
+ * Ctrl/Cmd plus that character is not ours to take.
+ */
+function isCommaKey(event: KeyboardEvent): boolean {
+  return event.key === ',' || (event.code === 'Comma' && event.key.length === 1 && event.key.charCodeAt(0) > 0x7f);
 }
 
 // Inputs that don't take typed text: ⌥-digit and ? still work while these are focused.
