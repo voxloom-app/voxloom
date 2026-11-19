@@ -482,7 +482,7 @@ fn field_outside_the_frontmost_app_keeps_ax_route_without_paste_authority() {
     let published = AtomicUsize::new(0);
     let snap = targets
         .snapshot(
-            "nonce".into(),
+            String::new(),
             || obs.clone(),
             |o| (o.snapshot.clone(), o.element),
             || {},
