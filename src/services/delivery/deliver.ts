@@ -39,12 +39,40 @@ async function readClipboardText(
  * Deliver transcript into the intended target, or Copy / Fail honestly.
  * Never inserts into a wrong / secure / changed app. Never synthesizes Enter.
  */
+/**
+ * Notify immediately before the actual insert, terminal paste, or Copy
+ * write, so the stop cap can tell a hung snapshot apart from a write.
+ */
+function withDeliveryStart(
+  platform: DeliverOptions['platform'],
+  onStart?: () => void,
+): DeliverOptions['platform'] {
+  if (!onStart) return platform;
+  return {
+    ...platform,
+    async clipboardWrite(text) {
+      onStart();
+      return platform.clipboardWrite(text);
+    },
+    insertText: ((...args: Parameters<DeliverOptions['platform']['insertText']>) => {
+      onStart();
+      return platform.insertText(...args);
+    }) as DeliverOptions['platform']['insertText'],
+    pasteText: platform.pasteText
+      ? ((...args: Parameters<NonNullable<DeliverOptions['platform']['pasteText']>>) => {
+        onStart();
+        return platform.pasteText!(...args);
+      }) as DeliverOptions['platform']['pasteText']
+      : platform.pasteText,
+  };
+}
+
 export async function deliverTranscript(
   options: DeliverOptions,
 ): Promise<DeliveryOutcome> {
   const text = options.text;
   const now = options.now ?? Date.now;
-  const platform = options.platform;
+  const platform = withDeliveryStart(options.platform, options.onDeliveryStart);
   const current = () => options.isCurrent?.() ?? true;
   const stale = () => failOutcome(text, 'session cancelled or superseded; delivery skipped');
 
@@ -80,17 +108,14 @@ export async function deliverTranscript(
 
   if (!current()) return stale();
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
-  const markWrite = () => options.onDeliveryStart?.();
 
   if (plan.action === 'paste') {
-    markWrite();
     return pasteInTerminal(options, plan.bound, current, stale);
   }
 
   if (plan.action === 'insert') {
     let report: InsertReport | void;
     try {
-      markWrite();
       report = await platform.insertText(text, plan.target);
     } catch (error: unknown) {
       const insertFail = error instanceof Error
@@ -107,7 +132,6 @@ export async function deliverTranscript(
       if (!options.clipboardFallback) {
         return failOutcome(text, `insert failed: ${insertFail}`);
       }
-      markWrite();
       return copyFallback(
         platform,
         text,
@@ -144,7 +168,6 @@ export async function deliverTranscript(
   }
 
   if (plan.action === 'copy') {
-    markWrite();
     return copyFallback(platform, text, plan.reason, plan.terminal);
   }
 
