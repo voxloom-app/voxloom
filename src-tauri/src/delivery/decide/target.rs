@@ -2,6 +2,15 @@
 
 use crate::delivery::types::TargetSnapshotDto;
 
+/// Reason texts the focus and validation code produces. `target_diag` maps
+/// these prefixes to log labels, so they live here once: change one and its
+/// label contract test fails.
+pub const REASON_FOCUS_UNAVAILABLE: &str = "Accessibility focus unavailable";
+pub const REASON_PERMISSION_DENIED: &str = "Accessibility permission denied";
+pub const REASON_IDENTITY_UNAVAILABLE: &str = "target identity unavailable — insert skipped";
+pub const REASON_DIFFERENT_APP: &str = "target changed (different app)";
+pub const REASON_DIFFERENT_FIELD: &str = "target changed (different field)";
+
 /// Classify an AX role (after secure-subrole folding) into kind/insertable/reason.
 pub fn classify_role(role: &str) -> (&'static str, bool, Option<&'static str>) {
     match role {
@@ -57,7 +66,7 @@ pub fn validate_snapshots(
     let unidentified = |current: TargetSnapshotDto| TargetSnapshotDto {
         insertable: false,
         kind: "unavailable".into(),
-        reason: Some("target identity unavailable — insert skipped".into()),
+        reason: Some(REASON_IDENTITY_UNAVAILABLE.into()),
         ..current
     };
     match (intended.app_pid, current.app_pid) {
@@ -65,7 +74,7 @@ pub fn validate_snapshots(
             return TargetSnapshotDto {
                 insertable: false,
                 kind: "changed".into(),
-                reason: Some("target changed (different app)".into()),
+                reason: Some(REASON_DIFFERENT_APP.into()),
                 ..current
             };
         }
@@ -76,7 +85,7 @@ pub fn validate_snapshots(
         (Some(want), Some(have)) if want != have => TargetSnapshotDto {
             insertable: false,
             kind: "changed".into(),
-            reason: Some("target changed (different field)".into()),
+            reason: Some(REASON_DIFFERENT_FIELD.into()),
             ..current
         },
         (Some(_), Some(_)) => current,

@@ -7,33 +7,38 @@
 //! Policy only. A snapshot that is already insertable is never re-read. The
 //! re-read stops after `SETTLE_READS` reads (~300 ms in `SETTLE_STEP_MS`
 //! steps), at the time budget, or as soon as the frontmost app or the
-//! focused process is no longer `pid`. `validate_snapshots` is untouched:
-//! this only decides which completion snapshot becomes the intended target.
+//! focused process is no longer `pid`. No read or sleep starts unless it is
+//! expected to end within `SETTLE_BUDGET_MS` of the first read's start (a
+//! read is expected to cost as much as the slowest so far), so the whole
+//! settle stays within the budget: Copy is about 0.35 s later on container
+//! focus, worst case about 0.7 s (one read far slower than the ones before
+//! it, as a gated container's child walk, capped at 250 ms, can be).
+//! `validate_snapshots` is untouched: this only decides which completion
+//! snapshot becomes the intended target.
 
-use super::paste_role::GRID_REASON;
+use super::paste_role::{container_or_custom, GRID_REASON};
 use super::snapshot_diag::{kind_label, AxName};
 use super::web_ax::{wait_for_focus_within, Read};
+use std::cell::Cell;
 
 /// The first read plus up to six re-reads.
 pub const SETTLE_READS: usize = 7;
 pub const SETTLE_STEP_MS: u64 = 50;
-/// Re-reads of a gated container can each walk children (≤250 ms): stop
-/// starting new reads once this much time has passed.
+/// Re-reads of a gated container can each walk children (≤250 ms): nothing
+/// starts that is not expected to finish within this much time.
 pub const SETTLE_BUDGET_MS: u128 = 350;
 
-/// Coarse, non-insertable roles a not-yet-ready window or document exposes.
-/// Controls, grids and secure fields are real answers and not listed.
-const COARSE_ROLES: &[&str] = &[
-    "AXApplication",
-    "AXWindow",
-    "AXSplitGroup",
-    "AXGroup",
-    "AXScrollArea",
-    "AXWebArea",
-    "AXDocument",
-    "AXTabGroup",
-    "unknown",
-];
+/// Window-level roles `paste_role` never pastes into (so they are outside
+/// `container_or_custom`) but which are all a not-yet-ready app exposes.
+const COARSE_WINDOW_ROLES: &[&str] = &["AXApplication", "AXWindow", "AXSplitGroup", "AXTabGroup"];
+
+/// A coarse, non-insertable role a not-yet-ready window or document exposes:
+/// a container or an unknown/custom role (`container_or_custom`: not a grid,
+/// control or secure role, an unreadable "unknown" role included) or a
+/// window-level role. Controls, grids and secure fields are real answers.
+pub fn coarse_role(role: &str) -> bool {
+    container_or_custom(role, None) || COARSE_WINDOW_ROLES.contains(&role)
+}
 
 /// Whether a completion snapshot may improve on a re-read.
 pub fn needs_settle(
@@ -47,11 +52,27 @@ pub fn needs_settle(
     }
     match kind {
         "unavailable" => true,
-        "unsupported" => {
-            reason != Some(GRID_REASON) && role.is_some_and(|r| COARSE_ROLES.contains(&r))
-        }
+        "unsupported" => reason != Some(GRID_REASON) && role.is_some_and(coarse_role),
         _ => false,
     }
+}
+
+/// The pid to re-read focus for, or None when the first snapshot is used as
+/// it is: it needs no settling (nothing else is even asked: no process
+/// probe for an insertable snapshot), no app is in front, the app is a
+/// terminal or paste-route app, or a Chromium/Electron host (their own
+/// bounded wait, `web_ax`).
+pub fn settle_target(
+    wanted: bool,
+    front: Option<i32>,
+    known_terminal: impl FnOnce() -> bool,
+    web_host: impl FnOnce(i32) -> bool,
+) -> Option<i32> {
+    if !wanted {
+        return None;
+    }
+    let pid = front.filter(|pid| *pid > 0)?;
+    (!known_terminal() && !web_host(pid)).then_some(pid)
 }
 
 /// One focus read, resolved to a snapshot's facts. `value` is whatever the
@@ -110,16 +131,19 @@ pub enum Outcome {
     Found,
     /// Still unsettled after `SETTLE_READS` reads.
     Exhausted,
-    /// Stopped early: front-changed, pid-changed or budget.
+    /// Stopped early: front-changed, pid-changed or budget. The snapshot
+    /// kept is the last one from `pid`.
     Aborted(&'static str),
 }
 
 pub struct Settled<T> {
     /// The snapshot to use: the last one from the same pid.
     pub value: T,
-    /// Reads made, an aborted one included.
+    /// Reads made; a budget abort stops before reading.
     pub reads: usize,
     pub outcome: Outcome,
+    /// Time from the first read's start to the end of the settle.
+    pub ms: u128,
     first: Label,
     last: Label,
 }
@@ -135,37 +159,50 @@ impl<T> Settled<T> {
         };
         format!(
             "[focus] settle bundle={} pid={pid} reads={}/{SETTLE_READS} first={} final={} \
-             outcome={outcome}",
+             outcome={outcome} settle_ms={}",
             bundle.as_ref().map_or("-", AxName::as_str),
             self.reads,
             self.first.text(),
             self.last.text(),
+            self.ms,
         )
     }
 }
 
 /// Observe focus until its snapshot needs no more settling, or a bound hits.
 /// `observe` makes one read (the first may already be in hand), `wait` sleeps
-/// a step, `elapsed_ms` is the time since the first read, and `discard`
+/// a step, `elapsed_ms` is the time since the first read began, and `discard`
 /// receives every superseded `value` so the caller can release it.
 pub fn settle<T>(
     pid: i32,
     mut observe: impl FnMut() -> Observation<T>,
     mut wait: impl FnMut(u64),
-    mut elapsed_ms: impl FnMut() -> u128,
+    elapsed_ms: impl Fn() -> u128,
     mut discard: impl FnMut(T),
 ) -> Settled<T> {
     let mut kept: Option<T> = None;
     let mut labels: Option<(Label, Label)> = None;
     let mut untouched = false;
     let mut reads = 0;
+    // What one read is expected to cost: the slowest so far.
+    let expected_ms = Cell::new(0u128);
+    let out_of_budget = Cell::new(false);
     let result = wait_for_focus_within(
         SETTLE_READS,
         || {
-            if reads > 0 && elapsed_ms() >= SETTLE_BUDGET_MS {
+            let began = elapsed_ms();
+            if reads > 0 && (out_of_budget.get() || began + expected_ms.get() > SETTLE_BUDGET_MS) {
                 return Read::Abort(Some("budget"));
             }
             let seen = observe();
+            // The first read began before the clock did: its cost is what
+            // the clock already shows.
+            let cost = if reads == 0 {
+                began
+            } else {
+                elapsed_ms().saturating_sub(began)
+            };
+            expected_ms.set(expected_ms.get().max(cost));
             reads += 1;
             if reads == 1 {
                 let label = seen.label();
@@ -203,7 +240,14 @@ pub fn settle<T>(
                 Read::Found(())
             }
         },
-        || wait(SETTLE_STEP_MS),
+        || {
+            // No sleep that would leave no room for the next read.
+            if elapsed_ms() + expected_ms.get() + u128::from(SETTLE_STEP_MS) > SETTLE_BUDGET_MS {
+                out_of_budget.set(true);
+            } else {
+                wait(SETTLE_STEP_MS);
+            }
+        },
     );
     let outcome = match result {
         Ok(()) if untouched => Outcome::Untouched,
@@ -216,6 +260,7 @@ pub fn settle<T>(
         value: kept.expect("the first read always runs"),
         reads,
         outcome,
+        ms: elapsed_ms(),
         first,
         last,
     }

@@ -6,6 +6,10 @@
 //! fixed labels, never copied, and codes are parsed as integers.
 
 use super::snapshot_diag::{kind_label, AxName};
+use super::target::{
+    REASON_DIFFERENT_APP, REASON_DIFFERENT_FIELD, REASON_FOCUS_UNAVAILABLE,
+    REASON_IDENTITY_UNAVAILABLE, REASON_PERMISSION_DENIED,
+};
 use crate::delivery::types::TargetSnapshotDto;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,17 +18,21 @@ pub enum Stage {
     Validation,
 }
 
-/// Voxloom's own reason texts as fixed labels; anything else is "other".
-fn reason_label(reason: Option<&str>) -> &'static str {
-    const KNOWN: [(&str, &str); 5] = [
-        ("Accessibility focus unavailable", "focus-unavailable"),
-        ("Accessibility permission denied", "no-permission"),
-        ("target identity unavailable", "identity-unavailable"),
-        ("target changed (different app)", "different-app"),
-        ("target changed (different field)", "different-field"),
-    ];
+/// Voxloom's own copy-cause reasons (`target::REASON_*`, matched by prefix)
+/// and their log labels. Not `snapshot_diag::reason_label`, which labels
+/// classification reasons.
+pub(super) const COPY_CAUSES: [(&str, &str); 5] = [
+    (REASON_FOCUS_UNAVAILABLE, "focus-unavailable"),
+    (REASON_PERMISSION_DENIED, "no-permission"),
+    (REASON_IDENTITY_UNAVAILABLE, "identity-unavailable"),
+    (REASON_DIFFERENT_APP, "different-app"),
+    (REASON_DIFFERENT_FIELD, "different-field"),
+];
+
+/// A copy-cause reason as its fixed label; anything else is "other".
+pub(super) fn copy_cause_label(reason: Option<&str>) -> &'static str {
     reason
-        .and_then(|r| KNOWN.iter().find(|(prefix, _)| r.starts_with(prefix)))
+        .and_then(|r| COPY_CAUSES.iter().find(|(prefix, _)| r.starts_with(prefix)))
         .map_or("other", |(_, label)| label)
 }
 
@@ -95,7 +103,7 @@ pub fn line(
     Some(format!(
         "[snapshot] {} at={at} reason={}{codes} pid={} role={} bundle={}{tail}",
         kind_label(&current.kind),
-        reason_label(reason),
+        copy_cause_label(reason),
         pid(current.app_pid),
         role(current),
         bundle.as_ref().map_or("-", AxName::as_str),

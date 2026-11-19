@@ -7,10 +7,13 @@ use super::focus_refine::refine_below;
 use super::{host, registry, snapshot_probe, web_ax};
 use crate::delivery::decide::container_gate::{decide, Class, GateLine, Path};
 use crate::delivery::decide::element_token;
-use crate::delivery::decide::focus_settle::{needs_settle, settle, Observation, Outcome};
+use crate::delivery::decide::focus_settle::{
+    needs_settle, settle, settle_target, Observation, Outcome,
+};
 use crate::delivery::decide::known_terminal::flag_terminal;
 use crate::delivery::decide::paste_role::{EditFacts, WideFacts};
 use crate::delivery::decide::snapshot_diag::{self, AxName};
+use crate::delivery::decide::target::{REASON_FOCUS_UNAVAILABLE, REASON_PERMISSION_DENIED};
 use crate::delivery::decide::target_diag::{self, Stage};
 use crate::delivery::types::TargetSnapshotDto;
 
@@ -29,7 +32,7 @@ pub fn focus_unavailable_reason(
 ) -> String {
     let null_suffix = if null { " (null)" } else { "" };
     format!(
-        "Accessibility focus unavailable at {stage} (AX trusted=yes; \
+        "{REASON_FOCUS_UNAVAILABLE} at {stage} (AX trusted=yes; \
          AXFocusedApplication={app_err}; AXFocusedUIElement={focus_err}{null_suffix})"
     )
 }
@@ -49,7 +52,7 @@ pub(super) fn focused_ui_element_once(
     let system = system_wide();
     if system.is_null() {
         return Err(format!(
-            "Accessibility focus unavailable at {stage} (AX trusted=yes; system element null)"
+            "{REASON_FOCUS_UNAVAILABLE} at {stage} (AX trusted=yes; system element null)"
         ));
     }
     let app = copy_attr(system, "AXFocusedApplication");
@@ -114,6 +117,23 @@ pub fn resolve_focus(
     app_name: Option<String>,
     register: bool,
 ) -> (AXUIElementRef, TargetSnapshotDto, Option<Path>) {
+    let mut lines = Vec::new();
+    let resolved = resolve_focus_quiet(element, app_name, register, &mut lines);
+    for line in lines {
+        eprintln!("{line}");
+    }
+    resolved
+}
+
+/// `resolve_focus` without printing: the `[bus232]` lines go to `lines`, so
+/// a completion that re-reads focus (`settle_completion`) prints the lines
+/// of the one snapshot it keeps, not one per read.
+fn resolve_focus_quiet(
+    element: AXUIElementRef,
+    app_name: Option<String>,
+    register: bool,
+    lines: &mut Vec<String>,
+) -> (AXUIElementRef, TargetSnapshotDto, Option<Path>) {
     let role = copy_string_attr(element, "AXRole").unwrap_or_else(|| "unknown".into());
     let pid = element_pid(element);
     let subrole = copy_string_attr(element, "AXSubrole");
@@ -133,7 +153,7 @@ pub fn resolve_focus(
             found.target.map(|(node, _, _)| node.retained())
         },
     );
-    let line = |path: Path, kind: &str| {
+    let line = |lines: &mut Vec<String>, path: Path, kind: &str| {
         let mut line = GateLine::new(path, path != Path::Old, register, kind);
         line.bundle = decision.bundle.as_deref().map(AxName::new);
         line.pid = pid;
@@ -141,17 +161,17 @@ pub fn resolve_focus(
         line.subrole = subrole.as_deref().map(AxName::new);
         line.refine = refine_label.clone();
         line.refine_ms = refine_ms;
-        eprintln!("{}", line.line());
+        lines.push(line.line());
     };
     if let Some(child) = decision.refined {
         release(element as CFTypeRef);
-        let (child, snap, _) = resolve_focus(child, app_name, register);
-        line(Path::Refine, &snap.kind);
+        let (child, snap, _) = resolve_focus_quiet(child, app_name, register, lines);
+        line(lines, Path::Refine, &snap.kind);
         return (child, snap, Some(Path::Refine));
     }
     let snap = build_snapshot(element, app_name, register, &role, pid, decision.class);
     if let Some(path) = decision.path {
-        line(path, &snap.kind);
+        line(lines, path, &snap.kind);
     }
     (element, snap, decision.path)
 }
@@ -185,24 +205,36 @@ fn build_snapshot(
     if unsafe { AXIsProcessTrusted() } == 0 {
         snap.insertable = false;
         snap.kind = "unavailable".into();
-        snap.reason = Some("Accessibility permission denied — insert skipped".into());
+        snap.reason = Some(format!("{REASON_PERMISSION_DENIED} — insert skipped"));
     }
     snap
 }
 
 /// A focus read resolved to its element (None when focus was unavailable),
-/// snapshot and BUS-232 path.
-type Resolved = (Option<AXUIElementRef>, TargetSnapshotDto, Option<Path>);
+/// snapshot, BUS-232 path and the `[bus232]` lines it would print.
+type Resolved = (
+    Option<AXUIElementRef>,
+    TargetSnapshotDto,
+    Option<Path>,
+    Vec<String>,
+);
 
 type Focus = Result<(AXUIElementRef, Option<String>), String>;
 
 fn resolve_read(focus: Focus, register: bool) -> Resolved {
     match focus {
         Ok((element, app_name)) => {
-            let (element, snap, path) = resolve_focus(element, app_name, register);
-            (Some(element), snap, path)
+            let mut lines = Vec::new();
+            let (element, snap, path) =
+                resolve_focus_quiet(element, app_name, register, &mut lines);
+            (Some(element), snap, path, lines)
         }
-        Err(msg) => (None, TargetSnapshotDto::unavailable(&msg, now_ms()), None),
+        Err(msg) => (
+            None,
+            TargetSnapshotDto::unavailable(&msg, now_ms()),
+            None,
+            Vec::new(),
+        ),
     }
 }
 
@@ -217,8 +249,13 @@ fn release_resolved((element, ..): Resolved) {
 /// Re-read (bounded, same pid, `decide::focus_settle`) until the snapshot is
 /// usable. Insertable snapshots, terminals and paste-route apps, and
 /// Chromium/Electron hosts (their own wait, `web_ax::settle_focus`) are
-/// returned as read. Re-reads register and describe like the first read.
+/// returned as read. Re-reads register like the first read; only the kept
+/// snapshot's `[bus232]` lines are printed (`snapshot_from_resolved`), so a
+/// completion logs one decision, not one per read.
 fn settle_completion(stage: &str, front: Option<i32>, first: Focus) -> Resolved {
+    // The clock covers the first read too: its cost sets the expectation
+    // for the re-reads (`focus_settle::settle`).
+    let started = std::time::Instant::now();
     let first = resolve_read(first, true);
     let snap = &first.1;
     let wanted = needs_settle(
@@ -227,17 +264,14 @@ fn settle_completion(stage: &str, front: Option<i32>, first: Focus) -> Resolved 
         snap.element_role.as_deref(),
         snap.reason.as_deref(),
     );
-    let pid = match front {
-        Some(pid)
-            if wanted
-                && !host::terminal_flags(front).known
-                && host::web_ax_activation(pid).is_none() =>
-        {
-            pid
-        }
-        _ => return first,
+    let Some(pid) = settle_target(
+        wanted,
+        front,
+        || host::terminal_flags(front).known,
+        |pid| host::web_ax_activation(pid).is_some(),
+    ) else {
+        return first;
     };
-    let started = std::time::Instant::now();
     let mut pending = Some(first);
     let settled = settle(
         pid,
@@ -274,7 +308,7 @@ pub fn snapshot_at(stage: &str, register: bool) -> TargetSnapshotDto {
     let flag = |snap| flag_terminal(snap, host::frontmost_pid, host::terminal_flags);
     if unsafe { AXIsProcessTrusted() } == 0 {
         return flag(TargetSnapshotDto::unavailable(
-            &format!("Accessibility permission denied at {stage} — insert skipped"),
+            &format!("{REASON_PERMISSION_DENIED} at {stage} — insert skipped"),
             now_ms(),
         ));
     }
@@ -304,7 +338,10 @@ fn snapshot_from_resolved(
     register: bool,
     flag: impl FnOnce(TargetSnapshotDto) -> TargetSnapshotDto,
 ) -> TargetSnapshotDto {
-    let (element, snap, path) = resolved;
+    let (element, snap, path, lines) = resolved;
+    for line in lines {
+        eprintln!("{line}");
+    }
     let snap = flag(snap);
     if register {
         match element {
