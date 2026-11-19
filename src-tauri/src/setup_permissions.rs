@@ -5,6 +5,8 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 mod readiness;
+#[cfg(any(test, target_os = "windows"))]
+mod windows_policy;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -21,9 +23,16 @@ pub enum PermissionState {
     Denied,
     Restricted,
     NotGranted,
-    /// Only the non-Mac adapter reports this.
-    #[cfg(not(target_os = "macos"))]
+    /// Only platforms with no setup adapter (not macOS, not Windows) report this.
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     Unsupported,
+    /// Windows has no such grant to ask for (Accessibility).
+    #[cfg(any(test, target_os = "windows"))]
+    NotRequired,
+    /// Windows cannot tell without a real capture (Microphone), so it is not
+    /// reported as granted.
+    #[cfg(any(test, target_os = "windows"))]
+    Unverified,
 }
 
 #[derive(Debug, Serialize)]
@@ -157,7 +166,11 @@ impl PermissionBackend for System {
                 }
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            windows_policy::query(kind)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             let _ = kind;
             PermissionState::Unsupported
@@ -185,7 +198,11 @@ impl PermissionBackend for System {
                 request_accessibility(&AX_PROMPTED, prompt_accessibility, || open_settings(kind))
             }
         }
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "windows")]
+        {
+            windows_policy::request(kind).map_err(str::to_owned)
+        }
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
         {
             let _ = kind;
             Err("Guided setup permissions require macOS".into())
@@ -205,7 +222,11 @@ fn open_settings(kind: PermissionKind) -> Result<(), String> {
             Err("Could not open System Settings. Open Privacy & Security manually.".into())
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        windows_policy::open_settings(kind).map_err(str::to_owned)
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = kind;
         Err("System Settings requires macOS".into())
@@ -378,5 +399,81 @@ mod tests {
             PermissionState::Authorized
         );
         assert!(trusted.0.borrow().is_empty());
+    }
+    #[test]
+    fn original_states_and_payload_keep_their_wire_names() {
+        // BUS-251: macOS answers must serialize exactly as before the Windows states existed.
+        let wire = |state| serde_json::to_value(state).unwrap();
+        assert_eq!(wire(PermissionState::Authorized), "authorized");
+        assert_eq!(wire(PermissionState::NotDetermined), "not-determined");
+        assert_eq!(wire(PermissionState::Denied), "denied");
+        assert_eq!(wire(PermissionState::Restricted), "restricted");
+        assert_eq!(wire(PermissionState::NotGranted), "not-granted");
+        let payload = serde_json::to_value(query_all(&Fake(RefCell::new(vec![])))).unwrap();
+        assert_eq!(
+            payload,
+            serde_json::json!({ "microphone": "denied", "accessibility": "not-granted" })
+        );
+    }
+    #[test]
+    fn windows_states_have_their_own_wire_names() {
+        let wire = |state| serde_json::to_value(state).unwrap();
+        assert_eq!(wire(PermissionState::NotRequired), "not-required");
+        assert_eq!(wire(PermissionState::Unverified), "unverified");
+    }
+    struct WindowsPolicy(RefCell<Vec<PermissionKind>>);
+    impl PermissionBackend for WindowsPolicy {
+        fn query(&self, kind: PermissionKind) -> PermissionState {
+            windows_policy::query(kind)
+        }
+        fn request(&self, kind: PermissionKind) -> Result<(), String> {
+            self.0.borrow_mut().push(kind);
+            windows_policy::request(kind).map_err(str::to_owned)
+        }
+    }
+    #[test]
+    fn windows_setup_reports_both_permissions_and_never_authorized() {
+        let backend = WindowsPolicy(RefCell::new(vec![]));
+        let states = query_all(&backend);
+        assert_eq!(states.microphone, PermissionState::Unverified);
+        assert_eq!(states.accessibility, PermissionState::NotRequired);
+        assert!(backend.0.borrow().is_empty(), "query must never request");
+    }
+    #[test]
+    fn windows_requests_settle_without_granting_anything() {
+        let backend = WindowsPolicy(RefCell::new(vec![]));
+        assert_eq!(
+            request_one(&backend, PermissionKind::Accessibility),
+            Ok(PermissionState::NotRequired)
+        );
+        let microphone = request_one(&backend, PermissionKind::Microphone).unwrap_err();
+        assert!(microphone.contains("Windows Settings > Privacy & security > Microphone"));
+    }
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn windows_system_backend_uses_the_windows_policy() {
+        for kind in [PermissionKind::Microphone, PermissionKind::Accessibility] {
+            assert_eq!(System.query(kind), windows_policy::query(kind));
+            assert_eq!(
+                System.request(kind),
+                windows_policy::request(kind).map_err(str::to_owned)
+            );
+            assert_eq!(
+                open_settings(kind),
+                windows_policy::open_settings(kind).map_err(str::to_owned)
+            );
+        }
+    }
+    // macOS pin: the real backend only ever answers with the original states,
+    // so neither Windows state can reach a Mac (query never prompts).
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_backend_only_reports_the_original_states() {
+        for kind in [PermissionKind::Microphone, PermissionKind::Accessibility] {
+            assert!(!matches!(
+                System.query(kind),
+                PermissionState::NotRequired | PermissionState::Unverified
+            ));
+        }
     }
 }

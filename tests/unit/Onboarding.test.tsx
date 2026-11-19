@@ -246,4 +246,35 @@ describe('B guided setup', () => {
     expect(screen.getByRole('heading', { name: /Your shortcut/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Change shortcut' })).toHaveFocus();
   });
+  describe('BUS-251: Windows permission step', () => {
+    const atPermissions = { read: () => JSON.stringify({ version: 1, step: 1 }), write: vi.fn() };
+    it('shows Windows wording, offers no unverifiable buttons and lets setup continue', async () => {
+      const io = setupBoundary();
+      vi.mocked(io.query).mockResolvedValue({ microphone: 'unverified', accessibility: 'not-required' });
+      renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={atPermissions} />);
+      await waitFor(() => expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled());
+      expect(screen.getByText('Not needed on Windows.')).toBeInTheDocument();
+      expect(screen.getByText('Checked when you first dictate.')).toBeInTheDocument();
+      expect(screen.queryByText('✓ Allowed')).not.toBeInTheDocument();
+      expect(screen.getByText(/Windows has no typing permission to turn on/)).toBeInTheDocument();
+      expect(screen.getByText(/open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone\./)).toBeInTheDocument();
+      expect(screen.queryByText(/System Settings|macOS/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Allow Microphone|Open Accessibility Settings|Open Microphone Settings/ })).not.toBeInTheDocument();
+      expect(io.request).not.toHaveBeenCalled();
+      expect(io.openSettings).not.toHaveBeenCalled();
+    });
+    it('keeps the macOS wording and buttons when permissions are macOS states', async () => {
+      const io = setupBoundary();
+      vi.mocked(io.query).mockResolvedValue({ microphone: 'denied', accessibility: 'not-granted' });
+      renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={atPermissions} />);
+      await waitFor(() => expect(screen.getByText('Access is off or has not been granted.')).toBeInTheDocument());
+      expect(screen.getByText(/Two permissions connect/)).toBeInTheDocument();
+      expect(screen.getByText(/Enable Voxloom in System Settings → Privacy & Security/)).toBeInTheDocument();
+      expect(screen.queryByText(/Windows/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Allow Microphone' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open Microphone Settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Open Accessibility Settings' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Continue/ })).toBeDisabled();
+    });
+  });
 });
