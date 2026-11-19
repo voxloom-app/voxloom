@@ -15,6 +15,9 @@ pub const RETRY_UNCHANGED_READS_MS: [u64; 2] = [150, 300];
 /// Read-back polling after the retry write (~600 ms total).
 pub const RETRY_READBACK_POLLS: usize = 30;
 pub const RETRY_READBACK_POLL_MS: u64 = 20;
+/// The first write was accepted but the field could no longer be read, so a
+/// late landing cannot be ruled out.
+pub const UNREADABLE_BEFORE_RETRY: &str = "AXValue unreadable before retry — insert skipped";
 
 /// Side effects of the retry, injected for tests.
 pub trait RetryIo {
@@ -66,10 +69,7 @@ pub fn retry_once(
             }
             Some(now) if same_ax_text(&now, before) => {}
             Some(_) => return done(AfterAx::Unverified),
-            None => {
-                let msg = "AXValue unreadable before retry — insert skipped";
-                return done(AfterAx::Failed(msg.into()));
-            }
+            None => return done(AfterAx::Failed(UNREADABLE_BEFORE_RETRY.into())),
         }
     }
     let result = io.write();

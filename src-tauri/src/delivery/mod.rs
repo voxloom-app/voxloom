@@ -40,10 +40,11 @@ pub fn delivery_validate_target(intended: TargetSnapshotDto) -> Result<TargetSna
 /// Insert plain text into the intended target; refuse wrong/secure targets.
 /// Async: typing + read-back polling must not block the main/UI thread.
 ///
-/// Only the fixed `delivery-safe-refusal:` prefix grants safe pre-dispatch
-/// recovery. Untagged errors remain uncertain at IPC; never infer no mutation
-/// from a string's type or an AX error code. Partial dispatch returns an
-/// unverified report rather than inviting another transport.
+/// Only the fixed `delivery-safe-refusal:` prefix grants safe recovery: nothing
+/// was dispatched, or read-back proved the field unchanged. Untagged errors
+/// remain uncertain at IPC; never infer no mutation from a string's type or an
+/// AX error code. Partial dispatch returns an unverified report rather than
+/// inviting another transport.
 #[tauri::command(async)]
 pub fn delivery_insert_text(
     text: String,
