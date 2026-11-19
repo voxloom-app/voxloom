@@ -13,6 +13,8 @@ pub mod error;
 pub mod filter_config;
 pub mod gate;
 pub mod initial_prompt;
+#[cfg(any(test, feature = "whisper"))]
+mod model_cache;
 pub mod parakeet;
 pub mod parakeet_catalog;
 pub mod pipeline;
@@ -116,9 +118,11 @@ fn require_main<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Fast admission only. Parakeet loads on its background runner; Turbo retains
-/// Whisper's load-on-transcribe behavior (no cache/prewarm). Model failures are
-/// returned by transcription using the exact admitted request token.
+/// Fast admission only. Parakeet loads on its background runner; Turbo
+/// does not load at prepare. The first transcribe loads the selected
+/// Whisper model, which then stays resident until the selection or the
+/// file changes. Model failures are returned by transcription using the
+/// exact admitted request token.
 #[tauri::command]
 pub fn stt_prepare<R: Runtime>(
     webview: Webview<R>,
@@ -271,6 +275,7 @@ fn transcribe_buffer(
             return state.turbo.run(epoch, id, model_id, |cancel| {
                 let path = state.models.resolved_path(model_id)?;
                 with_dictionary::transcribe_with_dictionary_cancellable(
+                    model_id,
                     &path,
                     &samples,
                     rate,
@@ -282,7 +287,9 @@ fn transcribe_buffer(
         }
         let path = state.models.resolved_path(model_id)?;
         // Preserve main's quiet-clip prompt suppression and Whisper filtering.
-        with_dictionary::transcribe_with_dictionary(&path, &samples, rate, &cfg, dictionary)
+        with_dictionary::transcribe_with_dictionary(
+            model_id, &path, &samples, rate, &cfg, dictionary,
+        )
     })();
     if out.is_err() {
         if let Some(id) = request_id {
@@ -368,8 +375,14 @@ mod tests {
 
         let path = models.resolved_path("whisper-tiny.en").unwrap();
         let (samples, rate) = buffers.take(&handle.id).unwrap();
-        let result =
-            engine::transcribe_pcm(&path, &samples, rate, &SpeechFilterConfig::default(), &[]);
+        let result = engine::transcribe_pcm(
+            "",
+            &path,
+            &samples,
+            rate,
+            &SpeechFilterConfig::default(),
+            &[],
+        );
 
         #[cfg(not(feature = "whisper"))]
         {

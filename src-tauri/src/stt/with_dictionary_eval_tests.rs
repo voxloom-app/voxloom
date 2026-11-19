@@ -79,7 +79,7 @@ fn the_prompt_against_no_prompt_on_the_corpus() {
         let samples = pcm(&audio, &item.id);
         let mut texts = vec![];
         for (i, dictionary) in [&[][..], &corpus.dictionary[..]].into_iter().enumerate() {
-            let out = transcribe_with_dictionary(&model, &samples, 16_000, &cfg, dictionary)
+            let out = transcribe_with_dictionary("", &model, &samples, 16_000, &cfg, dictionary)
                 .unwrap()
                 .raw_text;
             let tally = &mut tallies[i];

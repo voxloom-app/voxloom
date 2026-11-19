@@ -22,6 +22,7 @@ fn real_turbo_english_dictionary_and_silence() {
     let output = runtime
         .run(0, "real-speech", turbo::MODEL_ID, |cancel| {
             with_dictionary::transcribe_with_dictionary_cancellable(
+                turbo::MODEL_ID,
                 &path,
                 &pcm,
                 16_000,
@@ -62,6 +63,7 @@ fn real_turbo_english_dictionary_and_silence() {
         let silence = runtime
             .run(0, id, turbo::MODEL_ID, |cancel| {
                 with_dictionary::transcribe_with_dictionary_cancellable(
+                    turbo::MODEL_ID,
                     &path,
                     &vec![0.0; 16_000],
                     16_000,

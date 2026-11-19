@@ -106,6 +106,7 @@ pub fn validate_pcm(samples: &[f32], sample_rate_hz: u32) -> Result<(), SttError
 /// `decode` supplies the whisper.cpp non-speech parameters (BUS-23).
 /// `dictionary` (BUS-138) becomes Whisper's initial prompt; empty sets none.
 pub fn transcribe_pcm(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -113,6 +114,7 @@ pub fn transcribe_pcm(
     dictionary: &[String],
 ) -> Result<TranscriptDto, SttErrorDto> {
     transcribe_pcm_cancellable(
+        model_id,
         model_path,
         samples,
         sample_rate_hz,
@@ -123,6 +125,7 @@ pub fn transcribe_pcm(
 }
 
 pub(super) fn transcribe_pcm_cancellable(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -135,12 +138,12 @@ pub(super) fn transcribe_pcm_cancellable(
 
     #[cfg(feature = "whisper")]
     {
-        transcribe_with_whisper(model_path, samples, decode, dictionary, cancel)
+        transcribe_with_whisper(model_id, model_path, samples, decode, dictionary, cancel)
     }
 
     #[cfg(not(feature = "whisper"))]
     {
-        let _ = (model_path, decode, dictionary);
+        let _ = (model_id, model_path, decode, dictionary);
         Err(SttErrorDto::new(
             "engine-unavailable",
             "Native whisper.cpp is not linked in this build. On macOS rebuild \
@@ -152,7 +155,15 @@ pub(super) fn transcribe_pcm_cancellable(
 }
 
 #[cfg(feature = "whisper")]
+fn whisper_cache() -> &'static super::model_cache::ModelCache<whisper_rs::WhisperContext> {
+    static CACHE: std::sync::OnceLock<super::model_cache::ModelCache<whisper_rs::WhisperContext>> =
+        std::sync::OnceLock::new();
+    CACHE.get_or_init(super::model_cache::ModelCache::new)
+}
+
+#[cfg(feature = "whisper")]
 fn transcribe_with_whisper(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     decode: &SpeechFilterConfig,
@@ -160,9 +171,12 @@ fn transcribe_with_whisper(
     cancel: Option<&AtomicBool>,
 ) -> Result<TranscriptDto, SttErrorDto> {
     use super::initial_prompt::build_initial_prompt;
+    use super::model_cache;
     use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
-    with_loaded_model(
+    let timed = whisper_cache().with_context(
+        model_id,
+        model_path,
         cancel,
         || {
             WhisperContext::new_with_params(
@@ -232,7 +246,16 @@ fn transcribe_with_whisper(
                 Some("en".to_owned()),
             ))
         },
-    )
+    )?;
+    eprintln!(
+        "{}",
+        model_cache::format_timing(
+            model_cache::audio_ms(samples.len(), 16_000),
+            timed.load_ms,
+            timed.infer_ms,
+        )
+    );
+    Ok(timed.value)
 }
 
 #[cfg(test)]
@@ -243,6 +266,7 @@ mod tests {
     #[test]
     fn empty_audio_rejected() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[],
             16_000,
@@ -256,6 +280,7 @@ mod tests {
     #[test]
     fn wrong_rate_rejected() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[0.1],
             8_000,
@@ -270,6 +295,7 @@ mod tests {
     #[test]
     fn without_whisper_feature_reports_engine_unavailable() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[0.1, 0.2],
             16_000,
