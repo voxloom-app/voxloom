@@ -21,8 +21,10 @@ export interface Cancellation {
   retained?: boolean;
   /** Cap or Escape: do not insert; a late result still goes to History. */
   suppressDelivery?: boolean;
-  /** Set just before insert or paste so the cap cannot start a second delivery. */
+  /** Set just before insert, paste, or Copy so the cap cannot start a second delivery. */
   deliveryInFlight?: boolean;
+  /** performance.now() when deliveryInFlight was set, for the write grace. */
+  deliveryInFlightAt?: number;
   /** Escape during processing: retain any text or show the pending note. */
   retainOnCancel?: () => void;
   scope?: CancelScope;

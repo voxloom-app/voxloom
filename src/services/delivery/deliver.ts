@@ -80,14 +80,17 @@ export async function deliverTranscript(
 
   if (!current()) return stale();
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
+  const markWrite = () => options.onDeliveryStart?.();
 
   if (plan.action === 'paste') {
+    markWrite();
     return pasteInTerminal(options, plan.bound, current, stale);
   }
 
   if (plan.action === 'insert') {
     let report: InsertReport | void;
     try {
+      markWrite();
       report = await platform.insertText(text, plan.target);
     } catch (error: unknown) {
       const insertFail = error instanceof Error
@@ -104,6 +107,7 @@ export async function deliverTranscript(
       if (!options.clipboardFallback) {
         return failOutcome(text, `insert failed: ${insertFail}`);
       }
+      markWrite();
       return copyFallback(
         platform,
         text,
@@ -140,6 +144,7 @@ export async function deliverTranscript(
   }
 
   if (plan.action === 'copy') {
+    markWrite();
     return copyFallback(platform, text, plan.reason, plan.terminal);
   }
 

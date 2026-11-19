@@ -22,9 +22,11 @@ import type { CleanupEngine } from '../../../src/services/cleanup/contracts';
 import { CLEANUP_MODEL_ID } from '../../../src/services/cleanup/types';
 import {
   CAPTURE_CANCELLED_NOTHING,
+  DELIVERY_IN_FLIGHT_GRACE_MS,
   STOP_BUDGET_MS,
   STOP_CANCELLED_PENDING,
   STOP_CANCELLED_SAVED,
+  STOP_CANCELLED_SAVED_HISTORY,
   STOP_LATE_NOTHING_SAVED,
   STOP_LATE_SAVED,
   STOP_TAKING_LONGER_PENDING,
@@ -1443,28 +1445,114 @@ describe('useDogfoodCapture', () => {
       expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
     });
 
-    it('does not copy or deliver twice when the cap fires during an in-flight insert', async () => {
+    function insertablePlatform(
+      clip: ReturnType<typeof clipboard>,
+      overrides: {
+        insert?: (text: string, intended: TargetSnapshot) => Promise<void>;
+        snapshot?: () => Promise<TargetSnapshot>;
+        validate?: (intended: TargetSnapshot) => Promise<TargetSnapshot>;
+      },
+    ) {
+      const target: TargetSnapshot = {
+        appName: 'Notes', appPid: 42, capturedAt: 1, elementId: 'A',
+        elementRole: 'AXTextArea', insertable: true, kind: 'insertable', reason: null,
+      };
+      return createStubDeliveryAdapter({
+        clipboard: clip,
+        insert: overrides.insert ?? vi.fn().mockResolvedValue(undefined),
+        snapshot: overrides.snapshot ?? (async () => target),
+        validate: overrides.validate ?? (async () => target),
+      });
+    }
+
+    function instantDogfood(text: string): typeof dogfoodTranscribeAndCopy {
+      return (options) => dogfoodTranscribeAndCopy({
+        ...options,
+        createEngine: (modelId) => ({
+          ...createMockSttEngine({ modelId }),
+          transcribe: () => new Promise((resolve) => {
+            setTimeout(() => resolve({ language: 'en', text }), 0);
+          }),
+        }),
+      });
+    }
+
+    it('retains to History and the clipboard when snapshot hangs, because no write has started', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-snap-hang', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: insertablePlatform(clip, {
+          snapshot: () => new Promise(() => {}),
+        }),
+        dogfood: instantDogfood('snapshot words'),
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(0);
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.phase).toBe('success');
+      expect(clip.copy).toHaveBeenCalledWith('snapshot words');
+      expect(history).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'copied',
+        text: 'snapshot words',
+      }));
+    });
+
+    it('retains to History and the clipboard when validate hangs, because no write has started', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-validate-hang', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: insertablePlatform(clip, {
+          validate: () => new Promise(() => {}),
+        }),
+        dogfood: instantDogfood('validate words'),
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(0);
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.phase).toBe('success');
+      expect(clip.copy).toHaveBeenCalledWith('validate words');
+      expect(history).toHaveBeenCalledOnce();
+    });
+
+    it('lets an in-flight insert that finishes inside the grace stand as the only delivery', async () => {
       const store = createMockSttModelStore();
       await store.download('whisper-tiny.en');
       const clip = clipboard();
       const history = vi.fn();
       let finishInsert!: () => void;
       const insert = vi.fn(() => new Promise<void>((ok) => { finishInsert = ok; }));
-      const target: TargetSnapshot = {
-        appName: 'Notes', appPid: 42, capturedAt: 1, elementId: 'A',
-        elementRole: 'AXTextArea', insertable: true, kind: 'insertable', reason: null,
-      };
-      const platform = createStubDeliveryAdapter({
-        clipboard: clip,
-        insert,
-        snapshot: async () => target,
-        validate: async () => target,
-      });
       const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({
         ...options,
         createEngine: (modelId) => ({
           ...createMockSttEngine({ modelId }),
-          transcribe: async () => ({ language: 'en', text: 'typed once' }),
+          transcribe: () => new Promise((resolve) => {
+            setTimeout(() => resolve({ language: 'en', text: 'typed once' }), 14_000);
+          }),
         }),
       });
       const { result } = renderHook(() => useDogfoodCapture({
@@ -1474,24 +1562,128 @@ describe('useDogfoodCapture', () => {
         }),
         clipboard: clip,
         createModelStore: () => store,
-        deliveryPlatform: platform,
+        deliveryPlatform: insertablePlatform(clip, { insert }),
         dogfood,
         modelId: 'whisper-tiny.en',
         onHistoryRecord: history,
       }));
       await flush();
+      await advance(14_000);
+      await flush();
       expect(insert).toHaveBeenCalledOnce();
-      await advance(STOP_BUDGET_MS);
+      await advance(1_000);
       expect(clip.copy).not.toHaveBeenCalled();
+      expect(history).not.toHaveBeenCalled();
       expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
       expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
-      expect(insert).toHaveBeenCalledOnce();
       await act(async () => { finishInsert(); });
       await flush();
       expect(insert).toHaveBeenCalledOnce();
       expect(clip.copy).not.toHaveBeenCalled();
       expect(result.current.phase).toBe('success');
       expect(history).toHaveBeenCalledOnce();
+    });
+
+    it('retains to History only when an insert never resolves, after the write grace', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const insert = vi.fn(() => new Promise<void>(() => {}));
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-insert-hang', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: insertablePlatform(clip, { insert }),
+        dogfood: instantDogfood('hung insert'),
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(0);
+      await flush();
+      expect(insert).toHaveBeenCalledOnce();
+      await advance(DELIVERY_IN_FLIGHT_GRACE_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+      expect(result.current.phase).toBe('success');
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(history).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'hung insert',
+      }));
+    });
+
+    it('does not add a second History row if the insert resolves after the grace', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      let finishInsert!: () => void;
+      const insert = vi.fn(() => new Promise<void>((ok) => { finishInsert = ok; }));
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-insert-late', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: insertablePlatform(clip, { insert }),
+        dogfood: instantDogfood('late insert'),
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(0);
+      await flush();
+      expect(insert).toHaveBeenCalledOnce();
+      await advance(DELIVERY_IN_FLIGHT_GRACE_MS);
+      expect(history).toHaveBeenCalledOnce();
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+      await act(async () => { finishInsert(); });
+      await flush();
+      expect(history).toHaveBeenCalledOnce();
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('success');
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+    });
+
+    it('saves History only, with no clipboard, when Escape is pressed during an in-flight insert', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const insert = vi.fn(() => new Promise<void>(() => {}));
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-esc-inflight', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: insertablePlatform(clip, { insert }),
+        dogfood: instantDogfood('escape mid-insert'),
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(0);
+      await flush();
+      expect(insert).toHaveBeenCalledOnce();
+      act(() => result.current.cancel());
+      await flush();
+      expect(result.current.phase).toBe('cancelled');
+      expect(result.current.message).toBe(STOP_CANCELLED_SAVED_HISTORY);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(history).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'escape mid-insert',
+      }));
     });
   });
 

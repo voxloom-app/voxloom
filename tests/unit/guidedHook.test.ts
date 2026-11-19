@@ -1,6 +1,7 @@
 import * as cancelScope from '../../src/services/shortcut/cancelScope';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
+import { CAPTURE_CANCELLED_NOTHING } from '../../src/services/stt/stopBudget';
 import { useDogfoodCapture } from '../../src/services/stt/useDogfoodCapture';
 import { dogfoodTranscribeAndCopy } from '../../src/services/stt/dogfoodPath';
 import { createMockSttModelStore } from '../../src/services/stt/mockStt';
@@ -32,9 +33,11 @@ it('keeps an owned practice guard through capture and cancels without late inser
   const validation = new Promise<void>((resolve) => { resume = resolve; });
   const guard = { current: () => true, validate: vi.fn(async () => { await validation; return true; }), insert: vi.fn(() => true), result: vi.fn() };
   const clipboard = { copy: vi.fn() };
+  const history = vi.fn();
   const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({ ...options, createEngine: (modelId) => ({ modelId, transcribe: async () => ({ text: 'Boundary fixture' }) }) });
   const { result, rerender } = renderHook(({ captureState }: { captureState: CaptureState }) => useDogfoodCapture({
     clipboard, modelId: 'whisper-base.en', createModelStore: () => store, dogfood, deliveryGuard: guard,
+    onHistoryRecord: history,
     captureApi: { captureState, startFullCaptureSession: async () => 'started', stopFullCapture: async () => {}, cancelActiveCapture: vi.fn() } as unknown as UseCaptureStateResult,
   }), { initialProps: { captureState: { kind: 'idle' } as CaptureState } });
   await act(async () => result.current.start('gesture'));
@@ -45,8 +48,11 @@ it('keeps an owned practice guard through capture and cancels without late inser
   expect(result.current.phase).toBe('cancelled');
   expect(guard.insert).not.toHaveBeenCalled();
   expect(guard.result).not.toHaveBeenCalled();
-  // Guided practice Escape: History only, never the clipboard (pre-BUS-255).
+  // Match main: guided Escape-after-stop writes neither clipboard nor History.
   expect(clipboard.copy).not.toHaveBeenCalled();
+  expect(history).not.toHaveBeenCalled();
+  expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+  expect(result.current.message).not.toMatch(/saved to History/i);
 });
 
 it('owned-capture-only practice never consumes stopped audio from a session it did not start with a guard', async () => {

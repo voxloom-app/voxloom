@@ -8,6 +8,8 @@ import type { DogfoodViewActions } from './dogfoodPhase';
 import type { Cancellation } from './dogfoodSessionState';
 import { retainTranscript } from './retainTranscript';
 import {
+  CAPTURE_CANCELLED_NOTHING,
+  DELIVERY_IN_FLIGHT_GRACE_MS,
   STOP_LATE_NOTHING_SAVED,
   STOP_LATE_SAVED,
   stopPendingNote,
@@ -54,6 +56,33 @@ export function startStopBudget(
   };
 }
 
+/** Arm a 10s timer when an insert/paste/Copy write starts. */
+export function createDeliveryGrace(
+  graceMs: number = DELIVERY_IN_FLIGHT_GRACE_MS,
+): {
+  arm(): void;
+  clear(): void;
+  promise: Promise<'grace'>;
+} {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let armed = false;
+  let resolveGrace: (value: 'grace') => void = () => {};
+  const promise = new Promise<'grace'>((resolve) => {
+    resolveGrace = resolve;
+  });
+  return {
+    arm() {
+      if (armed) return;
+      armed = true;
+      timer = setTimeout(() => resolveGrace('grace'), graceMs);
+    },
+    clear() {
+      clearTimeout(timer);
+    },
+    promise,
+  };
+}
+
 export interface SafetyNetInput {
   actions: Pick<
     DogfoodViewActions,
@@ -67,8 +96,13 @@ export interface SafetyNetInput {
   now: () => number;
   onHistoryRecord: () => ((record: DictationRecord) => void) | undefined;
   ownsUi: () => boolean;
-  /** Guided practice: History only, never the clipboard. */
+  /** Guided practice: never write the clipboard. */
   skipClipboard: boolean;
+  /**
+   * Guided practice: match main's Escape-after-stop — no History row,
+   * and the status must not claim one was saved.
+   */
+  skipHistory: boolean;
   style: WritingStyle;
 }
 
@@ -99,10 +133,18 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     mode: 'cap' | 'cancel' | 'late',
   ) => {
     if (cancellation.retained || !transcript.text.trim()) return;
+    if (input.skipHistory) {
+      if (mode === 'cancel' && input.ownsUi()) {
+        actions.setPhase('cancelled');
+        actions.announce(CAPTURE_CANCELLED_NOTHING);
+      }
+      return;
+    }
     cancellation.retained = true;
     const copyToClipboard = mode !== 'late'
       && input.ownsUi()
       && !input.skipClipboard
+      && !cancellation.deliveryInFlight
       && input.clipboardFallback();
     const status = await retainTranscript({
       clipboard: input.clipboard(),
@@ -158,7 +200,8 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     finishLate(work, settle, release) {
       void work.then(async (value) => {
         await settle();
-        if (value?.transcript?.text.trim() && !cancellation.retained) {
+        if (value?.transcript?.text.trim() && !cancellation.retained
+          && !input.skipHistory) {
           await retain(value.transcript, 'late');
           return;
         }
@@ -171,6 +214,13 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     },
     wireRetainOnCancel(latestText, finished) {
       cancellation.retainOnCancel = () => {
+        if (input.skipHistory) {
+          if (input.ownsUi()) {
+            actions.setPhase('cancelled');
+            actions.announce(CAPTURE_CANCELLED_NOTHING);
+          }
+          return;
+        }
         const transcript = latestText();
         if (transcript?.text.trim()) {
           void retain(transcript, 'cancel');

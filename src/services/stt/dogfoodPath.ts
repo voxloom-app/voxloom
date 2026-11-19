@@ -67,9 +67,9 @@ export interface DogfoodTranscribeOptions {
    */
   onTranscript?: (transcript: Transcript) => void;
   /**
-   * Called once, immediately before an insert, terminal paste, or
-   * clipboard-restore paste fallback. The stop cap must not start a
-   * second delivery or write the clipboard after this.
+   * Called immediately before an insert, terminal paste, or Copy write
+   * inside deliverTranscript. The stop cap must not start a second
+   * delivery or write the clipboard after this.
    */
   onDeliveryStart?: () => void;
   /**
@@ -206,11 +206,8 @@ export async function dogfoodTranscribeAndCopy(
 
   const insertOwnField = options.insertOwnField ?? insertIntoOwnField;
   try {
-    const delivering = Boolean(
-      transcript.text.trim() && (options.isCurrent?.() ?? true),
-    );
-    if (delivering) options.onDeliveryStart?.();
-    if (delivering && insertOwnField(transcript.text)) {
+    if (transcript.text.trim() && (options.isCurrent?.() ?? true)
+      && insertOwnField(transcript.text)) {
       const delivery: DeliveryOutcome = {
         clipboardRestored: false,
         detail: 'Voxloom field',
@@ -243,6 +240,7 @@ export async function dogfoodTranscribeAndCopy(
         clipboardFallback,
         isCurrent: options.isCurrent,
         intended,
+        onDeliveryStart: options.onDeliveryStart,
         pasteBinding: options.pasteBinding,
         platform,
         text: transcript.text,

@@ -22,11 +22,11 @@ import {
 } from '../delivery';
 import { prepareDogfoodCleanup } from './dogfoodCleanup';
 import { errorText } from './dogfoodModel';
-import { dogfoodTranscribeAndCopy, type CaptureAudioMeta } from './dogfoodPath';
+import { dogfoodTranscribeAndCopy, type CaptureAudioMeta, type DogfoodResult } from './dogfoodPath';
 import { hudResultFor, type DogfoodViewActions } from './dogfoodPhase';
 import type { DogfoodLiveSession } from './dogfoodSessionState';
 import { remainingCleanupBudgetMs, STOP_BUDGET_MS, CAPTURE_CANCELLED_NOTHING } from './stopBudget';
-import { createSafetyNet, startStopBudget } from './stopSafetyNet';
+import { createDeliveryGrace, createSafetyNet, startStopBudget } from './stopSafetyNet';
 import type { Transcript } from './types';
 import type { UseDogfoodCaptureOptions } from './useDogfoodCapture';
 
@@ -120,6 +120,7 @@ export function useDogfoodProcessing({
     const startedAt = performance.now();
     // Arm before ensureModel / paste-binding awaits so a stall cannot skip the cap.
     const budget = startStopBudget(STOP_BUDGET_MS, startedAt);
+    const deliveryGrace = createDeliveryGrace();
     // Snapshot at stop: a settings change mid-dictation applies to the next
     // one. The same style goes to cleanup and onto the History row.
     const latest = optionsRef.current;
@@ -137,6 +138,7 @@ export function useDogfoodProcessing({
       onHistoryRecord: () => optionsRef.current.onHistoryRecord,
       ownsUi,
       skipClipboard: Boolean(guard),
+      skipHistory: Boolean(guard),
       style,
     });
     safety.wireRetainOnCancel(() => latestText, () => finished);
@@ -210,16 +212,40 @@ export function useDogfoodProcessing({
           return target;
         },
         modelId,
-        onDeliveryStart: () => { cancellation.deliveryInFlight = true; },
+        onDeliveryStart: () => {
+          cancellation.deliveryInFlight = true;
+          cancellation.deliveryInFlightAt = performance.now();
+          deliveryGrace.arm();
+        },
         onTranscript: (transcript) => { latestText = transcript; },
         requestId: cancellation.preparation?.requestId,
       });
 
-      let outcome = await budget.against(dogfoodPromise);
-      // An in-flight insert or paste must finish on its own. The cap must
-      // not retain, copy, or suppress that delivery.
+      let outcome: DogfoodResult | 'budget' | 'grace' = await Promise.race([
+        budget.against(dogfoodPromise),
+        deliveryGrace.promise,
+      ]);
+      // The 15s cap fired while a write is in flight: wait for the write
+      // or the 10s grace, and never start a second delivery or clipboard write.
       if (outcome === 'budget' && cancellation.deliveryInFlight) {
-        outcome = await dogfoodPromise;
+        outcome = await Promise.race([
+          dogfoodPromise,
+          deliveryGrace.promise,
+        ]);
+      }
+
+      if (outcome === 'grace') {
+        budget.clear();
+        deliveryGrace.clear();
+        await settleCancellation();
+        if (!cancellation.cancelled && latestText?.text.trim()) {
+          await safety.retain(latestText, 'cap');
+        } else if (!cancellation.cancelled) {
+          safety.showPending('cap');
+        }
+        lateInFlight = true;
+        safety.finishLate(dogfoodPromise, settleCancellation, releaseResources);
+        return;
       }
 
       if (outcome === 'budget') {
@@ -247,7 +273,7 @@ export function useDogfoodProcessing({
       await settleCancellation();
       if (cancellation.retained) return;
       if (cancellation.cancelled || cancellation.suppressDelivery) {
-        if (outcome.transcript.text.trim()) {
+        if (outcome.transcript.text.trim() && !guard) {
           await safety.retain(
             outcome.transcript,
             ownsUi() && cancellation.cancelled && !cancellation.suppressDelivery
@@ -306,6 +332,7 @@ export function useDogfoodProcessing({
       }
     } finally {
       budget.clear();
+      deliveryGrace.clear();
       if (!lateInFlight) await releaseResources();
     }
   }, [actions, cleanupEngine, ensureModel, live]);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CLEANUP_DELIVERY_MARGIN_MS,
+  DELIVERY_IN_FLIGHT_GRACE_MS,
   remainingCleanupBudgetMs,
   STOP_BUDGET_MS,
   STOP_LATE_NOTHING_SAVED,
@@ -15,9 +16,10 @@ import {
 } from '../../../src/services/stt/stopBudget';
 
 describe('stopBudget', () => {
-  it('keeps the safety net at 15 seconds and a 2s delivery margin', () => {
+  it('keeps the safety net at 15 seconds, a 2s delivery margin, and a 10s write grace', () => {
     expect(STOP_BUDGET_MS).toBe(15_000);
     expect(CLEANUP_DELIVERY_MARGIN_MS).toBe(2_000);
+    expect(DELIVERY_IN_FLIGHT_GRACE_MS).toBe(10_000);
   });
 
   it('names History and the clipboard only when the copy succeeded', () => {
@@ -29,7 +31,7 @@ describe('stopBudget', () => {
     expect(stopPendingNote('cancel')).toBe(STOP_CANCELLED_PENDING);
   });
 
-  it('names the late-failure placeholder for UI/UX review', () => {
+  it('names the late-failure toast when a pending result never arrives', () => {
     expect(STOP_LATE_NOTHING_SAVED).toBe(
       'Your last dictation didn’t come through — nothing was saved.',
     );

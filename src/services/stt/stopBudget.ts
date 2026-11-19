@@ -15,6 +15,13 @@ export const STOP_BUDGET_MS = 15_000;
  */
 export const CLEANUP_DELIVERY_MARGIN_MS = 2_000;
 
+/**
+ * After an insert, terminal paste, or Copy write starts, how long to wait
+ * for that in-flight delivery to settle. If it has not, retain to History
+ * only — never the clipboard, because a paste may still be using it.
+ */
+export const DELIVERY_IN_FLIGHT_GRACE_MS = 10_000;
+
 export const STOP_TAKING_LONGER_SAVED =
   'Took too long to insert — saved to History and the clipboard.';
 
@@ -35,7 +42,6 @@ export const STOP_CANCELLED_PENDING =
 
 export const STOP_LATE_SAVED = 'Your last dictation was saved to History.';
 
-/** Placeholder: shown when a pending late result never arrives. UI/UX review. */
 export const STOP_LATE_NOTHING_SAVED =
   'Your last dictation didn’t come through — nothing was saved.';
 
