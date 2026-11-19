@@ -17,6 +17,18 @@ describe('tauri insertText errors', () => {
     expect((error as InstanceType<typeof InsertError>).writeStarted).toBe(false);
   });
 
+  it('a tagged refusal reaches the user without the protocol tag', async () => {
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:AX set failed');
+    const error = await createTauriDeliveryAdapter(clipboard).insertText('hi', target).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('AX set failed');
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:completion destination changed or unavailable');
+    const validated = await createTauriDeliveryAdapter(clipboard).validateTarget({} as never);
+    expect(validated.reason).toBe('native validate failed: completion destination changed or unavailable');
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:target registry unavailable');
+    const snapshot = await createTauriDeliveryAdapter(clipboard).snapshotTarget();
+    expect(snapshot.reason).toBe('native snapshot failed: target registry unavailable');
+  });
+
   it('any other failure may have hit mid-write', async () => {
     invoke.mockRejectedValueOnce(new Error('IPC channel closed'));
     const error = await createTauriDeliveryAdapter(clipboard).insertText('hi', target).catch((e: unknown) => e);

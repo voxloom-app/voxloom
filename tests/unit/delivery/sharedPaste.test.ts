@@ -197,3 +197,27 @@ describe('clipboard refusals on the shared route dispatch nothing', () => {
     expect(clipboard.copy).not.toHaveBeenCalled();
   });
 });
+
+describe('Copy after a refused shared paste', () => {
+  const secure = 'delivery-safe-refusal:Secure Keyboard Entry is on — paste skipped';
+  async function copied(intended: TargetSnapshot) {
+    invoke.mockImplementation(async (command) => {
+      if (command === 'delivery_paste_target') throw secure;
+      return intended;
+    });
+    return deliverTranscript({
+      platform: createTauriDeliveryAdapter(clipboard), intended, clipboardFallback: true, text: 'hello',
+    });
+  }
+
+  it('gives a known terminal the ⌘V hint, as the Copy route does', async () => {
+    const outcome = await copied(target({ knownTerminal: true }));
+    expect(outcome).toMatchObject({ status: 'copied', message: 'Copied. Press ⌘V to paste.' });
+  });
+
+  it('says why elsewhere, without the native protocol tag', async () => {
+    const outcome = await copied(target());
+    expect(outcome.status).toBe('copied');
+    expect(outcome.message).toBe('Copied — paste skipped: Secure Keyboard Entry is on — paste skipped');
+  });
+});

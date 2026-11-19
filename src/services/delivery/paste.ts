@@ -67,7 +67,7 @@ export async function pasteInTarget(
   return pasteWith(options, () => {
     if (!options.platform.pasteTarget) throw new InsertError('paste unavailable on this platform', false);
     return options.platform.pasteTarget(options.text, intended);
-  }, current, stale, false, insertFallback);
+  }, current, stale, intended.knownTerminal === true, insertFallback);
 }
 
 async function pasteWith(

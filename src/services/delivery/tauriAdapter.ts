@@ -81,6 +81,14 @@ const CLIPBOARD_REFUSALS = [
   ['changed', `${SAFE_REFUSAL}clipboard-changed:`],
 ] as const;
 
+/** A native error's reason for the user: the protocol tag is not part of it. */
+function nativeDetail(error: unknown): string {
+  const detail = deliveryErrorDetail(error);
+  return typeof error === 'string' && detail.startsWith(SAFE_REFUSAL)
+    ? detail.slice(SAFE_REFUSAL.length).trimStart()
+    : detail;
+}
+
 /** Only this fixed native tag proves no dispatch AND completed clipboard cleanup. */
 function nativeError(error: unknown): InsertError {
   if (typeof error !== 'string' || !error.startsWith(SAFE_REFUSAL)) {
@@ -89,7 +97,7 @@ function nativeError(error: unknown): InsertError {
   for (const [clipboard, tag] of CLIPBOARD_REFUSALS) {
     if (error.startsWith(tag)) return new InsertError(error.slice(tag.length), false, clipboard);
   }
-  return new InsertError(error, false);
+  return new InsertError(nativeDetail(error), false);
 }
 
 async function invokeDelivery<T>(
@@ -145,7 +153,7 @@ export function createTauriDeliveryAdapter(
       try {
         return fromDto(await invoke<NativeTargetDto>('delivery_snapshot_target'));
       } catch (error: unknown) {
-        const detail = deliveryErrorDetail(error);
+        const detail = nativeDetail(error);
         return stub.snapshotTarget().then((snap) => ({
           ...snap,
           reason: `native snapshot failed: ${detail}`,
@@ -156,7 +164,7 @@ export function createTauriDeliveryAdapter(
       try {
         return fromDto(await invoke<NativeTargetDto>('delivery_validate_target', { intended }));
       } catch (error: unknown) {
-        const detail = deliveryErrorDetail(error);
+        const detail = nativeDetail(error);
         return {
           ...intended,
           insertable: false,
