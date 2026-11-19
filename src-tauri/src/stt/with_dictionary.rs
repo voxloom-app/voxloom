@@ -28,6 +28,7 @@ fn prompt_dictionary(quiet: bool, dictionary: &[String]) -> &[String] {
 /// then Whisper with the dictionary prompt (loud clips only) and cleanup. An
 /// empty dictionary sets no prompt and changes nothing.
 pub fn transcribe_with_dictionary(
+    model_id: &str,
     model_path: &Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -35,6 +36,7 @@ pub fn transcribe_with_dictionary(
     dictionary: &[String],
 ) -> Result<TranscriptDto, SttErrorDto> {
     transcribe_with_dictionary_cancellable(
+        model_id,
         model_path,
         samples,
         sample_rate_hz,
@@ -45,6 +47,7 @@ pub fn transcribe_with_dictionary(
 }
 
 pub(super) fn transcribe_with_dictionary_cancellable(
+    model_id: &str,
     model_path: &Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -58,6 +61,7 @@ pub(super) fn transcribe_with_dictionary_cancellable(
     let result =
         pipeline::transcribe_filtered(samples, sample_rate_hz, cfg, &NoVad, |pcm| match cancel {
             Some(_) => engine::transcribe_pcm_cancellable(
+                model_id,
                 model_path,
                 pcm,
                 sample_rate_hz,
@@ -65,7 +69,9 @@ pub(super) fn transcribe_with_dictionary_cancellable(
                 dictionary,
                 cancel,
             ),
-            None => engine::transcribe_pcm(model_path, pcm, sample_rate_hz, cfg, dictionary),
+            None => {
+                engine::transcribe_pcm(model_id, model_path, pcm, sample_rate_hz, cfg, dictionary)
+            }
         });
     engine::check_cancelled(cancel)?;
     result
@@ -104,6 +110,7 @@ mod tests {
         let silent = vec![0.0; 16_000];
         for d in [dictionary(), vec![]] {
             let out = transcribe_with_dictionary(
+                "whisper-tiny.en",
                 Path::new("/nope"),
                 &silent,
                 16_000,

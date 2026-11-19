@@ -78,8 +78,8 @@ fn quiet_clips_are_unchanged_by_a_dictionary_and_nothing_echoes_it() {
     let dict = dictionary();
     let (mut changed_quiet, mut echoed, mut differs_loud) = (vec![], vec![], vec![]);
     for (name, pcm) in clips() {
-        let main = transcribe_with_dictionary(&model, &pcm, RATE, &cfg, &[]).unwrap();
-        let with = transcribe_with_dictionary(&model, &pcm, RATE, &cfg, &dict).unwrap();
+        let main = transcribe_with_dictionary("", &model, &pcm, RATE, &cfg, &[]).unwrap();
+        let with = transcribe_with_dictionary("", &model, &pcm, RATE, &cfg, &dict).unwrap();
         let quiet = AudioStats::measure(&pcm).is_quiet(&cfg);
         println!(
             "{name} (quiet {quiet}): main {:?} {:?} | dictionary {:?} {:?}",

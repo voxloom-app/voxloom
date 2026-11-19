@@ -213,3 +213,26 @@ fn status_identifies_active_request_generation_and_mode() {
 }
 
 // Permission states
+
+#[test]
+fn starting_a_recording_does_not_touch_the_resident_whisper_model() {
+    // A Parakeet dictation or a Settings mic test must not extend the
+    // residency of a Whisper model loaded earlier (BUS-255 C1).
+    let before = crate::stt::engine::touch_count();
+    for (request, test_mode) in [("full-1", false), ("mic-test-1", true)] {
+        let (p, s) = authorized_backend(vec![]);
+        let c = mk(p, s);
+        let (emit, _) = mk_emit();
+        let status = c
+            .start_session(
+                String::from(request),
+                DeviceSelection::SystemDefault,
+                test_mode,
+                emit,
+            )
+            .unwrap();
+        c.cancel_request(&status.request_id);
+        idle_wait(&c, Duration::from_secs(3));
+    }
+    assert_eq!(crate::stt::engine::touch_count(), before);
+}

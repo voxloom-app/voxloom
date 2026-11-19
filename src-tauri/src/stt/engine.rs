@@ -4,10 +4,6 @@
 //! CI on Linux can compile without cmake + ggml. On a Mac, build with
 //! `--features whisper` (see README, Local STT).
 
-#[cfg(test)]
-#[path = "engine_cancel_tests.rs"]
-mod engine_cancel_tests;
-
 use super::cleanup::DropReason;
 use super::error::SttErrorDto;
 use super::filter_config::SpeechFilterConfig;
@@ -36,35 +32,6 @@ impl TranscriptDto {
             dropped: None,
         }
     }
-}
-
-#[cfg(any(test, feature = "whisper"))]
-fn with_loaded_model<C, T>(
-    cancel: Option<&AtomicBool>,
-    load: impl FnOnce() -> Result<C, SttErrorDto>,
-    infer: impl FnOnce(&C) -> Result<T, SttErrorDto>,
-) -> Result<T, SttErrorDto> {
-    check_cancelled(cancel)?;
-    #[cfg(test)]
-    let loaded_at = std::time::Instant::now();
-    let context = load();
-    #[cfg(test)]
-    eprintln!(
-        "whisper load_elapsed_ms={}",
-        loaded_at.elapsed().as_millis()
-    );
-    check_cancelled(cancel)?;
-    let context = context?;
-    #[cfg(test)]
-    let inferred_at = std::time::Instant::now();
-    let result = infer(&context);
-    #[cfg(test)]
-    eprintln!(
-        "whisper inference_elapsed_ms={}",
-        inferred_at.elapsed().as_millis()
-    );
-    check_cancelled(cancel)?;
-    result
 }
 
 pub(super) fn check_cancelled(cancel: Option<&AtomicBool>) -> Result<(), SttErrorDto> {
@@ -106,6 +73,7 @@ pub fn validate_pcm(samples: &[f32], sample_rate_hz: u32) -> Result<(), SttError
 /// `decode` supplies the whisper.cpp non-speech parameters (BUS-23).
 /// `dictionary` (BUS-138) becomes Whisper's initial prompt; empty sets none.
 pub fn transcribe_pcm(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -113,6 +81,7 @@ pub fn transcribe_pcm(
     dictionary: &[String],
 ) -> Result<TranscriptDto, SttErrorDto> {
     transcribe_pcm_cancellable(
+        model_id,
         model_path,
         samples,
         sample_rate_hz,
@@ -123,6 +92,7 @@ pub fn transcribe_pcm(
 }
 
 pub(super) fn transcribe_pcm_cancellable(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     sample_rate_hz: u32,
@@ -135,12 +105,12 @@ pub(super) fn transcribe_pcm_cancellable(
 
     #[cfg(feature = "whisper")]
     {
-        transcribe_with_whisper(model_path, samples, decode, dictionary, cancel)
+        transcribe_with_whisper(model_id, model_path, samples, decode, dictionary, cancel)
     }
 
     #[cfg(not(feature = "whisper"))]
     {
-        let _ = (model_path, decode, dictionary);
+        let _ = (model_id, model_path, decode, dictionary);
         Err(SttErrorDto::new(
             "engine-unavailable",
             "Native whisper.cpp is not linked in this build. On macOS rebuild \
@@ -152,7 +122,52 @@ pub(super) fn transcribe_pcm_cancellable(
 }
 
 #[cfg(feature = "whisper")]
+type WhisperCache = super::model_cache::ModelCache<whisper_rs::WhisperContext>;
+
+#[cfg(feature = "whisper")]
+static WHISPER_CACHE: std::sync::OnceLock<std::sync::Arc<WhisperCache>> =
+    std::sync::OnceLock::new();
+
+/// Created on the first Whisper transcribe, which also starts the idle
+/// sweeper. Nothing else creates it.
+#[cfg(feature = "whisper")]
+fn whisper_cache() -> &'static WhisperCache {
+    WHISPER_CACHE
+        .get_or_init(|| {
+            let cache = std::sync::Arc::new(WhisperCache::new());
+            WhisperCache::spawn_idle_sweeper(std::sync::Arc::clone(&cache));
+            cache
+        })
+        .as_ref()
+}
+
+#[cfg(test)]
+thread_local! {
+    static TOUCHES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Calls to [`touch_resident`] on this thread (tests only).
+#[cfg(test)]
+pub(crate) fn touch_count() -> usize {
+    TOUCHES.with(std::cell::Cell::get)
+}
+
+/// Restart the idle window of the resident Whisper model. Called when a
+/// Turbo prepare is admitted. No-op without whisper.cpp, and before the
+/// first Whisper load (there is nothing resident, and this must not
+/// create the cache or sweeper).
+pub(super) fn touch_resident() {
+    #[cfg(test)]
+    TOUCHES.with(|count| count.set(count.get() + 1));
+    #[cfg(feature = "whisper")]
+    if let Some(cache) = WHISPER_CACHE.get() {
+        cache.touch();
+    }
+}
+
+#[cfg(feature = "whisper")]
 fn transcribe_with_whisper(
+    model_id: &str,
     model_path: &std::path::Path,
     samples: &[f32],
     decode: &SpeechFilterConfig,
@@ -160,9 +175,12 @@ fn transcribe_with_whisper(
     cancel: Option<&AtomicBool>,
 ) -> Result<TranscriptDto, SttErrorDto> {
     use super::initial_prompt::build_initial_prompt;
+    use super::model_cache;
     use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
-    with_loaded_model(
+    let timed = whisper_cache().with_context(
+        model_id,
+        model_path,
         cancel,
         || {
             WhisperContext::new_with_params(
@@ -232,7 +250,16 @@ fn transcribe_with_whisper(
                 Some("en".to_owned()),
             ))
         },
-    )
+    )?;
+    eprintln!(
+        "{}",
+        model_cache::format_timing(
+            model_cache::audio_ms(samples.len(), 16_000),
+            timed.load_ms,
+            timed.infer_ms,
+        )
+    );
+    Ok(timed.value)
 }
 
 #[cfg(test)]
@@ -243,6 +270,7 @@ mod tests {
     #[test]
     fn empty_audio_rejected() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[],
             16_000,
@@ -256,6 +284,7 @@ mod tests {
     #[test]
     fn wrong_rate_rejected() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[0.1],
             8_000,
@@ -270,6 +299,7 @@ mod tests {
     #[test]
     fn without_whisper_feature_reports_engine_unavailable() {
         let err = transcribe_pcm(
+            "whisper-tiny.en",
             Path::new("/nope"),
             &[0.1, 0.2],
             16_000,

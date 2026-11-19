@@ -240,8 +240,11 @@ are bounded separately from Tiny/Base and Parakeet. Explicit cancellation
 cooperatively stops decoding; synchronous model loading cannot be interrupted,
 so its active reservation remains held until that work and context cleanup
 actually finish. Ordinary supersession still permits the earlier transcript to
-finish for History, without delivering it into another field. No resident-model
-cache or automatic model download is introduced.
+finish for History, without delivering it into another field. After the
+first transcribe, the selected Whisper model stays resident and is
+reloaded if the user switches models, the file changes, or the model
+has been idle for about 10 minutes. Automatic model download is not
+introduced.
 
 Upstream OpenAI Whisper and whisper.cpp license notices are included under
 `licenses/whisper/THIRD-PARTY-NOTICES.txt` in the app's resources.

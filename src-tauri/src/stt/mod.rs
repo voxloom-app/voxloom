@@ -10,9 +10,13 @@ pub mod catalog;
 pub mod cleanup;
 pub mod engine;
 pub mod error;
+#[cfg(any(test, feature = "whisper"))]
+mod file_stamp;
 pub mod filter_config;
 pub mod gate;
 pub mod initial_prompt;
+#[cfg(any(test, feature = "whisper"))]
+mod model_cache;
 pub mod parakeet;
 pub mod parakeet_catalog;
 pub mod pipeline;
@@ -116,9 +120,14 @@ fn require_main<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Fast admission only. Parakeet loads on its background runner; Turbo retains
-/// Whisper's load-on-transcribe behavior (no cache/prewarm). Model failures are
-/// returned by transcription using the exact admitted request token.
+/// Fast admission only. Parakeet loads on its background runner; Turbo
+/// does not load at prepare. The first transcribe loads the selected
+/// Whisper model, which then stays resident until the selection or the
+/// file changes, or until 10 minutes idle. A successful Turbo prepare
+/// restarts the idle timer. A recording start alone does not: Parakeet and
+/// mic tests must not keep a Whisper model resident.
+/// Model failures are returned by transcription using the exact admitted
+/// request token.
 #[tauri::command]
 pub fn stt_prepare<R: Runtime>(
     webview: Webview<R>,
@@ -128,10 +137,7 @@ pub fn stt_prepare<R: Runtime>(
 ) -> Result<(), String> {
     require_main(&webview)?;
     if model_id == turbo::MODEL_ID {
-        return state
-            .turbo
-            .prepare(state.turbo.epoch(), &request_id, &model_id)
-            .map_err(err_string);
+        return prepare_turbo(&state, &request_id, &model_id);
     }
     let epoch = state.parakeet.epoch();
     let spec = parakeet_catalog::find(&model_id)
@@ -151,6 +157,19 @@ pub fn stt_prepare<R: Runtime>(
         })
         .map_err(err_string)
 }
+
+/// Admit a Turbo request, then restart the resident model's idle timer.
+/// Only a timestamp is touched, so a renderer that retires before
+/// cancelling leaves nothing behind to keep the model resident.
+fn prepare_turbo(state: &SttState, request_id: &str, model_id: &str) -> Result<(), String> {
+    state
+        .turbo
+        .prepare(state.turbo.epoch(), request_id, model_id)
+        .map_err(err_string)?;
+    engine::touch_resident();
+    Ok(())
+}
+
 #[tauri::command]
 pub fn stt_cancel<R: Runtime>(
     webview: Webview<R>,
@@ -271,6 +290,7 @@ fn transcribe_buffer(
             return state.turbo.run(epoch, id, model_id, |cancel| {
                 let path = state.models.resolved_path(model_id)?;
                 with_dictionary::transcribe_with_dictionary_cancellable(
+                    model_id,
                     &path,
                     &samples,
                     rate,
@@ -282,7 +302,9 @@ fn transcribe_buffer(
         }
         let path = state.models.resolved_path(model_id)?;
         // Preserve main's quiet-clip prompt suppression and Whisper filtering.
-        with_dictionary::transcribe_with_dictionary(&path, &samples, rate, &cfg, dictionary)
+        with_dictionary::transcribe_with_dictionary(
+            model_id, &path, &samples, rate, &cfg, dictionary,
+        )
     })();
     if out.is_err() {
         if let Some(id) = request_id {
@@ -368,8 +390,14 @@ mod tests {
 
         let path = models.resolved_path("whisper-tiny.en").unwrap();
         let (samples, rate) = buffers.take(&handle.id).unwrap();
-        let result =
-            engine::transcribe_pcm(&path, &samples, rate, &SpeechFilterConfig::default(), &[]);
+        let result = engine::transcribe_pcm(
+            "",
+            &path,
+            &samples,
+            rate,
+            &SpeechFilterConfig::default(),
+            &[],
+        );
 
         #[cfg(not(feature = "whisper"))]
         {
@@ -388,5 +416,22 @@ mod tests {
             "buffer must be single-use (consumed)"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prepare_turbo_touches_the_resident_model_only_when_admitted() {
+        let state = SttState::new(
+            ModelStore::new(std::env::temp_dir().join("turbo-prepare-touch")),
+            Arc::new(PcmBufferStore::new()),
+        );
+        let before = engine::touch_count();
+        assert!(prepare_turbo(&state, "", turbo::MODEL_ID).is_err());
+        assert_eq!(
+            engine::touch_count(),
+            before,
+            "a rejected prepare is not activity"
+        );
+        prepare_turbo(&state, "rec-1", turbo::MODEL_ID).unwrap();
+        assert_eq!(engine::touch_count(), before + 1);
     }
 }
