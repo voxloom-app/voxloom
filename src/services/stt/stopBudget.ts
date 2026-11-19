@@ -7,13 +7,13 @@
 export const STOP_BUDGET_MS = 15_000;
 
 export const STOP_TAKING_LONGER_SAVED =
-  'This is taking longer than usual. The text is saved in History and on the clipboard.';
+  'Took too long to insert — saved to History and the clipboard.';
 
 export const STOP_TAKING_LONGER_SAVED_HISTORY =
-  'This is taking longer than usual. The text is saved in History.';
+  'Took too long to insert — saved to History.';
 
 export const STOP_TAKING_LONGER_PENDING =
-  'This is taking longer than usual. If a transcript finishes, it will be saved in History.';
+  'This is taking longer than usual. It won’t be typed, but if transcription finishes, it will be saved to History.';
 
 export const STOP_CANCELLED_SAVED =
   'Cancelled — saved to History and the clipboard.';
@@ -22,9 +22,9 @@ export const STOP_CANCELLED_SAVED_HISTORY =
   'Cancelled — saved to History.';
 
 export const STOP_CANCELLED_PENDING =
-  'Cancelled. If a transcript finishes, it will be saved in History.';
+  'Cancelled. If transcription finishes, it will be saved to History.';
 
-export const STOP_LATE_SAVED = 'Saved to History.';
+export const STOP_LATE_SAVED = 'Your last dictation was saved to History.';
 
 export const CAPTURE_CANCELLED_NOTHING =
   'Capture cancelled — nothing transcribed.';
