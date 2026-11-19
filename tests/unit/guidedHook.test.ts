@@ -1,7 +1,7 @@
 import * as cancelScope from '../../src/services/shortcut/cancelScope';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import { CAPTURE_CANCELLED_NOTHING } from '../../src/services/stt/stopBudget';
+import { GUIDED_ESCAPE_NOTHING_SAVED } from '../../src/services/stt/stopBudget';
 import { useDogfoodCapture } from '../../src/services/stt/useDogfoodCapture';
 import { dogfoodTranscribeAndCopy } from '../../src/services/stt/dogfoodPath';
 import { createMockSttModelStore } from '../../src/services/stt/mockStt';
@@ -51,7 +51,7 @@ it('keeps an owned practice guard through capture and cancels without late inser
   // Match main: guided Escape-after-stop writes neither clipboard nor History.
   expect(clipboard.copy).not.toHaveBeenCalled();
   expect(history).not.toHaveBeenCalled();
-  expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+  expect(result.current.message).toBe(GUIDED_ESCAPE_NOTHING_SAVED);
   expect(result.current.message).not.toMatch(/saved to History/i);
 });
 

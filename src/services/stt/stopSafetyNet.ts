@@ -8,8 +8,9 @@ import type { DogfoodViewActions } from './dogfoodPhase';
 import type { Cancellation } from './dogfoodSessionState';
 import { retainTranscript } from './retainTranscript';
 import {
-  CAPTURE_CANCELLED_NOTHING,
   DELIVERY_IN_FLIGHT_GRACE_MS,
+  GUIDED_CAP_NOTHING_SAVED,
+  GUIDED_ESCAPE_NOTHING_SAVED,
   STOP_LATE_NOTHING_SAVED,
   STOP_LATE_SAVED,
   stopPendingNote,
@@ -99,9 +100,9 @@ export interface SafetyNetInput {
   /** Guided practice: never write the clipboard. */
   skipClipboard: boolean;
   /**
-   * Guided practice: match main's Escape-after-stop — no History row,
-   * and the status must not claim one was saved. A cap or Escape ends on
-   * the same cancelled state, with no pending note or late toast.
+   * Guided practice: no History row and no clipboard, and the status must
+   * not claim one was saved. A cap or Escape after stop ends on a cancelled
+   * state with its own guided line, with no pending note or late toast.
    */
   skipHistory: boolean;
   style: WritingStyle;
@@ -129,11 +130,13 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
   const { actions, cancellation } = input;
   let pendingShown = false;
 
-  /** Guided practice ends here: main's Escape state, never a History promise. */
-  const showGuidedCancelled = () => {
+  /** Guided practice ends here: a terminal state, never a History promise. */
+  const showGuidedCancelled = (mode: StopNoteKind) => {
     if (!input.ownsUi()) return;
     actions.setPhase('cancelled');
-    actions.announce(CAPTURE_CANCELLED_NOTHING);
+    actions.announce(
+      mode === 'cap' ? GUIDED_CAP_NOTHING_SAVED : GUIDED_ESCAPE_NOTHING_SAVED,
+    );
   };
 
   const retain = async (
@@ -144,7 +147,7 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     if (input.skipHistory) {
       // Guided practice: no History row and no clipboard. End on the same
       // terminal state as Escape so no spinner stays up after a cap.
-      if (mode !== 'late') showGuidedCancelled();
+      if (mode !== 'late') showGuidedCancelled(mode);
       return;
     }
     cancellation.retained = true;
@@ -185,7 +188,7 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     cancellation.suppressDelivery = true;
     if (input.skipHistory) {
       // Nothing will be saved, so never promise History or toast later.
-      showGuidedCancelled();
+      showGuidedCancelled(mode);
       return;
     }
     pendingShown = true;
@@ -227,7 +230,7 @@ export function createSafetyNet(input: SafetyNetInput): SafetyNet {
     wireRetainOnCancel(latestText, finished) {
       cancellation.retainOnCancel = () => {
         if (input.skipHistory) {
-          showGuidedCancelled();
+          showGuidedCancelled('cancel');
           return;
         }
         const transcript = latestText();

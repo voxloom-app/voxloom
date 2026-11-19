@@ -45,6 +45,14 @@ export const STOP_LATE_SAVED = 'Your last dictation was saved to History.';
 export const STOP_LATE_NOTHING_SAVED =
   'Your last dictation didn’t come through — nothing was saved.';
 
+/** Guided practice only: the 15s cap fired. Nothing is typed or saved. */
+export const GUIDED_CAP_NOTHING_SAVED =
+  'That took too long — nothing was typed or saved. Try again.';
+
+/** Guided practice only: Escape after stop. Nothing is typed or saved. */
+export const GUIDED_ESCAPE_NOTHING_SAVED =
+  'Practice cancelled — nothing was typed or saved.';
+
 export const CAPTURE_CANCELLED_NOTHING =
   'Capture cancelled — nothing transcribed.';
 

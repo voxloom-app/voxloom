@@ -25,6 +25,8 @@ import { CLEANUP_MODEL_ID } from '../../../src/services/cleanup/types';
 import {
   CAPTURE_CANCELLED_NOTHING,
   DELIVERY_IN_FLIGHT_GRACE_MS,
+  GUIDED_CAP_NOTHING_SAVED,
+  GUIDED_ESCAPE_NOTHING_SAVED,
   STOP_BUDGET_MS,
   STOP_CANCELLED_PENDING,
   STOP_CANCELLED_SAVED,
@@ -1920,8 +1922,9 @@ describe('useDogfoodCapture', () => {
         rerender({ state: stoppedState('pcm-guided-gap') });
         await flush();
         expect(result.current.phase).toBe('cancelled');
-        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).toBe(GUIDED_ESCAPE_NOTHING_SAVED);
         expect(result.current.message).not.toBe(STOP_CANCELLED_PENDING);
+        expect(result.current.message).not.toBe(CAPTURE_CANCELLED_NOTHING);
         await act(async () => {
           resolve({
             copied: false,
@@ -1931,7 +1934,7 @@ describe('useDogfoodCapture', () => {
         });
         await flush();
         expect(result.current.phase).toBe('cancelled');
-        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).toBe(GUIDED_ESCAPE_NOTHING_SAVED);
         expectNothingSaved(spies);
       });
 
@@ -1947,7 +1950,61 @@ describe('useDogfoodCapture', () => {
         expect(result.current.phase).toBe('transcribing');
         await advance(STOP_BUDGET_MS);
         expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(GUIDED_CAP_NOTHING_SAVED);
+        expectNothingSaved(spies);
+      });
+
+      it('shows the guided Escape line when Escape comes after stop with text already in hand', async () => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        const dogfood = vi.fn((options: { onTranscript?: (t: { language: string; text: string }) => void }) => {
+          options.onTranscript?.({ language: 'en', text: 'guided words' });
+          return new Promise<DogfoodResult>(() => {});
+        });
+        const { result, rerender } = await startGuided(dogfood, spies);
+        rerender({ state: stoppedState('pcm-guided-esc-text') });
+        await flush();
+        act(() => { result.current.cancel(); });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(GUIDED_ESCAPE_NOTHING_SAVED);
+        expectNothingSaved(spies);
+      });
+
+      it('shows the guided Escape line when Escape comes after stop with no text yet', async () => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        const dogfood = vi.fn(() => new Promise<DogfoodResult>(() => {}));
+        const { result, rerender } = await startGuided(dogfood, spies);
+        rerender({ state: stoppedState('pcm-guided-esc-empty') });
+        await flush();
+        act(() => { result.current.cancel(); });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(GUIDED_ESCAPE_NOTHING_SAVED);
+        expectNothingSaved(spies);
+      });
+
+      it('keeps the existing capture-cancelled line when Escape comes while still listening', async () => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        const store = createMockSttModelStore();
+        await store.download('whisper-tiny.en');
+        const dogfood = vi.fn();
+        const { result } = renderHook(() => useDogfoodCapture({
+          captureApi: stubCapture({ kind: 'idle' }),
+          clipboard: spies.clip,
+          createModelStore: () => store,
+          deliveryGuard: guard(),
+          dogfood: dogfood as never,
+          modelId: 'whisper-tiny.en',
+          onHistoryRecord: spies.history,
+          onToast: spies.toast,
+        }));
+        await act(async () => { await result.current.start('gesture'); });
+        act(() => { result.current.cancel(); });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
         expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).not.toBe(GUIDED_ESCAPE_NOTHING_SAVED);
+        expect(dogfood).not.toHaveBeenCalled();
         expectNothingSaved(spies);
       });
 
@@ -1967,7 +2024,7 @@ describe('useDogfoodCapture', () => {
         await flush();
         await advance(STOP_BUDGET_MS);
         expect(result.current.phase).toBe('cancelled');
-        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).toBe(GUIDED_CAP_NOTHING_SAVED);
         expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
         await act(async () => {
           settle({
@@ -1978,7 +2035,7 @@ describe('useDogfoodCapture', () => {
         });
         await flush();
         expect(result.current.phase).toBe('cancelled');
-        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).toBe(GUIDED_CAP_NOTHING_SAVED);
         expectNothingSaved(spies);
       });
     });
