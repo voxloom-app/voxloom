@@ -7,6 +7,7 @@
 //! - `may_paste`: the ⌘V fallback runs only after nothing was written
 //!   (Ok writes proven unchanged, or write-free AX errors only).
 
+use super::ax_step::AX_WRITE_SKIPPED_LABEL;
 use super::diag::DeliveryDiag;
 use super::report::{InsertReport, PasteReport};
 use super::retry::{RETRY_READBACK_POLLS, RETRY_READBACK_POLL_MS};
@@ -71,24 +72,6 @@ pub fn readback_text(before: &ValueStatus, after: &ValueStatus) -> Option<String
         return None;
     }
     after.text().map(str::to_string)
-}
-
-/// BUS-223 H4b: the `ax_write=` log label and the refusal reason when the
-/// AX write is skipped.
-pub const AX_WRITE_SKIPPED_LABEL: &str = "skipped(selected_text-unsettable)";
-pub const AX_WRITE_SKIPPED_REASON: &str =
-    "AXSelectedText not settable and AXValue empty — AX write skipped";
-
-/// Skip the AXSelectedText write when it cannot work and cannot be checked:
-/// the selection is not settable (an OK return is then a silent no-op in
-/// every app that showed it: Excel, Weather, Podcasts, Word, Journal) and
-/// AXValue reads no-value, so no read-back could ever tell. Writing anyway
-/// ends as Unverified with no paste (Journal). With nothing written the
-/// refusal is write-free, and `may_paste` decides on ⌘V. A readable value
-/// keeps the strict write and read-back; a Chromium/Electron host keeps its
-/// own typing route.
-pub fn skip_ax_write(selected_text_settable: bool, before: &ValueStatus, web_host: bool) -> bool {
-    !selected_text_settable && *before == ValueStatus::NoValue && !web_host
 }
 
 /// AX errors returned before the app touched the field: unsupported
@@ -285,6 +268,12 @@ pub fn after_ax_refusal(
     };
     let report = match paste(pid) {
         Ok(report) => report,
+        Err(error) if diag.ax_write == AX_WRITE_SKIPPED_LABEL => {
+            // F1: the UI shows the plain reason only; why the paste was
+            // refused stays in the log.
+            diag.fallback = format!("paste-refused({error})");
+            return Err(reason);
+        }
         Err(error) => {
             diag.fallback = "paste-refused".into();
             return Err(format!("{reason}; ⌘V fallback skipped: {error}"));

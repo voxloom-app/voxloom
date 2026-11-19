@@ -27,14 +27,15 @@ use std::sync::Mutex;
 use ax::{copy_string_attr, release, AXIsProcessTrusted, CFTypeRef};
 use focus::{edit_facts, focused_ui_element, resolve_focus, snapshot_at};
 
+use super::decide::ax_step::{decide_ax_step, run_ax_step, AxFacts};
 use super::decide::diag::DeliveryDiag;
 use super::decide::fallback::{
-    after_ax_refusal, field_unchanged, in_web_content, may_paste, poll_readback, skip_ax_write,
-    under_grid, AxAttempt, PasteFacts, ValueStatus, AX_WRITE_SKIPPED_LABEL,
-    AX_WRITE_SKIPPED_REASON,
+    after_ax_refusal, field_unchanged, in_web_content, may_paste, poll_readback, under_grid,
+    AxAttempt, PasteFacts, ValueStatus,
 };
 use super::decide::paste_target::{binding_for, check_paste_target};
 use super::decide::report::PasteReport;
+use super::decide::target::effective_role;
 use super::decide::target_diag::Stage;
 use super::decide::{
     check_insert_text, validate_snapshots, value_confirms_insert, InsertPath, InsertReport,
@@ -132,13 +133,13 @@ pub fn insert_text(
     let validated = validate_snapshots(intended, current);
     let before = ax::read_value(element);
     let terminal = validated.app_pid.and_then(host::apple_terminal_identity);
-    let facts = edit_facts(element);
+    let edit = edit_facts(element);
     let mut diag = DeliveryDiag {
         bundle_id: validated.app_pid.and_then(host::bundle_id),
         role: validated.element_role.clone(),
         subrole: copy_string_attr(element, "AXSubrole"),
         value: before.label(),
-        settable: facts.label(),
+        settable: edit.label(),
         ..Default::default()
     };
     let path = super::decide::terminal::choose_path(&validated, before.text().is_some(), terminal);
@@ -155,37 +156,56 @@ pub fn insert_text(
         }
         InsertPath::AxSelectedText => {
             diag.gate = "ax";
-            let web_host = validated
-                .app_pid
-                .and_then(host::web_ax_activation)
-                .is_some();
-            if skip_ax_write(facts.selected_text, &before, web_host) {
-                // BUS-223 H4b: nothing is written, so `attempt` stays empty
-                // (write-free) and `paste_after_refusal` decides on ⌘V.
-                diag.ax_write = AX_WRITE_SKIPPED_LABEL;
-                Err(AX_WRITE_SKIPPED_REASON.to_string())
-            } else {
-                ax_insert::insert_selected(
-                    element,
-                    &validated,
-                    &before,
-                    text,
-                    &mut diag,
-                    &mut attempt,
-                )
-            }
+            // BUS-223 H4b F1: `decide_ax_step` may skip the write; nothing is
+            // written then, so `attempt` stays empty (write-free) and
+            // `paste_after_refusal` decides on ⌘V.
+            let step = decide_ax_step(&AxFacts {
+                role: effective_role(
+                    validated.element_role.as_deref().unwrap_or_default(),
+                    diag.subrole.as_deref(),
+                ),
+                edit,
+                enabled: ax::copy_bool_attr(element, "AXEnabled"),
+                before: &before,
+                web_host: validated
+                    .app_pid
+                    .and_then(host::web_ax_activation)
+                    .is_some(),
+            });
+            run_ax_step(
+                step,
+                |diag| {
+                    ax_insert::insert_selected(
+                        element,
+                        &validated,
+                        &before,
+                        text,
+                        diag,
+                        &mut attempt,
+                    )
+                },
+                &mut diag,
+            )
         }
     };
     let result = if terminal_path {
         result // Apple Terminal never takes the ⌘V fallback.
     } else {
-        let facts = PasteFacts {
+        let paste_facts = PasteFacts {
             enabled: paste_fallback,
             apple_terminal: terminal,
             attempt,
             ..Default::default()
         };
-        paste_after_refusal(result, element, &validated, &before, facts, text, &mut diag)
+        paste_after_refusal(
+            result,
+            element,
+            &validated,
+            &before,
+            paste_facts,
+            text,
+            &mut diag,
+        )
     };
     release(element as CFTypeRef);
     diag.total_ms = started.elapsed().as_millis();

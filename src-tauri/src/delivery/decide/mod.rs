@@ -1,6 +1,7 @@
 //! Platform-independent delivery decisions (pure; unit-tested on any OS).
 //! The macOS adapter gathers AX facts and delegates every policy choice here.
 
+pub mod ax_step;
 pub mod container_gate;
 pub mod diag;
 pub mod fallback;

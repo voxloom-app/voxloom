@@ -20,7 +20,7 @@ pub struct DeliveryDiag {
     /// The AXSelectedText write error, if any.
     pub ax_error: Option<String>,
     pub readback: &'static str,
-    /// `fallback::AX_WRITE_SKIPPED_LABEL` when the AX write was skipped.
+    /// `ax_step::AX_WRITE_SKIPPED_LABEL` when the AX write was skipped.
     pub ax_write: &'static str,
     /// none, paste, or why the paste was skipped.
     pub fallback: String,
