@@ -67,6 +67,12 @@ export interface DogfoodTranscribeOptions {
    */
   onTranscript?: (transcript: Transcript) => void;
   /**
+   * Called once, immediately before an insert, terminal paste, or
+   * clipboard-restore paste fallback. The stop cap must not start a
+   * second delivery or write the clipboard after this.
+   */
+  onDeliveryStart?: () => void;
+  /**
    * The user's dictionary words (BUS-138). Entries are spelled exactly as
    * saved in the transcript, right after STT and again after cleanup. History
    * keeps the engine output as `rawText`. Empty or missing: no change.
@@ -200,8 +206,11 @@ export async function dogfoodTranscribeAndCopy(
 
   const insertOwnField = options.insertOwnField ?? insertIntoOwnField;
   try {
-    if (transcript.text.trim() && (options.isCurrent?.() ?? true)
-      && insertOwnField(transcript.text)) {
+    const delivering = Boolean(
+      transcript.text.trim() && (options.isCurrent?.() ?? true),
+    );
+    if (delivering) options.onDeliveryStart?.();
+    if (delivering && insertOwnField(transcript.text)) {
       const delivery: DeliveryOutcome = {
         clipboardRestored: false,
         detail: 'Voxloom field',

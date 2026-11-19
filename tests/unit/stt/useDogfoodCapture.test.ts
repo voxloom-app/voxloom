@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ClipboardAdapter } from '../../../src/services/clipboard';
 import type { DeliveryPlatformAdapter, TargetSnapshot } from
@@ -18,10 +18,14 @@ import {
 import { useDogfoodCapture } from
   '../../../src/services/stt/useDogfoodCapture';
 import * as cancelScopeModule from '../../../src/services/shortcut/cancelScope';
+import type { CleanupEngine } from '../../../src/services/cleanup/contracts';
+import { CLEANUP_MODEL_ID } from '../../../src/services/cleanup/types';
 import {
   CAPTURE_CANCELLED_NOTHING,
+  STOP_BUDGET_MS,
   STOP_CANCELLED_PENDING,
   STOP_CANCELLED_SAVED,
+  STOP_LATE_NOTHING_SAVED,
   STOP_LATE_SAVED,
   STOP_TAKING_LONGER_PENDING,
   STOP_TAKING_LONGER_SAVED,
@@ -224,9 +228,10 @@ describe('useDogfoodCapture', () => {
     } } as CaptureState } });
     await waitFor(() => expect(dogfood).toHaveBeenCalledOnce());
     act(() => result.current.cancel());
+    expect(result.current.message).toBe(STOP_CANCELLED_PENDING);
     toast.mockClear();
     await act(async () => { reject(new Error('late failure')); });
-    expect(toast).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(STOP_LATE_NOTHING_SAVED);
     expect(history).not.toHaveBeenCalled();
     expect(result.current.phase).toBe('cancelled');
     rerender({ state: { kind: 'idle' } });
@@ -956,189 +961,538 @@ describe('useDogfoodCapture', () => {
       status: 'unverified',
     }));
   });
-  it('shows a plain pending note when the safety net fires before any text, then saves a late transcript to History', async () => {
-    const store = createMockSttModelStore();
-    await store.download('whisper-tiny.en');
-    let resolve!: (value: DogfoodResult) => void;
-    const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
-    const toast = vi.fn();
-    const history = vi.fn();
-    const clip = clipboard();
-    const { result } = renderHook(() => useDogfoodCapture({
-      captureApi: stubCapture({
-        audio: { duration_ms: 60_000, id: 'pcm-cap-pending', sample_rate_hz: 16_000 },
-        kind: 'stopped',
-      }),
-      clipboard: clip,
-      createModelStore: () => store,
-      dogfood,
-      modelId: 'whisper-tiny.en',
-      onHistoryRecord: history,
-      onToast: toast,
-      stopBudgetMs: 80,
-    }));
-    await waitFor(() => expect(dogfood).toHaveBeenCalledOnce());
-    expect(result.current.phase).toBe('transcribing');
-    await waitFor(() => expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING));
-    expect(result.current.phase).toBe('success');
-    expect(result.current.hudResult).toBeNull();
-    expect(history).not.toHaveBeenCalled();
-    expect(result.current.message).not.toMatch(/fail|error/i);
-    expect(result.current.message).not.toBe(CAPTURE_CANCELLED_NOTHING);
-    await act(async () => {
-      resolve({
-        copied: false,
-        delivery: deliveryOutcome('failed', 'late words'),
-        transcript: { language: 'en', text: 'late words' },
+
+
+  describe('stop safety net', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function flush() {
+      await act(async () => {
+        await Promise.resolve();
       });
-    });
-    await waitFor(() => expect(history).toHaveBeenCalledOnce());
-    expect(history).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'failed',
-      text: 'late words',
-    }));
-    expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
-    expect(clip.copy).not.toHaveBeenCalled();
-    expect(result.current.phase).toBe('success');
-  });
+    }
 
-  it('saves existing text to History and the clipboard when the safety net fires, with a plain note rather than an error', async () => {
-    const store = createMockSttModelStore();
-    await store.download('whisper-tiny.en');
-    const clip = clipboard();
-    const history = vi.fn();
-    const dogfood: typeof dogfoodTranscribeAndCopy = (options) => {
-      options.onTranscript?.({ language: 'en', text: 'partial words' });
-      return new Promise<DogfoodResult>(() => {});
-    };
-    const { result } = renderHook(() => useDogfoodCapture({
-      captureApi: stubCapture({
-        audio: { duration_ms: 60_000, id: 'pcm-cap-saved', sample_rate_hz: 16_000 },
-        kind: 'stopped',
-      }),
-      clipboard: clip,
-      createModelStore: () => store,
-      dogfood,
-      modelId: 'whisper-tiny.en',
-      onHistoryRecord: history,
-      stopBudgetMs: 80,
-    }));
-    await waitFor(() => expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED));
-    expect(result.current.phase).toBe('success');
-    expect(result.current.hudResult).toBe('copied');
-    expect(result.current.transcript?.text).toBe('partial words');
-    expect(clip.copy).toHaveBeenCalledWith('partial words');
-    expect(history).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'copied',
-      text: 'partial words',
-    }));
-    expect(result.current.message).not.toMatch(/fail|error/i);
-  });
-
-  it('saves existing text to History only when the safety net fires and Copy fallback is off', async () => {
-    const store = createMockSttModelStore();
-    await store.download('whisper-tiny.en');
-    const clip = clipboard();
-    const history = vi.fn();
-    const dogfood: typeof dogfoodTranscribeAndCopy = (options) => {
-      options.onTranscript?.({ language: 'en', text: 'partial words' });
-      return new Promise<DogfoodResult>(() => {});
-    };
-    const { result } = renderHook(() => useDogfoodCapture({
-      captureApi: stubCapture({
-        audio: { duration_ms: 60_000, id: 'pcm-cap-hist', sample_rate_hz: 16_000 },
-        kind: 'stopped',
-      }),
-      clipboard: clip,
-      clipboardFallback: false,
-      createModelStore: () => store,
-      dogfood,
-      modelId: 'whisper-tiny.en',
-      onHistoryRecord: history,
-      stopBudgetMs: 80,
-    }));
-    await waitFor(() => expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY));
-    expect(clip.copy).not.toHaveBeenCalled();
-    expect(history).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'failed',
-      text: 'partial words',
-    }));
-    expect(result.current.phase).toBe('success');
-  });
-
-  it('saves existing text on Escape during transcription, and does not say nothing was transcribed', async () => {
-    const store = createMockSttModelStore();
-    await store.download('whisper-tiny.en');
-    const clip = clipboard();
-    const history = vi.fn();
-    const dogfood = vi.fn((options: Parameters<typeof dogfoodTranscribeAndCopy>[0]) => {
-      options.onTranscript?.({ language: 'en', text: 'heard you' });
-      return new Promise<DogfoodResult>(() => {});
-    });
-    const { result } = renderHook(() => useDogfoodCapture({
-      captureApi: stubCapture({
-        audio: { duration_ms: 8_000, id: 'pcm-esc-saved', sample_rate_hz: 16_000 },
-        kind: 'stopped',
-      }),
-      clipboard: clip,
-      createModelStore: () => store,
-      dogfood,
-      modelId: 'whisper-tiny.en',
-      onHistoryRecord: history,
-    }));
-    await waitFor(() => expect(dogfood).toHaveBeenCalledOnce());
-    act(() => result.current.cancel());
-    await waitFor(() => expect(result.current.message).toBe(STOP_CANCELLED_SAVED));
-    expect(result.current.phase).toBe('cancelled');
-    expect(result.current.message).not.toBe(CAPTURE_CANCELLED_NOTHING);
-    expect(clip.copy).toHaveBeenCalledWith('heard you');
-    expect(history).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'copied',
-      text: 'heard you',
-    }));
-  });
-
-  it('keeps a pending note on Escape before any text, then saves a late transcript to History', async () => {
-    const store = createMockSttModelStore();
-    await store.download('whisper-tiny.en');
-    let resolve!: (value: DogfoodResult) => void;
-    const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
-    const toast = vi.fn();
-    const history = vi.fn();
-    const clip = clipboard();
-    const { result } = renderHook(() => useDogfoodCapture({
-      captureApi: stubCapture({
-        audio: { duration_ms: 8_000, id: 'pcm-esc-pending', sample_rate_hz: 16_000 },
-        kind: 'stopped',
-      }),
-      clipboard: clip,
-      createModelStore: () => store,
-      dogfood,
-      modelId: 'whisper-tiny.en',
-      onHistoryRecord: history,
-      onToast: toast,
-    }));
-    await waitFor(() => expect(dogfood).toHaveBeenCalledOnce());
-    act(() => result.current.cancel());
-    await waitFor(() => expect(result.current.message).toBe(STOP_CANCELLED_PENDING));
-    expect(result.current.phase).toBe('cancelled');
-    expect(history).not.toHaveBeenCalled();
-    await act(async () => {
-      resolve({
-        copied: false,
-        delivery: deliveryOutcome('failed', 'late words'),
-        transcript: { language: 'en', text: 'late words' },
+    async function advance(ms: number) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(ms);
       });
+    }
+
+    it('shows a plain pending note when the safety net fires before any text, then saves a late transcript to History', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let resolve!: (value: DogfoodResult) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const clip = clipboard();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 60_000, id: 'pcm-cap-pending', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+        onToast: toast,
+      }));
+      await flush();
+      expect(dogfood).toHaveBeenCalledOnce();
+      expect(result.current.phase).toBe('transcribing');
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
+      expect(result.current.phase).toBe('success');
+      expect(result.current.hudResult).toBeNull();
+      expect(history).not.toHaveBeenCalled();
+      expect(result.current.message).not.toMatch(/fail|error/i);
+      expect(result.current.message).not.toBe(CAPTURE_CANCELLED_NOTHING);
+      await act(async () => {
+        resolve({
+          copied: false,
+          delivery: deliveryOutcome('failed', 'late words'),
+          transcript: { language: 'en', text: 'late words' },
+        });
+      });
+      await flush();
+      expect(history).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'late words',
+      }));
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('success');
     });
-    await waitFor(() => expect(history).toHaveBeenCalledOnce());
-    expect(history).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'failed',
-      text: 'late words',
-    }));
-    expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
-    expect(clip.copy).not.toHaveBeenCalled();
-    expect(result.current.phase).toBe('cancelled');
+
+    it('saves existing text to History and the clipboard when the safety net fires, with a plain note rather than an error', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const dogfood: typeof dogfoodTranscribeAndCopy = (options) => {
+        options.onTranscript?.({ language: 'en', text: 'partial words' });
+        return new Promise<DogfoodResult>(() => {});
+      };
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 60_000, id: 'pcm-cap-saved', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.phase).toBe('success');
+      expect(result.current.hudResult).toBe('copied');
+      expect(result.current.transcript?.text).toBe('partial words');
+      expect(clip.copy).toHaveBeenCalledWith('partial words');
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'copied',
+        text: 'partial words',
+      }));
+      expect(result.current.message).not.toMatch(/fail|error/i);
+    });
+
+    it('saves existing text to History only when the safety net fires and Copy fallback is off', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const dogfood: typeof dogfoodTranscribeAndCopy = (options) => {
+        options.onTranscript?.({ language: 'en', text: 'partial words' });
+        return new Promise<DogfoodResult>(() => {});
+      };
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 60_000, id: 'pcm-cap-hist', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        clipboardFallback: false,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'partial words',
+      }));
+      expect(result.current.phase).toBe('success');
+    });
+
+    it('saves existing text on Escape during transcription, and does not say nothing was transcribed', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const dogfood = vi.fn((options: Parameters<typeof dogfoodTranscribeAndCopy>[0]) => {
+        options.onTranscript?.({ language: 'en', text: 'heard you' });
+        return new Promise<DogfoodResult>(() => {});
+      });
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 8_000, id: 'pcm-esc-saved', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      expect(dogfood).toHaveBeenCalledOnce();
+      act(() => result.current.cancel());
+      await flush();
+      expect(result.current.message).toBe(STOP_CANCELLED_SAVED);
+      expect(result.current.phase).toBe('cancelled');
+      expect(result.current.message).not.toBe(CAPTURE_CANCELLED_NOTHING);
+      expect(clip.copy).toHaveBeenCalledWith('heard you');
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'copied',
+        text: 'heard you',
+      }));
+    });
+
+    it('keeps a pending note on Escape before any text, then saves a late transcript to History', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let resolve!: (value: DogfoodResult) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const clip = clipboard();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 8_000, id: 'pcm-esc-pending', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+        onToast: toast,
+      }));
+      await flush();
+      expect(dogfood).toHaveBeenCalledOnce();
+      act(() => result.current.cancel());
+      await flush();
+      expect(result.current.message).toBe(STOP_CANCELLED_PENDING);
+      expect(result.current.phase).toBe('cancelled');
+      expect(history).not.toHaveBeenCalled();
+      await act(async () => {
+        resolve({
+          copied: false,
+          delivery: deliveryOutcome('failed', 'late words'),
+          transcript: { language: 'en', text: 'late words' },
+        });
+      });
+      await flush();
+      expect(history).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'late words',
+      }));
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('cancelled');
+    });
+
+    it('does not start Transcribing after Escape in the stop-to-stopped gap', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let resolve!: (value: DogfoodResult) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const clip = clipboard();
+      const { result, rerender } = renderHook(
+        ({ state }: { state: CaptureState }) => useDogfoodCapture({
+          captureApi: stubCapture(state),
+          clipboard: clip,
+          createModelStore: () => store,
+          dogfood,
+          modelId: 'whisper-tiny.en',
+          onHistoryRecord: history,
+          onToast: toast,
+        }),
+        { initialProps: { state: { kind: 'idle' } as CaptureState } },
+      );
+      await act(async () => { await result.current.start(); });
+      await act(async () => { await result.current.stop(); });
+      act(() => { result.current.cancel(); });
+      expect(result.current.phase).toBe('cancelled');
+      rerender({
+        state: {
+          audio: { duration_ms: 8_000, id: 'pcm-gap', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        },
+      });
+      await flush();
+      expect(dogfood).toHaveBeenCalledOnce();
+      expect(result.current.phase).toBe('cancelled');
+      expect(result.current.message).toBe(STOP_CANCELLED_PENDING);
+      expect(result.current.message).not.toMatch(/Transcribing/i);
+      await act(async () => {
+        resolve({
+          copied: false,
+          delivery: deliveryOutcome('failed', 'gap words'),
+          transcript: { language: 'en', text: 'gap words' },
+        });
+      });
+      await flush();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'gap words',
+      }));
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('cancelled');
+    });
+
+    it('treats Escape after the cap as a cancel-pending note, then saves a late result to History', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let resolve!: (value: DogfoodResult) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const clip = clipboard();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 8_000, id: 'pcm-esc-after-cap', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+        onToast: toast,
+      }));
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
+      act(() => result.current.cancel());
+      await flush();
+      expect(result.current.phase).toBe('cancelled');
+      expect(result.current.message).toBe(STOP_CANCELLED_PENDING);
+      await act(async () => {
+        resolve({
+          copied: false,
+          delivery: deliveryOutcome('failed', 'after cap'),
+          transcript: { language: 'en', text: 'after cap' },
+        });
+      });
+      await flush();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        text: 'after cap',
+        status: 'failed',
+      }));
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('cancelled');
+    });
+
+    it('keeps a late result on History only when a new session has started', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let resolve!: (value: DogfoodResult) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const clip = clipboard();
+      const { result, rerender } = renderHook(
+        ({ state }: { state: CaptureState }) => useDogfoodCapture({
+          captureApi: stubCapture(state),
+          clipboard: clip,
+          createModelStore: () => store,
+          dogfood,
+          modelId: 'whisper-tiny.en',
+          onHistoryRecord: history,
+          onToast: toast,
+        }),
+        { initialProps: { state: {
+          audio: { duration_ms: 8_000, id: 'pcm-late-new', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        } as CaptureState } },
+      );
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
+      rerender({ state: { kind: 'idle' } });
+      await act(async () => { await result.current.start(); });
+      expect(result.current.phase).toBe('recording');
+      const messageAfterStart = result.current.message;
+      await act(async () => {
+        resolve({
+          copied: true,
+          delivery: deliveryOutcome('copied', 'stale words'),
+          transcript: { language: 'en', text: 'stale words' },
+        });
+      });
+      await flush();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({
+        status: 'failed',
+        text: 'stale words',
+      }));
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('recording');
+      expect(result.current.message).toBe(messageAfterStart);
+    });
+
+    it('times cleanup out with the delivery margin so raw text is inserted before the cap', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const insert = vi.fn().mockResolvedValue(undefined);
+      const target: TargetSnapshot = {
+        appName: 'Notes', appPid: 42, capturedAt: 1, elementId: 'A',
+        elementRole: 'AXTextArea', insertable: true, kind: 'insertable', reason: null,
+      };
+      const platform = createStubDeliveryAdapter({
+        clipboard: clip,
+        insert,
+        snapshot: async () => target,
+        validate: async () => target,
+      });
+      const cleanupEngine = {
+        acquire: vi.fn().mockResolvedValue(undefined),
+        cancel: vi.fn().mockResolvedValue(undefined),
+        release: vi.fn().mockResolvedValue(undefined),
+        run: vi.fn(() => new Promise<string>(() => {})),
+      } satisfies CleanupEngine;
+      const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({
+        ...options,
+        createEngine: (modelId) => ({
+          ...createMockSttEngine({ modelId }),
+          transcribe: () => new Promise((resolve) => {
+            setTimeout(() => resolve({ language: 'en', text: 'raw words' }), 14_000);
+          }),
+        }),
+      });
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-cleanup-margin', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        cleanupActive: true,
+        cleanupEngine,
+        cleanupModelId: CLEANUP_MODEL_ID,
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: platform,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      await advance(14_000);
+      await flush();
+      expect(cleanupEngine.run).toHaveBeenCalled();
+      await advance(50);
+      expect(result.current.phase).toBe('success');
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
+      expect(insert).toHaveBeenCalledOnce();
+      expect(insert).toHaveBeenCalledWith('raw words', expect.objectContaining({ elementId: 'A' }));
+      expect(clip.copy).not.toHaveBeenCalled();
+      await advance(STOP_BUDGET_MS);
+      expect(insert).toHaveBeenCalledOnce();
+      expect(history).toHaveBeenCalledOnce();
+    });
+
+    it('clears the cap timer on normal completion so a later tick does not retain again', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      const dogfood = vi.fn(async (): Promise<DogfoodResult> => ({
+        copied: true,
+        delivery: deliveryOutcome('copied', 'done quickly', 'Copied — test'),
+        transcript: { language: 'en', text: 'done quickly' },
+      }));
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 1_000, id: 'pcm-timer-cleared', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      expect(result.current.phase).toBe('success');
+      expect(history).toHaveBeenCalledOnce();
+      await advance(STOP_BUDGET_MS + 1_000);
+      expect(history).toHaveBeenCalledOnce();
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
+      expect(clip.copy).not.toHaveBeenCalled();
+    });
+
+    it('toasts when a pending late result fails and nothing was saved', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      let reject!: (error: Error) => void;
+      const dogfood = vi.fn(() => new Promise<DogfoodResult>((_, no) => { reject = no; }));
+      const toast = vi.fn();
+      const history = vi.fn();
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 8_000, id: 'pcm-late-fail', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clipboard(),
+        createModelStore: () => store,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+        onToast: toast,
+      }));
+      await flush();
+      await advance(STOP_BUDGET_MS);
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
+      await act(async () => { reject(new Error('native stt hung')); });
+      await flush();
+      expect(toast).toHaveBeenCalledWith(STOP_LATE_NOTHING_SAVED);
+      expect(history).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('success');
+      expect(result.current.message).toBe(STOP_TAKING_LONGER_PENDING);
+    });
+
+    it('does not copy or deliver twice when the cap fires during an in-flight insert', async () => {
+      const store = createMockSttModelStore();
+      await store.download('whisper-tiny.en');
+      const clip = clipboard();
+      const history = vi.fn();
+      let finishInsert!: () => void;
+      const insert = vi.fn(() => new Promise<void>((ok) => { finishInsert = ok; }));
+      const target: TargetSnapshot = {
+        appName: 'Notes', appPid: 42, capturedAt: 1, elementId: 'A',
+        elementRole: 'AXTextArea', insertable: true, kind: 'insertable', reason: null,
+      };
+      const platform = createStubDeliveryAdapter({
+        clipboard: clip,
+        insert,
+        snapshot: async () => target,
+        validate: async () => target,
+      });
+      const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({
+        ...options,
+        createEngine: (modelId) => ({
+          ...createMockSttEngine({ modelId }),
+          transcribe: async () => ({ language: 'en', text: 'typed once' }),
+        }),
+      });
+      const { result } = renderHook(() => useDogfoodCapture({
+        captureApi: stubCapture({
+          audio: { duration_ms: 2_000, id: 'pcm-cap-insert', sample_rate_hz: 16_000 },
+          kind: 'stopped',
+        }),
+        clipboard: clip,
+        createModelStore: () => store,
+        deliveryPlatform: platform,
+        dogfood,
+        modelId: 'whisper-tiny.en',
+        onHistoryRecord: history,
+      }));
+      await flush();
+      expect(insert).toHaveBeenCalledOnce();
+      await advance(STOP_BUDGET_MS);
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED);
+      expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
+      expect(insert).toHaveBeenCalledOnce();
+      await act(async () => { finishInsert(); });
+      await flush();
+      expect(insert).toHaveBeenCalledOnce();
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(result.current.phase).toBe('success');
+      expect(history).toHaveBeenCalledOnce();
+    });
   });
 
 });
-

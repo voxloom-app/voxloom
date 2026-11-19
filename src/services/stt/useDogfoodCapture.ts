@@ -70,11 +70,6 @@ export interface UseDogfoodCaptureOptions {
    * after stop still appends when a transcript (including a late one) exists.
    */
   onHistoryRecord?: (record: DictationRecord) => void;
-  /**
-   * Test seam: stop safety-net duration in ms (defaults to STOP_BUDGET_MS).
-   * Production callers must leave this unset.
-   */
-  stopBudgetMs?: number;
   /** Toast / announce callback for loading / success / error. */
   onToast?: (message: string) => void;
   /** Preferred mic id; system default means omit and let native pick. */

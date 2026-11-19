@@ -6,6 +6,15 @@
 /** Wait after stop before the UI leaves the spinner. Not an STT abort. */
 export const STOP_BUDGET_MS = 15_000;
 
+/**
+ * Time reserved after cleanup so a raw-text insert (or terminal paste,
+ * including the clipboard-restore paste fallback) can still start before
+ * the 15s safety net. Two seconds covers a typical AX insert or paste
+ * plus restore without eating the whole leftover window; cleanup already
+ * has its own 10s cap. The 15s cap remains the UI deadline.
+ */
+export const CLEANUP_DELIVERY_MARGIN_MS = 2_000;
+
 export const STOP_TAKING_LONGER_SAVED =
   'Took too long to insert — saved to History and the clipboard.';
 
@@ -26,6 +35,10 @@ export const STOP_CANCELLED_PENDING =
 
 export const STOP_LATE_SAVED = 'Your last dictation was saved to History.';
 
+/** Placeholder: shown when a pending late result never arrives. UI/UX review. */
+export const STOP_LATE_NOTHING_SAVED =
+  'Transcription didn\'t finish — nothing was saved.';
+
 export const CAPTURE_CANCELLED_NOTHING =
   'Capture cancelled — nothing transcribed.';
 
@@ -45,15 +58,23 @@ export function stopPendingNote(kind: StopNoteKind): string {
 }
 
 /**
- * Time left for optional cleanup inside the overall stop budget. Cleanup is
- * already capped at 10s; this only shrinks that when STT used most of the
- * 15s window. Always at least 1ms so the stage can time out to raw text.
+ * Time left for optional cleanup inside the overall stop budget, after
+ * reserving the delivery margin. Cleanup is already capped at 10s; this
+ * only shrinks that when STT used most of the 15s window. Always at least
+ * 1ms so the stage can time out to raw text and still insert before the cap.
  */
 export function remainingCleanupBudgetMs(
   startedAt: number,
   now: number = performance.now(),
   stopBudgetMs: number = STOP_BUDGET_MS,
   cleanupBudgetMs: number = 10_000,
+  deliveryMarginMs: number = CLEANUP_DELIVERY_MARGIN_MS,
 ): number {
-  return Math.max(1, Math.min(cleanupBudgetMs, stopBudgetMs - (now - startedAt)));
+  return Math.max(
+    1,
+    Math.min(
+      cleanupBudgetMs,
+      stopBudgetMs - deliveryMarginMs - (now - startedAt),
+    ),
+  );
 }

@@ -7,7 +7,6 @@ import type { PreparedSttSession } from './prepareSession';
 import type { PasteBinding } from '../delivery';
 import type { CancelScope } from '../shortcut/cancelScope';
 import type { OwnFieldDeliveryGuard } from './dogfoodPath';
-import type { Transcript } from './types';
 
 /** Per-session lease: cancellation discards results, unlike supersession. */
 export interface Cancellation {
@@ -18,12 +17,12 @@ export interface Cancellation {
   transcribing?: boolean;
   /** Set when stop() is called, so Escape after stop cannot discard the clip. */
   captureStopped?: boolean;
-  /** Mid-flight STT or cleaned text, for the stop safety net and Escape. */
-  latestText?: Transcript;
   /** True once this run has written a History row (avoids duplicates). */
   retained?: boolean;
   /** Cap or Escape: do not insert; a late result still goes to History. */
   suppressDelivery?: boolean;
+  /** Set just before insert or paste so the cap cannot start a second delivery. */
+  deliveryInFlight?: boolean;
   /** Escape during processing: retain any text or show the pending note. */
   retainOnCancel?: () => void;
   scope?: CancelScope;

@@ -6,7 +6,8 @@
 /// A 15s safety net (BUS-255) is not an STT abort: when it fires, any text
 /// already in hand is saved to History and the clipboard with a plain note.
 /// If nothing is ready yet, transcription keeps running and a late result is
-/// saved to History. Escape during processing does the same.
+/// saved to History. Escape during processing does the same. If delivery
+/// has already started, the cap leaves that outcome alone.
 
 import { useCallback, useEffect, useRef } from 'react';
 import { createDogfoodRecord } from '../../domain/records';
@@ -21,18 +22,11 @@ import {
 } from '../delivery';
 import { prepareDogfoodCleanup } from './dogfoodCleanup';
 import { errorText } from './dogfoodModel';
-import { dogfoodTranscribeAndCopy, type CaptureAudioMeta, type DogfoodResult } from './dogfoodPath';
+import { dogfoodTranscribeAndCopy, type CaptureAudioMeta } from './dogfoodPath';
 import { hudResultFor, type DogfoodViewActions } from './dogfoodPhase';
 import type { DogfoodLiveSession } from './dogfoodSessionState';
-import { retainTranscript } from './retainTranscript';
-import {
-  remainingCleanupBudgetMs,
-  STOP_BUDGET_MS,
-  STOP_LATE_SAVED,
-  stopPendingNote,
-  stopSavedNote,
-  CAPTURE_CANCELLED_NOTHING,
-} from './stopBudget';
+import { remainingCleanupBudgetMs, STOP_BUDGET_MS, CAPTURE_CANCELLED_NOTHING } from './stopBudget';
+import { createSafetyNet, startStopBudget } from './stopSafetyNet';
 import type { Transcript } from './types';
 import type { UseDogfoodCaptureOptions } from './useDogfoodCapture';
 
@@ -91,6 +85,7 @@ export function useDogfoodProcessing({
     cancellation.transcribing = true;
     cancellation.retained = false;
     cancellation.suppressDelivery = cancellation.cancelled;
+    cancellation.deliveryInFlight = false;
     let latestText: Transcript | undefined;
     const current = () => session === live.session && !cancellation.cancelled;
     const canDeliver = () =>
@@ -120,72 +115,31 @@ export function useDogfoodProcessing({
     const processing = new AbortController();
     live.processing = processing;
     let stopWaitingForBinding: (() => void) | undefined;
-    let budgetTimer: ReturnType<typeof setTimeout> | undefined;
     let lateInFlight = false;
     let finished = false;
     const startedAt = performance.now();
-    const budgetMs = optionsRef.current.stopBudgetMs ?? STOP_BUDGET_MS;
+    // Arm before ensureModel / paste-binding awaits so a stall cannot skip the cap.
+    const budget = startStopBudget(STOP_BUDGET_MS, startedAt);
     // Snapshot at stop: a settings change mid-dictation applies to the next
     // one. The same style goes to cleanup and onto the History row.
     const latest = optionsRef.current;
     const style = latest.style ?? 'formal';
     let modelId = cancellation.modelId ?? 'unknown';
 
-    const retain = async (transcript: Transcript, mode: 'cap' | 'cancel' | 'late') => {
-      if (cancellation.retained || !transcript.text.trim()) return;
-      cancellation.retained = true;
-      const copyToClipboard = mode !== 'late'
-        && ownsUi()
-        && optionsRef.current.clipboardFallback !== false;
-      const status = await retainTranscript({
-        clipboard: optionsRef.current.clipboard,
-        copyToClipboard,
-        durationMs: audio.duration_ms,
-        id: `dogfood-${audio.id}`,
-        model: modelId,
-        now: (optionsRef.current.now ?? Date.now)(),
-        onHistoryRecord: optionsRef.current.onHistoryRecord,
-        rawText: transcript.rawText,
-        style,
-        text: transcript.text,
-      });
-      if (mode === 'late') {
-        toast(STOP_LATE_SAVED);
-        return;
-      }
-      if (!ownsUi()) return;
-      setTranscript(transcript);
-      if (mode === 'cap') {
-        setHudResult(status === 'copied' ? 'copied' : null);
-        setPhase('success');
-        announce(stopSavedNote('cap', status === 'copied'));
-      } else {
-        setPhase('cancelled');
-        announce(stopSavedNote('cancel', status === 'copied'));
-      }
-    };
-
-    const showPending = (mode: 'cap' | 'cancel') => {
-      cancellation.suppressDelivery = true;
-      if (!ownsUi()) return;
-      if (mode === 'cap') {
-        setHudResult(null);
-        setPhase('success');
-        announce(stopPendingNote('cap'));
-      } else {
-        setPhase('cancelled');
-        announce(stopPendingNote('cancel'));
-      }
-    };
-
-    cancellation.retainOnCancel = () => {
-      if (latestText?.text.trim()) {
-        void retain(latestText, 'cancel');
-      } else if (!finished) {
-        showPending('cancel');
-      }
-      // If STT already failed or returned empty, do not promise a late save.
-    };
+    const safety = createSafetyNet({
+      actions,
+      audio,
+      cancellation,
+      clipboard: () => optionsRef.current.clipboard,
+      clipboardFallback: () => optionsRef.current.clipboardFallback !== false,
+      modelId: () => modelId,
+      now: () => (optionsRef.current.now ?? Date.now)(),
+      onHistoryRecord: () => optionsRef.current.onHistoryRecord,
+      ownsUi,
+      skipClipboard: Boolean(guard),
+      style,
+    });
+    safety.wireRetainOnCancel(() => latestText, () => finished);
 
     const releaseResources = async () => {
       if (stopWaitingForBinding) {
@@ -194,21 +148,6 @@ export function useDogfoodProcessing({
       await cancellation.preparation?.release(audio.id).catch(() => {});
       if (live.processing === processing) live.processing = null;
       await cancellation.scope?.dispose().catch(() => {});
-    };
-
-    const finishLate = (work: Promise<unknown>) => {
-      lateInFlight = true;
-      void work.then(async (value) => {
-        await settleCancellation();
-        const result = value as { transcript?: Transcript };
-        if (result?.transcript && !cancellation.retained) {
-          await retain(result.transcript, 'late');
-        }
-      }).catch(() => {
-        // A late rejection stays silent: no toast, no History (existing policy).
-      }).finally(() => {
-        void releaseResources();
-      });
     };
 
     const cleanup = prepareDogfoodCleanup({
@@ -226,11 +165,17 @@ export function useDogfoodProcessing({
         modelId: latest.cleanupModelId ?? null,
         style,
       },
-      timeoutMs: () => remainingCleanupBudgetMs(startedAt, performance.now(), budgetMs),
+      timeoutMs: () => remainingCleanupBudgetMs(startedAt, performance.now()),
       userCancelled: () => cancellation.cancelled,
     });
-    setPhase('transcribing');
-    announce('Transcribing…');
+    // Escape in the stop→stopped gap already cancelled; do not clobber the
+    // cancelled phase with "Transcribing…". Still run STT for History.
+    if (cancellation.cancelled) {
+      safety.showPending('cancel');
+    } else {
+      setPhase('transcribing');
+      announce('Transcribing…');
+    }
     try {
       modelId = cancellation.modelId ?? await ensureModel();
       // Escape after stop must still start STT so a late result can reach History.
@@ -265,36 +210,37 @@ export function useDogfoodProcessing({
           return target;
         },
         modelId,
-        onTranscript: (transcript) => {
-          latestText = transcript;
-          cancellation.latestText = transcript;
-        },
+        onDeliveryStart: () => { cancellation.deliveryInFlight = true; },
+        onTranscript: (transcript) => { latestText = transcript; },
         requestId: cancellation.preparation?.requestId,
       });
 
-      const outcome = await new Promise<DogfoodResult | 'budget'>((resolve, reject) => {
-        budgetTimer = setTimeout(() => resolve('budget'), budgetMs);
-        dogfoodPromise.then((result) => resolve(result), reject);
-      });
+      let outcome = await budget.against(dogfoodPromise);
+      // An in-flight insert or paste must finish on its own. The cap must
+      // not retain, copy, or suppress that delivery.
+      if (outcome === 'budget' && cancellation.deliveryInFlight) {
+        outcome = await dogfoodPromise;
+      }
 
       if (outcome === 'budget') {
-        clearTimeout(budgetTimer);
+        budget.clear();
         cancellation.suppressDelivery = true;
         // Abort cleanup and delivery only. Do not cancel native STT.
         processing.abort();
         await settleCancellation();
         if (!cancellation.cancelled) {
           if (latestText?.text.trim()) {
-            await retain(latestText, 'cap');
+            await safety.retain(latestText, 'cap');
           } else {
-            showPending('cap');
+            safety.showPending('cap');
           }
         }
-        finishLate(dogfoodPromise);
+        lateInFlight = true;
+        safety.finishLate(dogfoodPromise, settleCancellation, releaseResources);
         return;
       }
 
-      clearTimeout(budgetTimer);
+      budget.clear();
       finished = true;
       // A stale successful path skips beforeDelivery, but still needs the
       // saved cancellation decision before publishing History or a toast.
@@ -302,12 +248,14 @@ export function useDogfoodProcessing({
       if (cancellation.retained) return;
       if (cancellation.cancelled || cancellation.suppressDelivery) {
         if (outcome.transcript.text.trim()) {
-          await retain(
+          await safety.retain(
             outcome.transcript,
             ownsUi() && cancellation.cancelled && !cancellation.suppressDelivery
               ? 'cancel'
               : 'late',
           );
+        } else {
+          safety.toastIfPendingFailed();
         }
         return;
       }
@@ -345,7 +293,10 @@ export function useDogfoodProcessing({
     } catch (error: unknown) {
       finished = true;
       await settleCancellation();
-      if (cancellation.cancelled || cancellation.suppressDelivery) return;
+      if (cancellation.cancelled || cancellation.suppressDelivery) {
+        safety.toastIfPendingFailed();
+        return;
+      }
       if (current()) {
         setHudResult('transcribe-failed');
         setPhase('error');
@@ -354,7 +305,7 @@ export function useDogfoodProcessing({
         toast(errorText(error));
       }
     } finally {
-      clearTimeout(budgetTimer);
+      budget.clear();
       if (!lateInFlight) await releaseResources();
     }
   }, [actions, cleanupEngine, ensureModel, live]);

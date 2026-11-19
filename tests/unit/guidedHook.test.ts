@@ -45,8 +45,8 @@ it('keeps an owned practice guard through capture and cancels without late inser
   expect(result.current.phase).toBe('cancelled');
   expect(guard.insert).not.toHaveBeenCalled();
   expect(guard.result).not.toHaveBeenCalled();
-  // Escape after STT keeps the transcript (BUS-255); it must not insert.
-  expect(clipboard.copy).toHaveBeenCalledWith('Boundary fixture');
+  // Guided practice Escape: History only, never the clipboard (pre-BUS-255).
+  expect(clipboard.copy).not.toHaveBeenCalled();
 });
 
 it('owned-capture-only practice never consumes stopped audio from a session it did not start with a guard', async () => {
