@@ -13,6 +13,7 @@ import { pasteInTerminal, pasteInTarget } from './paste';
 import { isInsertReport } from './reports';
 import { deliveryErrorDetail } from './errors';
 import {
+  mayInsert,
   planDelivery,
   shouldRestoreClipboard,
   unavailableSnapshot,
@@ -35,6 +36,68 @@ async function readClipboardText(
   } catch {
     return null;
   }
+}
+
+/** The verified AX route. `copyAllowed` gates Copy recovery after a safe refusal. */
+async function insertInto(
+  options: DeliverOptions,
+  target: TargetSnapshot,
+  current: () => boolean,
+  stale: () => DeliveryOutcome,
+  copyAllowed: boolean,
+): Promise<DeliveryOutcome> {
+  const { platform, text } = options;
+  let report: InsertReport | void;
+  try {
+    report = await platform.insertText(text, target);
+    // Void remains the declared legacy test/stub contract, never a Tauri reply.
+    if (report !== undefined && !isInsertReport(report)) {
+      throw new InsertError('adapter insert reply malformed or contradictory', true);
+    }
+  } catch (error: unknown) {
+    const insertFail = deliveryErrorDetail(error);
+    if (!(error instanceof InsertError) || error.writeStarted) {
+      // The write may have landed: never say "Couldn't insert" (mayHaveInserted).
+      const report = { detail: `insert error after write began: ${insertFail}`, typed: false, unverified: true };
+      return mayHaveInserted(text, report);
+    }
+    if (!current()) return stale();
+    // Insert API failed after a valid-looking target → Copy + toast if enabled.
+    if (!options.clipboardFallback || !copyAllowed) {
+      return failOutcome(text, `insert failed: ${insertFail}`);
+    }
+    return copyFallback(
+      platform,
+      text,
+      `insert failed: ${insertFail}`,
+      target.knownTerminal === true,
+    );
+  }
+  if (report?.terminalDispatch) {
+    // Posting is not input-buffer confirmation. Never copy or retry after
+    // any Terminal dispatch, even if the session was cancelled in flight.
+    const sent = report.terminalDispatch === 'complete' ? 'Text sent' : 'Text partly sent';
+    return {
+      clipboardRestored: false,
+      detail: report.detail,
+      message: `${sent} to Terminal — input not verified. Inspect before retrying.`,
+      restoreSkippedReason: null,
+      status: 'unverified',
+      text,
+    };
+  }
+  if (report?.unverified) {
+    // An in-flight native write cannot be undone; preserve its uncertainty.
+    return mayHaveInserted(text, report);
+  }
+  return {
+    clipboardRestored: false,
+    detail: report?.typed ? 'typed' : null,
+    message: deliveryMessage('inserted', null),
+    restoreSkippedReason: null,
+    status: 'inserted',
+    text,
+  };
 }
 
 /**
@@ -87,64 +150,19 @@ export async function deliverTranscript(
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
 
   if (plan.action === 'shared-paste') {
-    return pasteInTarget(options, plan.target, current, stale);
+    // A clipboard refusal dispatched nothing; an editable field may still take
+    // the verified AX route, which never touches the clipboard.
+    const insert = mayInsert(validated)
+      ? (copyAllowed: boolean) => insertInto(options, validated, current, stale, copyAllowed)
+      : undefined;
+    return pasteInTarget(options, plan.target, current, stale, insert);
   }
   if (plan.action === 'paste') {
     return pasteInTerminal(options, plan.bound, current, stale);
   }
 
   if (plan.action === 'insert') {
-    let report: InsertReport | void;
-    try {
-      report = await platform.insertText(text, plan.target);
-      // Void remains the declared legacy test/stub contract, never a Tauri reply.
-      if (report !== undefined && !isInsertReport(report)) {
-        throw new InsertError('adapter insert reply malformed or contradictory', true);
-      }
-    } catch (error: unknown) {
-      const insertFail = deliveryErrorDetail(error);
-      if (!(error instanceof InsertError) || error.writeStarted) {
-        // The write may have landed: never say "Couldn't insert" (mayHaveInserted).
-        const report = { detail: `insert error after write began: ${insertFail}`, typed: false, unverified: true };
-        return mayHaveInserted(text, report);
-      }
-      if (!current()) return stale();
-      // Insert API failed after a valid-looking target → Copy + toast if enabled.
-      if (!options.clipboardFallback) {
-        return failOutcome(text, `insert failed: ${insertFail}`);
-      }
-      return copyFallback(
-        platform,
-        text,
-        `insert failed: ${insertFail}`,
-        plan.target.knownTerminal === true,
-      );
-    }
-    if (report?.terminalDispatch) {
-      // Posting is not input-buffer confirmation. Never copy or retry after
-      // any Terminal dispatch, even if the session was cancelled in flight.
-      const sent = report.terminalDispatch === 'complete' ? 'Text sent' : 'Text partly sent';
-      return {
-        clipboardRestored: false,
-        detail: report.detail,
-        message: `${sent} to Terminal — input not verified. Inspect before retrying.`,
-        restoreSkippedReason: null,
-        status: 'unverified',
-        text,
-      };
-    }
-    if (report?.unverified) {
-      // An in-flight native write cannot be undone; preserve its uncertainty.
-      return mayHaveInserted(text, report);
-    }
-    return {
-      clipboardRestored: false,
-      detail: report?.typed ? 'typed' : null,
-      message: deliveryMessage('inserted', null),
-      restoreSkippedReason: null,
-      status: 'inserted',
-      text,
-    };
+    return insertInto(options, plan.target, current, stale, true);
   }
 
   if (plan.action === 'copy') {

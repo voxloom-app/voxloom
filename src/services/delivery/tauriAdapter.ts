@@ -75,7 +75,23 @@ async function tauriClipboardRead(): Promise<ClipboardSnapshot> {
   }
 }
 
+const SAFE_REFUSAL = 'delivery-safe-refusal:';
+const CLIPBOARD_REFUSALS = [
+  ['unsaved', `${SAFE_REFUSAL}clipboard-unsaved:`],
+  ['changed', `${SAFE_REFUSAL}clipboard-changed:`],
+] as const;
+
 /** Only this fixed native tag proves no dispatch AND completed clipboard cleanup. */
+function nativeError(error: unknown): InsertError {
+  if (typeof error !== 'string' || !error.startsWith(SAFE_REFUSAL)) {
+    return new InsertError(deliveryErrorDetail(error), true);
+  }
+  for (const [clipboard, tag] of CLIPBOARD_REFUSALS) {
+    if (error.startsWith(tag)) return new InsertError(error.slice(tag.length), false, clipboard);
+  }
+  return new InsertError(error, false);
+}
+
 async function invokeDelivery<T>(
   command: string,
   args: Record<string, unknown>,
@@ -91,8 +107,7 @@ async function invokeDelivery<T>(
   try {
     report = await invoke<unknown>(command, args);
   } catch (error: unknown) {
-    const safe = typeof error === 'string' && error.startsWith('delivery-safe-refusal:');
-    throw new InsertError(deliveryErrorDetail(error), !safe);
+    throw nativeError(error);
   }
   if (!valid(report)) throw new InsertError('native delivery reply missing, malformed or contradictory', true);
   return report;

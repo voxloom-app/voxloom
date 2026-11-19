@@ -84,10 +84,16 @@ export interface DeliveryOutcome {
  */
 export class InsertError extends Error {
   readonly writeStarted: boolean;
-  constructor(message: string, writeStarted: boolean) {
+  /**
+   * Native refused while saving the user's clipboard, before writing it:
+   * `unsaved` (concealed or too large) or `changed` (a newer copy exists).
+   */
+  readonly clipboard: 'unsaved' | 'changed' | null;
+  constructor(message: string, writeStarted: boolean, clipboard: 'unsaved' | 'changed' | null = null) {
     super(message);
     this.name = 'InsertError';
     this.writeStarted = writeStarted;
+    this.clipboard = clipboard;
   }
 }
 

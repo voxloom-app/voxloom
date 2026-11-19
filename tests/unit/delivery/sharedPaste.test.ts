@@ -134,3 +134,66 @@ describe('native completion shared paste through adapter and orchestration', () 
     },
   );
 });
+
+describe('clipboard refusals on the shared route dispatch nothing', () => {
+  const unsaved = 'delivery-safe-refusal:clipboard-unsaved:prior clipboard could not be saved';
+  const changed = 'delivery-safe-refusal:clipboard-changed:clipboard changed during snapshot — paste skipped';
+  const editable = () => target({ insertable: true, kind: 'insertable', elementRole: 'AXTextField' });
+  const axRefused = async () => { throw 'delivery-safe-refusal:AX set failed'; };
+
+  function native(pasteError: string, completion: TargetSnapshot, insert: () => Promise<unknown>) {
+    invoke.mockImplementation(async (command) => {
+      if (command === 'delivery_paste_target') throw pasteError;
+      if (command === 'delivery_insert_text') return insert();
+      return completion;
+    });
+  }
+  const deliver = (intended: TargetSnapshot) => deliverTranscript({
+    platform: createTauriDeliveryAdapter(clipboard), intended, clipboardFallback: true, text: 'hello',
+  });
+  const commands = () => invoke.mock.calls.map(([command]) => command);
+
+  it.each([unsaved, changed])('an editable field still gets the AX insert, clipboard untouched (%s)', async (error) => {
+    const intended = editable();
+    native(error, intended, async () => ({ typed: false, unverified: false, detail: null }));
+    const outcome = await deliver(intended);
+    expect(commands()).toEqual(['delivery_validate_target', 'delivery_paste_target', 'delivery_insert_text']);
+    expect(outcome.status).toBe('inserted');
+    expect(clipboard.copy).not.toHaveBeenCalled();
+  });
+
+  it('a refused AX insert after an unsaved clipboard copies, as on the insert route', async () => {
+    const intended = editable();
+    native(unsaved, intended, axRefused);
+    const outcome = await deliver(intended);
+    expect(outcome.status).toBe('copied');
+    expect(clipboard.copy).toHaveBeenCalledWith('hello');
+  });
+
+  it('an unsaved clipboard without an editable field copies, as before shared paste', async () => {
+    native(unsaved, target(), axRefused);
+    const outcome = await deliver(target());
+    expect(commands()).toEqual(['delivery_validate_target', 'delivery_paste_target']);
+    expect(outcome.status).toBe('copied');
+    expect(clipboard.copy).toHaveBeenCalledWith('hello');
+  });
+
+  it.each([
+    ['editable', editable()],
+    ['non-editable', target()],
+  ] as const)('never copies over a newer clipboard (%s)', async (_, intended) => {
+    native(changed, intended, axRefused);
+    const outcome = await deliver(intended);
+    expect(outcome.status).toBe('failed');
+    expect(outcome.mayHaveInserted).toBeUndefined();
+    expect(clipboard.copy).not.toHaveBeenCalled();
+  });
+
+  it('a may-have-inserted AX failure after a clipboard refusal stays uncertain', async () => {
+    const intended = editable();
+    native(unsaved, intended, async () => { throw 'AX write raced'; });
+    const outcome = await deliver(intended);
+    expect(outcome).toMatchObject({ status: 'unverified', mayHaveInserted: true });
+    expect(clipboard.copy).not.toHaveBeenCalled();
+  });
+});

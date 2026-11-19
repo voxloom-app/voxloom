@@ -1,6 +1,7 @@
 //! Completion authority. OS observations are injected, ownership and ordering are not.
 use std::sync::Mutex;
 
+use super::paste::{CLIPBOARD_CHANGED, CLIPBOARD_UNSAVED};
 use super::report::PasteReport;
 use crate::delivery::types::TargetSnapshotDto;
 
@@ -312,7 +313,20 @@ impl<I: Clone + PartialEq> Targets<I> {
         };
         // Do not wrap transaction errors: only the clipboard owner knows if
         // cleanup completed and a refusal is safe for automatic recovery.
-        paste(target.pid.unwrap(), target.terminal, text, &guard)
+        let result = paste(target.pid.unwrap(), target.terminal, text, &guard);
+        if let Err(err) = &result {
+            // Refused while saving the clipboard: nothing was written or posted.
+            // Release the claim so the verified AX route may still run once.
+            if err.starts_with(CLIPBOARD_UNSAVED) || err.starts_with(CLIPBOARD_CHANGED) {
+                if let Ok(mut s) = self.state.lock() {
+                    if let Some(e) = s.entry.as_mut().filter(|e| e.token == token) {
+                        e.claimed = false;
+                        s.legacy_claimed = false;
+                    }
+                }
+            }
+        }
+        result
     }
 }
 

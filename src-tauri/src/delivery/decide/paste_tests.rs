@@ -242,6 +242,25 @@ fn an_unsavable_clipboard_refuses_before_mutation() {
 }
 
 #[test]
+fn clipboard_refusals_say_whether_a_newer_copy_exists() {
+    // Concealed or oversized: never touched, still the user's clipboard.
+    let mut host = Fake::new("secret");
+    host.can_snapshot = false;
+    let error = paste_text(&host, "hello").unwrap_err();
+    assert!(error.starts_with(CLIPBOARD_UNSAVED), "{error}");
+    // A copy landed while saving, whether or not the save completed.
+    for can_snapshot in [true, false] {
+        let mut host = Fake::new("old");
+        host.can_snapshot = can_snapshot;
+        host.copy_during_snapshot = true;
+        let error = paste_text(&host, "hello").unwrap_err();
+        assert!(error.starts_with(CLIPBOARD_CHANGED), "{error}");
+        assert_eq!(host.calls(), ["preflight", "snapshot"]);
+        assert_eq!(*host.board.borrow(), "new copy");
+    }
+}
+
+#[test]
 fn a_failed_restore_is_reported_not_hidden() {
     let mut host = Fake::new("my notes");
     host.restore_err = true;

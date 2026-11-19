@@ -21,6 +21,12 @@ pub const CLIPBOARD_RESTORE_DELAY_MS: u64 = 1500;
 
 pub use pasteboard_policy::PublicationFailure;
 
+/// Safe refusals from saving the user's clipboard, before anything was written.
+/// Unsaved (concealed, oversized): the clipboard is still the user's, so prefer
+/// a route that leaves it alone. Changed: a newer copy exists; never Copy over it.
+pub const CLIPBOARD_UNSAVED: &str = "delivery-safe-refusal:clipboard-unsaved:";
+pub const CLIPBOARD_CHANGED: &str = "delivery-safe-refusal:clipboard-changed:";
+
 pub trait PasteHost {
     /// The user's clipboard, whole (every item and type).
     type Saved;
@@ -92,12 +98,14 @@ pub fn paste_text<H: PasteHost>(host: &H, text: &str) -> Result<PasteReport, Str
     host.preflight()
         .map_err(|e| format!("delivery-safe-refusal:{e}"))?;
     let before = host.change_count();
-    let saved = host
-        .snapshot()
-        .ok_or_else(|| "delivery-safe-refusal:prior clipboard could not be saved".to_string())?;
+    let saved = host.snapshot();
     if host.change_count() != before {
-        return Err("clipboard changed during snapshot — paste skipped".into());
+        return Err(format!(
+            "{CLIPBOARD_CHANGED}clipboard changed during snapshot — paste skipped"
+        ));
     }
+    let saved =
+        saved.ok_or_else(|| format!("{CLIPBOARD_UNSAVED}prior clipboard could not be saved"))?;
     let ours = match host.publish(text, before) {
         Ok(count) => count,
         Err(PublicationFailure::Untouched(error)) => {

@@ -574,3 +574,49 @@ fn editable_fields_and_known_terminals_keep_their_existing_text_rules() {
     );
     assert_eq!(handed.unwrap_err(), refused("terminal policy"));
 }
+
+#[test]
+fn clipboard_refusal_releases_the_claim_for_one_ax_insert() {
+    use super::super::paste::{CLIPBOARD_CHANGED, CLIPBOARD_UNSAVED};
+    for tag in [CLIPBOARD_UNSAVED, CLIPBOARD_CHANGED] {
+        let targets = Targets::new();
+        let obs = observation(Some(1));
+        let token = snapshot(&targets, &obs).shared_paste_token.unwrap();
+        let err = targets
+            .deliver(
+                &Mutex::new(()),
+                &token,
+                "hi",
+                || obs.clone(),
+                |_, _, _, guard| {
+                    guard()?;
+                    Err(format!("{tag}prior clipboard could not be saved"))
+                },
+            )
+            .unwrap_err();
+        assert!(err.starts_with(tag), "{err}");
+        assert!(targets.claim_legacy(1).is_ok(), "nothing was dispatched");
+        assert!(targets.claim_legacy(1).is_err(), "still single use");
+    }
+}
+
+#[test]
+fn other_paste_refusals_keep_the_claim_consumed() {
+    let targets = Targets::new();
+    let obs = observation(Some(1));
+    let token = snapshot(&targets, &obs).shared_paste_token.unwrap();
+    let err = targets
+        .deliver(
+            &Mutex::new(()),
+            &token,
+            "hi",
+            || obs.clone(),
+            |_, _, _, guard| {
+                guard()?;
+                Err(refused("event posting denied"))
+            },
+        )
+        .unwrap_err();
+    assert_eq!(err, refused("event posting denied"));
+    assert!(targets.claim_legacy(1).is_err());
+}

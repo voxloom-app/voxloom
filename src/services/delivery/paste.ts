@@ -6,7 +6,7 @@
  * paste whose clipboard was not restored says so.
  */
 
-import { copyFallback, mayHaveInserted } from './fallback';
+import { copyFallback, failOutcome, mayHaveInserted } from './fallback';
 import { restoreSkippedSuffix, TERMINAL_PASTE_MESSAGE } from './messages';
 import { InsertError } from './types';
 import { isPasteReport } from './reports';
@@ -49,17 +49,25 @@ export async function pasteInTerminal(
   }, current, stale, true);
 }
 
-/** Generic route: completion authority is independent of AX editability/start binding. */
+/** Insert through the verified AX route; `copyAllowed` gates its Copy recovery. */
+export type InsertFallback = (copyAllowed: boolean) => Promise<DeliveryOutcome>;
+
+/**
+ * Generic route: completion authority is independent of AX editability/start binding.
+ * `insertFallback` (editable fields only) runs when native refused while saving
+ * the clipboard: nothing was written, and AX insertion leaves the clipboard alone.
+ */
 export async function pasteInTarget(
   options: DeliverOptions,
   intended: TargetSnapshot,
   current: () => boolean,
   stale: () => DeliveryOutcome,
+  insertFallback?: InsertFallback,
 ): Promise<DeliveryOutcome> {
   return pasteWith(options, () => {
     if (!options.platform.pasteTarget) throw new InsertError('paste unavailable on this platform', false);
     return options.platform.pasteTarget(options.text, intended);
-  }, current, stale, false);
+  }, current, stale, false, insertFallback);
 }
 
 async function pasteWith(
@@ -68,6 +76,7 @@ async function pasteWith(
   current: () => boolean,
   stale: () => DeliveryOutcome,
   terminal: boolean,
+  insertFallback?: InsertFallback,
 ): Promise<DeliveryOutcome> {
   const { platform, text } = options;
   try {
@@ -82,6 +91,9 @@ async function pasteWith(
       return mayHaveInserted(text, report);
     }
     if (!current()) return stale();
+    // Never Copy over a newer clipboard (`changed`).
+    if (error.clipboard && insertFallback) return insertFallback(error.clipboard === 'unsaved');
+    if (error.clipboard === 'changed') return failOutcome(text, `paste skipped: ${detail}`);
     return copyFallback(platform, text, `paste skipped: ${detail}`, terminal);
   }
 }
