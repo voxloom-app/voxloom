@@ -226,3 +226,19 @@ fn unreadable_window_title_at_capture_refuses_the_late_target() {
     assert!(!context_holds(Some(true), &start, &start, false));
     assert!(!context_holds(Some(true), &start, &start, true));
 }
+
+#[test]
+fn wait_within_stops_at_the_given_read_count() {
+    let mut reads = 0;
+    let mut waits = 0;
+    let r: Result<(), &str> = wait_for_focus_within(
+        3,
+        || {
+            reads += 1;
+            Read::Retry("container")
+        },
+        || waits += 1,
+    );
+    assert_eq!(r, Err("container"));
+    assert_eq!((reads, waits), (3, 2));
+}

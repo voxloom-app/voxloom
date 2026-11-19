@@ -7,9 +7,11 @@ use super::focus_refine::refine_below;
 use super::{host, registry, snapshot_probe, web_ax};
 use crate::delivery::decide::container_gate::{decide, Class, GateLine, Path};
 use crate::delivery::decide::element_token;
+use crate::delivery::decide::focus_settle::{needs_settle, settle, Observation, Outcome};
 use crate::delivery::decide::known_terminal::flag_terminal;
 use crate::delivery::decide::paste_role::{EditFacts, WideFacts};
 use crate::delivery::decide::snapshot_diag::{self, AxName};
+use crate::delivery::decide::target_diag::{self, Stage};
 use crate::delivery::types::TargetSnapshotDto;
 
 pub fn now_ms() -> i64 {
@@ -188,6 +190,83 @@ fn build_snapshot(
     snap
 }
 
+/// A focus read resolved to its element (None when focus was unavailable),
+/// snapshot and BUS-232 path.
+type Resolved = (Option<AXUIElementRef>, TargetSnapshotDto, Option<Path>);
+
+type Focus = Result<(AXUIElementRef, Option<String>), String>;
+
+fn resolve_read(focus: Focus, register: bool) -> Resolved {
+    match focus {
+        Ok((element, app_name)) => {
+            let (element, snap, path) = resolve_focus(element, app_name, register);
+            (Some(element), snap, path)
+        }
+        Err(msg) => (None, TargetSnapshotDto::unavailable(&msg, now_ms()), None),
+    }
+}
+
+fn release_resolved((element, ..): Resolved) {
+    if let Some(element) = element {
+        release(element as CFTypeRef);
+    }
+}
+
+/// BUS-223 H4b F2: the first completion read can be unavailable or only a
+/// coarse container while the app is still waking its accessibility tree.
+/// Re-read (bounded, same pid, `decide::focus_settle`) until the snapshot is
+/// usable. Insertable snapshots, terminals and paste-route apps, and
+/// Chromium/Electron hosts (their own wait, `web_ax::settle_focus`) are
+/// returned as read. Re-reads register and describe like the first read.
+fn settle_completion(stage: &str, front: Option<i32>, first: Focus) -> Resolved {
+    let first = resolve_read(first, true);
+    let snap = &first.1;
+    let wanted = needs_settle(
+        &snap.kind,
+        snap.insertable,
+        snap.element_role.as_deref(),
+        snap.reason.as_deref(),
+    );
+    let pid = match front {
+        Some(pid)
+            if wanted
+                && !host::terminal_flags(front).known
+                && host::web_ax_activation(pid).is_none() =>
+        {
+            pid
+        }
+        _ => return first,
+    };
+    let started = std::time::Instant::now();
+    let mut pending = Some(first);
+    let settled = settle(
+        pid,
+        || {
+            let resolved = pending
+                .take()
+                .unwrap_or_else(|| resolve_read(focused_ui_element_once(stage), true));
+            let snap = &resolved.1;
+            Observation {
+                front: host::frontmost_pid(),
+                focus_pid: snap.app_pid,
+                kind: snap.kind.clone(),
+                insertable: snap.insertable,
+                role: snap.element_role.clone(),
+                reason: snap.reason.clone(),
+                value: resolved,
+            }
+        },
+        |ms| std::thread::sleep(std::time::Duration::from_millis(ms)),
+        || started.elapsed().as_millis(),
+        release_resolved,
+    );
+    if settled.outcome != Outcome::Untouched {
+        let bundle = host::bundle_id(pid);
+        eprintln!("{}", settled.line(pid, bundle.as_deref().map(AxName::new)));
+    }
+    settled.value
+}
+
 /// Snapshot plus the terminal flags (Copy hint, paste route). They also cover
 /// unavailable snapshots (no AX focus or permission), where a terminal is the
 /// likeliest reason for Copy and the app pid is not known from AX.
@@ -208,35 +287,52 @@ pub fn snapshot_at(stage: &str, register: bool) -> TargetSnapshotDto {
         let front = host::frontmost_pid();
         web_ax::reassert(front);
         let focus = web_ax::settle_focus(stage, front, focused_ui_element_once(stage));
-        return snapshot_from_focus(focus, true, flag);
+        let resolved = settle_completion(stage, front, focus);
+        return snapshot_from_resolved(resolved, true, flag);
     }
-    snapshot_from_focus(focused_ui_element(stage), false, flag)
+    snapshot_from_resolved(resolve_read(focused_ui_element(stage), false), false, flag)
 }
 
 /// `register` marks the completion snapshot (once per delivery): only that
 /// one may print the BUS-232 `[snapshot]` diagnostic, after the terminal
 /// flags are known and before the element is released: on every Copy
-/// fallback (all apps), and for a gated app's paste-only (C) target.
+/// fallback (all apps), for a gated app's paste-only (C) target, and for an
+/// unavailable focus (BUS-223 H4b F2, `target_diag`).
 /// Diagnostic only; the returned snapshot is the same either way.
-fn snapshot_from_focus(
-    focus: Result<(AXUIElementRef, Option<String>), String>,
+fn snapshot_from_resolved(
+    resolved: Resolved,
     register: bool,
     flag: impl FnOnce(TargetSnapshotDto) -> TargetSnapshotDto,
 ) -> TargetSnapshotDto {
-    match focus {
-        Ok((element, app_name)) => {
-            let (element, snap, path) = resolve_focus(element, app_name, register);
-            let snap = flag(snap);
-            if register {
-                if snapshot_diag::should_log(&snap) {
-                    snapshot_probe::log_snapshot(element, &snap, "not-insertable");
-                } else if path == Some(Path::Paste) {
-                    snapshot_probe::log_snapshot(element, &snap, "paste-only");
-                }
+    let (element, snap, path) = resolved;
+    let snap = flag(snap);
+    if register {
+        match element {
+            Some(element) if snapshot_diag::should_log(&snap) => {
+                snapshot_probe::log_snapshot(element, &snap, "not-insertable");
             }
-            release(element as CFTypeRef);
-            snap
+            Some(element) if path == Some(Path::Paste) => {
+                snapshot_probe::log_snapshot(element, &snap, "paste-only");
+            }
+            _ => {}
         }
-        Err(msg) => flag(TargetSnapshotDto::unavailable(&msg, now_ms())),
+        log_unavailable(Stage::Completion, None, &snap);
+    }
+    if let Some(element) = element {
+        release(element as CFTypeRef);
+    }
+    snap
+}
+
+/// `target_diag::line` with the snapshot's bundle id.
+pub fn log_unavailable(
+    stage: Stage,
+    intended: Option<&TargetSnapshotDto>,
+    snap: &TargetSnapshotDto,
+) {
+    let bundle = snap.app_pid.and_then(host::bundle_id);
+    let line = target_diag::line(stage, intended, snap, bundle.as_deref().map(AxName::new));
+    if let Some(line) = line {
+        eprintln!("{line}");
     }
 }

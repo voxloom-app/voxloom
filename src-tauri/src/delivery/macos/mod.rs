@@ -35,6 +35,7 @@ use super::decide::fallback::{
 };
 use super::decide::paste_target::{binding_for, check_paste_target};
 use super::decide::report::PasteReport;
+use super::decide::target_diag::Stage;
 use super::decide::{
     check_insert_text, validate_snapshots, value_confirms_insert, InsertPath, InsertReport,
 };
@@ -48,10 +49,11 @@ pub fn snapshot_target() -> Result<TargetSnapshotDto, String> {
 }
 
 pub fn validate_target(intended: TargetSnapshotDto) -> Result<TargetSnapshotDto, String> {
-    Ok(validate_snapshots(
-        &intended,
-        snapshot_at("delivery validation", false),
-    ))
+    let validated = validate_snapshots(&intended, snapshot_at("delivery validation", false));
+    // BUS-223 H4b F2: an insertable target turned changed/unavailable Copies
+    // without any other line.
+    focus::log_unavailable(Stage::Validation, Some(&intended), &validated);
+    Ok(validated)
 }
 
 /// Re-read focus and require it to still be the validated, insertable field.

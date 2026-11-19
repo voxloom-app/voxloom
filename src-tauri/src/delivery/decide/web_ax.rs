@@ -24,7 +24,13 @@ pub enum Read<T, E> {
 }
 
 /// Read until `Found`, an `Abort`, or `BOOTSTRAP_READS` attempts.
-pub fn wait_for_focus<T, E>(
+pub fn wait_for_focus<T, E>(read: impl FnMut() -> Read<T, E>, wait: impl FnMut()) -> Result<T, E> {
+    wait_for_focus_within(BOOTSTRAP_READS, read, wait)
+}
+
+/// `wait_for_focus` with its own read bound (`focus_settle`'s shorter one).
+pub fn wait_for_focus_within<T, E>(
+    max_reads: usize,
     mut read: impl FnMut() -> Read<T, E>,
     mut wait: impl FnMut(),
 ) -> Result<T, E> {
@@ -34,7 +40,7 @@ pub fn wait_for_focus<T, E>(
         match read() {
             Read::Found(v) => return Ok(v),
             Read::Abort(e) => return Err(e),
-            Read::Retry(e) if attempt >= BOOTSTRAP_READS => return Err(e),
+            Read::Retry(e) if attempt >= max_reads => return Err(e),
             Read::Retry(_) => wait(),
         }
     }
