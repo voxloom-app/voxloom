@@ -1,6 +1,6 @@
 import type { DogfoodResult } from '../../src/services/stt/dogfoodPath';
 import { describe, expect, it, vi } from 'vitest';
-import { createGuidedSetup, type SetupBoundary } from '../../src/features/onboarding/guidedSetup';
+import { createGuidedSetup, permissionsClear, type PermissionState, type SetupBoundary } from '../../src/features/onboarding/guidedSetup';
 import { SttError } from '../../src/services/stt/types';
 
 const authorized = { microphone: 'authorized', accessibility: 'authorized' } as const;
@@ -263,5 +263,37 @@ describe('guided setup lifecycle', () => {
     expect(io.download).toHaveBeenCalledWith('whisper-base.en', expect.any(Function));
     expect(setup.getSnapshot().step).toBe(1);
     expect(setup.getSnapshot().ready).toBe(true);
+  });
+  describe('BUS-251: permission states', () => {
+    const states: PermissionState[] = ['authorized', 'not-determined', 'denied', 'restricted', 'not-granted', 'unknown', 'unsupported', 'not-required', 'unverified'];
+    it('macOS states pass only when both are authorized, exactly as before Windows states existed', () => {
+      for (const microphone of states.slice(0, 7)) {
+        for (const accessibility of states.slice(0, 7)) {
+          expect(permissionsClear({ microphone, accessibility }), `${microphone} ${accessibility}`)
+            .toBe(microphone === 'authorized' && accessibility === 'authorized');
+        }
+      }
+    });
+    it('Windows states pass, but a denied or unknown partner never does', () => {
+      expect(permissionsClear({ microphone: 'unverified', accessibility: 'not-required' })).toBe(true);
+      expect(permissionsClear({ microphone: 'authorized', accessibility: 'not-required' })).toBe(true);
+      expect(permissionsClear({ microphone: 'unverified', accessibility: 'not-granted' })).toBe(false);
+      expect(permissionsClear({ microphone: 'denied', accessibility: 'not-required' })).toBe(false);
+      expect(permissionsClear({ microphone: 'unknown', accessibility: 'not-required' })).toBe(false);
+    });
+    it('lets Windows setup reach practice but not finish without both real tries', async () => {
+      const io = boundary();
+      io.query = vi.fn().mockResolvedValue({ microphone: 'unverified', accessibility: 'not-required' });
+      const setup = createGuidedSetup(io, () => 'whisper-base.en', () => 'Ctrl + Shift + Space');
+      await setup.start();
+      expect(setup.getSnapshot()).toMatchObject({ step: 1, ready: true, modelReady: true });
+      expect(await setup.next()).toBe(true);
+      expect(await setup.next()).toBe(true);
+      expect(setup.getSnapshot().step).toBe(3);
+      expect(await setup.next()).toBe(false);
+      expect(await setup.finish()).toBe(false);
+      expect(io.request).not.toHaveBeenCalled();
+      expect(io.openSettings).not.toHaveBeenCalled();
+    });
   });
 });

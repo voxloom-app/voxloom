@@ -6,7 +6,7 @@ export interface PracticeLease { id: number; mode: 'hold' | 'tap'; model: string
 export interface SetupProgressStorage { read(): string | null; write(value: string): void; clear?(): void }
 
 export type PermissionKind = 'microphone' | 'accessibility';
-export type PermissionState = 'authorized' | 'not-determined' | 'denied' | 'restricted' | 'not-granted' | 'unknown' | 'unsupported';
+export type PermissionState = 'authorized' | 'not-determined' | 'denied' | 'restricted' | 'not-granted' | 'unknown' | 'unsupported' | 'not-required' | 'unverified';
 export interface Permissions { microphone: PermissionState; accessibility: PermissionState }
 export type SetupModelState = 'pending' | 'missing' | 'available' | 'downloading' | 'unavailable';
 export interface ModelReadiness { modelId: string; ready: boolean; reason: string | null; status?: SetupModelState }
@@ -36,8 +36,16 @@ export interface GuidedState {
   mode: 'hold' | 'tap';
 }
 const unknown: Permissions = { microphone: 'unknown', accessibility: 'unknown' };
-export function permissionsAuthorized(value: Permissions): boolean {
-  return value?.microphone === 'authorized' && value?.accessibility === 'authorized';
+/**
+ * Nothing left for the person to grant in setup: allowed, not a grant on this
+ * OS (Windows Accessibility), or only provable by a real capture (Windows
+ * microphone). Practice still has to dictate before setup can finish.
+ */
+export function permissionClear(state: PermissionState | undefined): boolean {
+  return state === 'authorized' || state === 'not-required' || state === 'unverified';
+}
+export function permissionsClear(value: Permissions): boolean {
+  return permissionClear(value?.microphone) && permissionClear(value?.accessibility);
 }
 
 /** Setup authority: readiness is ephemeral; persisted progress never grants it. */
@@ -118,7 +126,7 @@ export function createGuidedSetup(io: SetupBoundary, modelId: () => string, shor
           : downloading === id ? 'downloading' : model.ready ? 'available'
             : model.status ?? (status?.status === 'missing' || status?.status === 'failed' ? 'missing' : 'pending');
         const modelReady = model.ready === true && modelState === 'available';
-        const ready = io.native && modelReady && permissionsAuthorized(permissions) && io.activeShortcut() === binding;
+        const ready = io.native && modelReady && permissionsClear(permissions) && io.activeShortcut() === binding;
         if (!ready) cancelPractice();
         verdictFor = config;
         readinessReason = modelReady ? null : model.reason;
@@ -173,7 +181,7 @@ export function createGuidedSetup(io: SetupBoundary, modelId: () => string, shor
     next: async () => {
       cancelPractice();
       const ready = await refresh();
-      if (!ready && !(state.step === 1 && checkedModel === modelId() && io.native && state.modelReady && permissionsAuthorized(state.permissions))) return false;
+      if (!ready && !(state.step === 1 && checkedModel === modelId() && io.native && state.modelReady && permissionsClear(state.permissions))) return false;
       if (state.step === 3 && (!state.holdDone || !state.tapDone)) return false;
       patch({ step: Math.min(4, state.step + 1) });
       return true;

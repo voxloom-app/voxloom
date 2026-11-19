@@ -11,7 +11,7 @@ import { subscribe as subscribeSettings } from '../../services/settingsWindow';
 import { listenShortcutBound } from '../../services/shortcut/bindingEvents';
 import { listenModelsChanged } from '../../services/stt/modelsChanged';
 import { createOverlayBridge } from '../../services/shortcut';
-import { createGuidedSetup, permissionsAuthorized, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
+import { createGuidedSetup, permissionClear, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
 import { registerPracticeHandler, resetPracticeGestures } from './practiceBridge';
 import { createSetupBoundary } from './setupBoundary';
 import { SetupWindow } from './SetupWindow';
@@ -198,7 +198,9 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
   }, [practice.phase, practice.hudReady, practice.scopeReady]);
   useEffect(() => () => { sequence.current++; controller.cancelPractice(); }, [controller]);
 
-  const allPermissions = permissionsAuthorized(guided.permissions);
+  const allPermissions = permissionsClear(guided.permissions);
+  // Only Windows reports Accessibility as not required, so this selects its setup copy.
+  const onWindows = guided.permissions.accessibility === 'not-required';
   const connected = io.native && allPermissions && guided.modelReady && !guided.checking;
   const both = guided.holdDone && guided.tapDone;
   // Step 4 not ready shows a specific error in place of its attention line, so it is never shown twice.
@@ -229,15 +231,15 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
 
           </>}
           {guided.step === 1 && <>
-            <p className="guided-intro">Two permissions connect your microphone, typing and keyboard controls. We’ll check each before moving on.</p>
+            <p className="guided-intro">{onWindows ? 'Windows has no typing permission to turn on. Microphone access is a Windows privacy setting, so Voxloom finds out when you first dictate.' : 'Two permissions connect your microphone, typing and keyboard controls. We’ll check each before moving on.'}</p>
             <div className="guided-permissions">{permissions.map((item) => {
               const status = guided.permissions[item.key];
               return <div className="guided-permission" key={item.kind}>
-                <div><strong>{item.title}</strong><p>{item.copy}</p><small>{status === 'authorized' ? '✓ Allowed' : status === 'not-granted' ? 'Access is off or has not been granted.' : status === 'not-determined' ? 'Not requested yet.' : status === 'unknown' ? 'Checking access…' : status}</small></div>
-                {status !== 'authorized' && <div className="guided-permission-actions"><button className="btn" disabled={!io.native} onClick={() => void permission(item.kind)} type="button">{item.kind === 'accessibility' ? 'Open Accessibility Settings' : `Allow ${item.name}`}</button>{status !== 'not-determined' && item.kind !== 'accessibility' && <button className="btn ghost" disabled={!io.native} onClick={() => void permission(item.kind, true)} type="button">Open {item.name} Settings</button>}</div>}
+                <div><strong>{item.title}</strong><p>{item.copy}</p><small>{status === 'authorized' ? '✓ Allowed' : status === 'not-granted' ? 'Access is off or has not been granted.' : status === 'not-determined' ? 'Not requested yet.' : status === 'unknown' ? 'Checking access…' : status === 'not-required' ? 'Not needed on Windows.' : status === 'unverified' ? 'Not checked yet.' : status}</small></div>
+                {!permissionClear(status) && <div className="guided-permission-actions"><button className="btn" disabled={!io.native} onClick={() => void permission(item.kind)} type="button">{item.kind === 'accessibility' ? 'Open Accessibility Settings' : `Allow ${item.name}`}</button>{status !== 'not-determined' && item.kind !== 'accessibility' && <button className="btn ghost" disabled={!io.native} onClick={() => void permission(item.kind, true)} type="button">Open {item.name} Settings</button>}</div>}
               </div>;
             })}</div>
-            <p className="guided-mini">Enable Voxloom in System Settings → Privacy &amp; Security, then return and check again. If macOS asks you to quit and reopen Voxloom, do so, then resume setup. If Accessibility shows as off, Voxloom can’t tell whether access was denied or never requested.</p>
+            <p className="guided-mini">{onWindows ? 'If Voxloom can’t hear you, open Windows Settings > Privacy & security > Microphone, turn on Let desktop apps access your microphone, then check again.' : 'Enable Voxloom in System Settings → Privacy & Security, then return and check again. If macOS asks you to quit and reopen Voxloom, do so, then resume setup. If Accessibility shows as off, Voxloom can’t tell whether access was denied or never requested.'}</p>
             <button className="btn ghost" onClick={() => void action(controller.refresh)} type="button">Check again</button>
             <div className="guided-pack"><strong>{guided.modelReady ? '✓ Voice pack verified · engine available' : guided.downloading ? `Downloading ${STT_MODEL_CATALOG.find((item) => item.id === guided.downloading)?.label ?? guided.downloading}…` : 'Voice pack needs attention'}</strong><span>{modelLabel} · {size}</span>
               {guided.progress && <progress aria-label="Voice pack download" max={guided.progress.bytesTotal || undefined} value={guided.progress.bytesReceived} />}
