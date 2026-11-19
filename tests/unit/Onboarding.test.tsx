@@ -254,10 +254,10 @@ describe('B guided setup', () => {
       renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={atPermissions} />);
       await waitFor(() => expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled());
       expect(screen.getByText('Not needed on Windows.')).toBeInTheDocument();
-      expect(screen.getByText('Not checked yet.')).toBeInTheDocument();
+      expect(screen.getByText('Checked when you first dictate.')).toBeInTheDocument();
       expect(screen.queryByText('✓ Allowed')).not.toBeInTheDocument();
       expect(screen.getByText(/Windows has no typing permission to turn on/)).toBeInTheDocument();
-      expect(screen.getByText(/open Windows Settings > Privacy & security > Microphone, turn on Let desktop apps access your microphone/)).toBeInTheDocument();
+      expect(screen.getByText(/open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone\./)).toBeInTheDocument();
       expect(screen.queryByText(/System Settings|macOS/)).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /Allow Microphone|Open Accessibility Settings|Open Microphone Settings/ })).not.toBeInTheDocument();
       expect(io.request).not.toHaveBeenCalled();

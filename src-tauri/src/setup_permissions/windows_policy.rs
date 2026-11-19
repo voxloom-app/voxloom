@@ -3,7 +3,7 @@
 //! microphone. The real privacy probe and endpoint lifecycle belong to BUS-238.
 use super::{PermissionKind, PermissionState};
 
-const MICROPHONE_REQUEST_REASON: &str = "Windows does not ask for microphone access. To check it, open Windows Settings > Privacy & security > Microphone and turn on Let desktop apps access your microphone.";
+const MICROPHONE_REQUEST_REASON: &str = "Windows does not ask for microphone access. To check it, open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone.";
 const SETTINGS_NOT_OPENED_REASON: &str = "Voxloom does not open Windows Settings from setup. To check microphone access, open Windows Settings > Privacy & security > Microphone.";
 
 /// Windows has no Accessibility grant to ask for. Microphone access is a
@@ -66,7 +66,7 @@ mod tests {
         assert_eq!(request(PermissionKind::Accessibility), Ok(()));
         assert_eq!(
             request(PermissionKind::Microphone),
-            Err("Windows does not ask for microphone access. To check it, open Windows Settings > Privacy & security > Microphone and turn on Let desktop apps access your microphone.")
+            Err("Windows does not ask for microphone access. To check it, open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone.")
         );
         for kind in KINDS {
             assert_eq!(
