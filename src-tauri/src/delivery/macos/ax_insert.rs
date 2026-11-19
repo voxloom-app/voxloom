@@ -4,7 +4,10 @@
 
 use super::ax::{ancestor_roles, copy_string_attr, set_ax_string, AXUIElementRef};
 use super::{focus_still_matches, host, typing, web_ax};
-use crate::delivery::decide::retry::{reprobe_decision, retry_eligible, retry_once, RetryIo};
+use crate::delivery::decide::retry::{
+    reprobe_decision, retry_eligible, retry_once, RetryIo, UNREADABLE_BEFORE_RETRY,
+};
+use crate::delivery::decide::shared_target::refused;
 use crate::delivery::decide::{
     after_ax, is_web_content_field, value_confirms_insert, AfterAx, InsertReport,
 };
@@ -39,7 +42,13 @@ pub fn insert_selected(
     before: String,
     text: &str,
 ) -> Result<InsertReport, String> {
-    let ax = insert_selected_text_with(text, |a, t| set_ax_string(element, a, t));
+    // Value reads may have blocked or a successor may have armed while queued.
+    // Recheck the native retained generation immediately before the AX mutation.
+    let ax = insert_selected_text_guarded_with(
+        text,
+        || focus_still_matches(validated),
+        |a, t| set_ax_string(element, a, t),
+    )?;
     let after = copy_string_attr(element, "AXValue");
     let role = validated.element_role.clone().unwrap_or_default();
     let has_dom_id = copy_string_attr(element, "AXDOMIdentifier").is_some();
@@ -75,28 +84,38 @@ pub fn insert_selected(
             log_chrome_failure(validated, err);
         }
     }
+    settle(outcome, || {
+        typing::type_text(
+            text,
+            || focus_still_matches(validated),
+            |so_far| wait_for_insert(element, &before, so_far),
+        )
+    })
+}
+
+/// Errors are safe refusals only when nothing was written: read-back proved
+/// the field unchanged, or typing posted no event. A field that became
+/// unreadable after an accepted write is not proof, so it stays untagged.
+fn settle(
+    outcome: AfterAx,
+    type_text: impl FnOnce() -> (usize, Result<(), String>),
+) -> Result<InsertReport, String> {
     match outcome {
         AfterAx::Inserted => Ok(InsertReport::default()),
-        AfterAx::Failed(err) => Err(err),
+        AfterAx::Failed(err) if err == UNREADABLE_BEFORE_RETRY => Err(err),
+        AfterAx::Failed(err) => Err(refused(&err)),
         AfterAx::Unverified => unverified(
             false,
             "AX write changed the field but could not be verified".into(),
         ),
-        AfterAx::TypeFallback => {
-            let (posted, typed) = typing::type_text(
-                text,
-                || focus_still_matches(validated),
-                |so_far| wait_for_insert(element, &before, so_far),
-            );
-            match typed {
-                Err(err) if posted == 0 => Err(err),
-                Err(err) => unverified(true, format!("{err} (partially typed)")),
-                Ok(()) => Ok(InsertReport {
-                    typed: true,
-                    ..Default::default()
-                }),
-            }
-        }
+        AfterAx::TypeFallback => match type_text() {
+            (0, Err(err)) => Err(refused(&err)),
+            (_, Err(err)) => unverified(true, format!("{err} (partially typed)")),
+            (_, Ok(())) => Ok(InsertReport {
+                typed: true,
+                ..Default::default()
+            }),
+        },
     }
 }
 
@@ -161,6 +180,17 @@ fn unverified(typed: bool, detail: String) -> Result<InsertReport, String> {
     })
 }
 
+/// Outer errors prove the first setter was never called; inner errors retain
+/// possible-mutation semantics for read-back and must not be safe-refusal tagged.
+fn insert_selected_text_guarded_with(
+    text: &str,
+    guard: impl FnOnce() -> Result<(), String>,
+    set: impl FnOnce(&str, &str) -> Result<(), String>,
+) -> Result<Result<(), String>, String> {
+    guard().map_err(|e| refused(&e))?;
+    Ok(insert_selected_text_with(text, set))
+}
+
 fn insert_selected_text_with(
     text: &str,
     set: impl FnOnce(&str, &str) -> Result<(), String>,
@@ -173,6 +203,93 @@ fn insert_selected_text_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unchanged_field_and_unposted_typing_are_safe_refusals() {
+        // Read-back showed the field unchanged, or no key event was posted:
+        // nothing was written, so configured Copy/Fail recovery applies.
+        let failed = settle(AfterAx::Failed("AX set failed".into()), || {
+            panic!("no typing after a failed AX write")
+        });
+        assert_eq!(failed.unwrap_err(), "delivery-safe-refusal:AX set failed");
+        let unposted = settle(AfterAx::TypeFallback, || (0, Err("focus changed".into())));
+        assert_eq!(unposted.unwrap_err(), "delivery-safe-refusal:focus changed");
+    }
+
+    #[test]
+    fn unreadable_field_after_accepted_write_is_not_a_safe_refusal() {
+        let err = settle(AfterAx::Failed(UNREADABLE_BEFORE_RETRY.into()), || {
+            panic!("no typing")
+        })
+        .unwrap_err();
+        assert!(!err.starts_with(crate::delivery::decide::shared_target::SAFE_REFUSAL));
+    }
+
+    #[test]
+    fn possible_writes_stay_unverified_reports() {
+        let partial = settle(AfterAx::TypeFallback, || (2, Err("focus changed".into())));
+        let partial = partial.expect("partial typing is never an Err");
+        assert!(partial.typed && partial.unverified);
+        let changed = settle(AfterAx::Unverified, || panic!("no typing"));
+        assert!(changed.expect("changed field is never an Err").unverified);
+        let typed = settle(AfterAx::TypeFallback, || (1, Ok(()))).unwrap();
+        assert!(typed.typed && !typed.unverified);
+        assert_eq!(
+            settle(AfterAx::Inserted, || panic!("no typing")),
+            Ok(InsertReport::default())
+        );
+    }
+
+    #[test]
+    fn first_write_guard_refusal_is_safe_without_calling_setter() {
+        let mut sets = 0;
+        let error = insert_selected_text_guarded_with(
+            "dictation",
+            || Err("target changed".into()),
+            |_, _| {
+                sets += 1;
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert_eq!(sets, 0);
+        assert_eq!(error, "delivery-safe-refusal:target changed");
+    }
+
+    #[test]
+    fn guarded_setter_failure_remains_an_untagged_write_result() {
+        let mut attrs = Vec::new();
+        let write = insert_selected_text_guarded_with(
+            "dictation",
+            || Ok(()),
+            |attr, text| {
+                attrs.push((attr.to_string(), text.to_string()));
+                Err("AX set failed".into())
+            },
+        )
+        .expect("guard succeeded; setter failure is not a prewrite refusal");
+        assert_eq!(write, Err("AX set failed".into()));
+        assert_eq!(attrs, [("AXSelectedText".into(), "dictation".into())]);
+    }
+
+    #[test]
+    fn successful_guard_precedes_the_single_selected_text_write() {
+        let calls = std::cell::RefCell::new(Vec::new());
+        let result = insert_selected_text_guarded_with(
+            "dictation",
+            || {
+                calls.borrow_mut().push("guard");
+                Ok(())
+            },
+            |attr, text| {
+                assert_eq!((attr, text), ("AXSelectedText", "dictation"));
+                calls.borrow_mut().push("setter");
+                Ok(())
+            },
+        );
+        assert_eq!(result, Ok(Ok(())));
+        assert_eq!(calls.into_inner(), ["guard", "setter"]);
+    }
 
     #[test]
     fn selected_text_failure_never_attempts_value_write() {

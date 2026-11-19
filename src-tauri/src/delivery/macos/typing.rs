@@ -132,23 +132,80 @@ pub const FLAG_COMMAND: u64 = 0x0010_0000;
 /// One key press (down, up) with `flags` held, from a private event source so
 /// physically held modifiers do not leak in. The caller picks the keycode.
 pub fn post_key_chord(keycode: u16, flags: u64) -> Result<(), String> {
-    post_key_chord_with(&NativeEvents, keycode, flags)
+    post_key_chord_guarded(keycode, flags, || Ok(()), || Ok(()))
 }
 
+/// All events preallocated. `ready`, the full target check, runs after
+/// layout/main-queue waits and before Command-down. Only `last`, which must be
+/// cheap (no AX reads), runs while Command is held, immediately before V. A
+/// Command-only refusal always releases Command, including unwinding. Once V
+/// is posted there are no fallible operations.
+pub fn post_key_chord_guarded(
+    keycode: u16,
+    flags: u64,
+    ready: impl FnOnce() -> Result<(), String>,
+    last: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    post_key_chord_guarded_with(&NativeEvents, keycode, flags, ready, last)
+}
+
+#[cfg(test)]
 fn post_key_chord_with(api: &impl Events, keycode: u16, flags: u64) -> Result<(), String> {
+    post_key_chord_guarded_with(api, keycode, flags, || Ok(()), || Ok(()))
+}
+
+struct CommandHeld<'a, E: Events> {
+    api: &'a E,
+    up: CFTypeRef,
+}
+impl<E: Events> Drop for CommandHeld<'_, E> {
+    fn drop(&mut self) {
+        self.api.post(HID_EVENT_TAP, self.up);
+    }
+}
+
+fn post_key_chord_guarded_with(
+    api: &impl Events,
+    keycode: u16,
+    flags: u64,
+    ready: impl FnOnce() -> Result<(), String>,
+    last: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    if flags != FLAG_COMMAND {
+        return Err("only Command paste chords are supported".into());
+    }
     let source = OwnedEvent(api, api.source(SOURCE_PRIVATE_STATE));
     if source.1.is_null() {
         return Err("could not create private event source".into());
     }
+    let command_down = OwnedEvent(api, api.keyboard(source.1, 55, true));
     let down = OwnedEvent(api, api.keyboard(source.1, keycode, true));
     let up = OwnedEvent(api, api.keyboard(source.1, keycode, false));
-    if down.1.is_null() || up.1.is_null() {
-        return Err("could not create key events".into());
+    let command_up = OwnedEvent(api, api.keyboard(source.1, 55, false));
+    if [command_down.1, down.1, up.1, command_up.1]
+        .iter()
+        .any(|e| e.is_null())
+    {
+        return Err("could not create complete paste key sequence".into());
     }
-    api.flags(down.1, flags);
-    api.flags(up.1, flags);
+    for event in [command_down.1, down.1, up.1] {
+        api.flags(event, FLAG_COMMAND);
+    }
+    api.flags(command_up.1, 0);
+    if !api.post_access() {
+        return Err("event-posting permission denied".into());
+    }
+    ready()?;
+    api.post(HID_EVENT_TAP, command_down.1);
+    let held = CommandHeld {
+        api,
+        up: command_up.1,
+    };
+    // No waits, AX reads, TIS calls or physically queried modifier state here.
+    last()?;
     api.post(HID_EVENT_TAP, down.1);
     api.post(HID_EVENT_TAP, up.1);
+    drop(held);
     Ok(())
 }
 

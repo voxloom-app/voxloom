@@ -25,6 +25,23 @@ impl Drop for Registry {
 }
 
 #[test]
+fn legacy_claim_is_single_use_but_guards_keep_the_same_generation() {
+    let field = Owned::string("heap allocated single-use AX completion fixture");
+    let r = Registry::default();
+    let generation = r.register(&field).unwrap();
+    assert!(claim_in(field.0 as AXUIElementRef, generation, &r.slot));
+    assert!(
+        !claim_in(field.0 as AXUIElementRef, generation, &r.slot),
+        "an AX command cannot replay the same completion"
+    );
+    assert_eq!(
+        r.matching(&field),
+        Some(generation),
+        "in-flight chunk guards remain valid through cleanup"
+    );
+}
+
+#[test]
 fn replacement_releases_old_target_and_invalidates_old_generation() {
     let a = Owned::string("heap allocated completion field A, not a tagged string");
     let b = Owned::string("heap allocated completion field B, not a tagged string");

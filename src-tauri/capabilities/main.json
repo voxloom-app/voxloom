@@ -55,6 +55,7 @@
     "allow-delivery-insert-text",
     "allow-delivery-paste-binding",
     "allow-delivery-paste-text",
+    "allow-delivery-paste-target",
     "allow-delivery-snapshot-target",
     "allow-delivery-validate-target",
     "allow-dictionary-load",

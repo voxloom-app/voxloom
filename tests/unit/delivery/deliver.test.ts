@@ -52,7 +52,7 @@ describe('deliverTranscript', () => {
     });
     await started;
     current = false;
-    reject(new Error('late native failure'));
+    reject(new InsertError('late safe refusal', false));
     const result = await pending;
     expect(result.status).toBe('failed');
     expect(result.message).toContain('cancelled or superseded');
@@ -142,7 +142,7 @@ describe('deliverTranscript', () => {
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
   });
 
-  it('unverified native insert → may have been inserted, also copied', async () => {
+  it('unverified native insert never copies or retries', async () => {
     const platform = adapter({
       clipboardRead: vi.fn().mockResolvedValue({ ok: true, text: 'hello' }),
       insertText: vi.fn().mockResolvedValue({
@@ -157,13 +157,13 @@ describe('deliverTranscript', () => {
       platform,
       text: 'hello',
     });
-    expect(outcome.status).toBe('copied');
-    expect(outcome.message).toBe('May have been inserted — also copied');
+    expect(outcome.status).toBe('unverified');
+    expect(outcome.message).toContain('Inspect before retrying');
     expect(outcome.mayHaveInserted).toBe(true);
-    expect(platform.clipboardWrite).toHaveBeenCalledWith('hello');
+    expect(platform.clipboardWrite).not.toHaveBeenCalled();
   });
 
-  it('keeps the may-have-been-inserted warning when Copy fails', async () => {
+  it('does not attempt Copy even when the clipboard would fail', async () => {
     const platform = adapter({
       clipboardWrite: vi.fn().mockRejectedValue(new Error('denied')),
       insertText: vi.fn().mockResolvedValue({
@@ -178,8 +178,9 @@ describe('deliverTranscript', () => {
       platform,
       text: 'hello',
     });
-    expect(outcome.status).toBe('failed');
-    expect(outcome.message).toMatch(/^May have been inserted — Failed/);
+    expect(outcome.status).toBe('unverified');
+    expect(outcome.message).toContain('Inspect before retrying');
+    expect(platform.clipboardWrite).not.toHaveBeenCalled();
     expect(outcome.mayHaveInserted).toBe(true);
   });
 
@@ -192,7 +193,8 @@ describe('deliverTranscript', () => {
       const outcome = await deliverTranscript({ clipboardFallback, intended: snap(), platform, text: 'hello' });
       expect(outcome.mayHaveInserted).toBe(true);
       expect(outcome.message).toMatch(/^May have been inserted/);
-      expect(outcome.status).toBe(clipboardFallback ? 'copied' : 'failed');
+      expect(outcome.status).toBe('unverified');
+      expect(platform.clipboardWrite).not.toHaveBeenCalled();
     }
   });
 
@@ -219,10 +221,10 @@ describe('deliverTranscript', () => {
       platform,
       text: 'hello',
     });
-    expect(outcome.status).toBe('failed');
-    expect(outcome.message).toMatch(/^May have been inserted — Failed/);
-    expect(outcome.mayHaveInserted).toBe(true);
+    expect(outcome.status).toBe('unverified');
+    expect(outcome.message).toContain('Inspect before retrying');
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
+    expect(outcome.mayHaveInserted).toBe(true);
   });
 
   it('empty transcript never inserts or overwrites the clipboard', async () => {
@@ -241,9 +243,9 @@ describe('deliverTranscript', () => {
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
   });
 
-  it('plain insert failures keep the regular Copied message', async () => {
+  it('explicit safe insert refusals keep the regular Copied message', async () => {
     const platform = adapter({
-      insertText: vi.fn().mockRejectedValue(new Error('AX set failed')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX set failed', false)),
       clipboardRead: vi.fn().mockResolvedValue({ ok: true, text: 'hello' }),
     });
     const outcome = await deliverTranscript({
@@ -341,7 +343,7 @@ describe('deliverTranscript', () => {
 
   it('insert API failure falls back to Copy when enabled', async () => {
     const platform = adapter({
-      insertText: vi.fn().mockRejectedValue(new Error('AX set failed')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX set failed', false)),
       clipboardRead: vi.fn().mockResolvedValue({
         ok: true,
         text: 'fallback text',
@@ -359,7 +361,7 @@ describe('deliverTranscript', () => {
 
   it('AX selected-text failure Copies without claiming Inserted', async () => {
     const platform = adapter({
-      insertText: vi.fn().mockRejectedValue(new Error('AX set AXSelectedText failed')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX set AXSelectedText failed', false)),
       clipboardRead: vi.fn().mockResolvedValue({ ok: true, text: 'dictation' }),
     });
     const outcome = await deliverTranscript({
@@ -375,7 +377,7 @@ describe('deliverTranscript', () => {
 
   it('AX selected-text failure with Copy off fails without writing', async () => {
     const platform = adapter({
-      insertText: vi.fn().mockRejectedValue(new Error('AX set AXSelectedText failed')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX set AXSelectedText failed', false)),
     });
     const outcome = await deliverTranscript({
       clipboardFallback: false,

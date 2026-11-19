@@ -31,6 +31,7 @@ const COMMANDS: &[&str] = &[
     "delivery_insert_text",
     "delivery_paste_binding",
     "delivery_paste_text",
+    "delivery_paste_target",
     "delivery_snapshot_target",
     "delivery_validate_target",
     "dictionary_load",

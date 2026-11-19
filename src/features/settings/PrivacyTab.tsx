@@ -4,6 +4,7 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { audioRetentions, parseChoice } from '../../domain/settings';
 import type { Settings } from '../../domain/types';
 import { isTauriEnv } from '../../services/capture/captureService';
+import { ThirdPartyNotices } from './ThirdPartyNotices';
 
 const transcriptOptions: { value: Settings['transcriptRetention']; label: string }[] = [
   { value: '30-days', label: '30 days' },
@@ -85,6 +86,8 @@ export function PrivacyTab() {
           </div>
         ))}
       </div>
+      <h3 className="settings-subhead">Licenses</h3>
+      <ThirdPartyNotices />
     </>
   );
 }

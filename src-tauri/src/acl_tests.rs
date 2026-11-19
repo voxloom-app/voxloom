@@ -1,7 +1,6 @@
-//! BUS-42: the app command ACL (build.rs + capabilities/*.json) must let the
-//! main window call `store_backup`, and deny it to the Settings and overlay
-//! windows. Runs the REAL generated context on Tauri's mock runtime; a
-//! same-named stub stands in for the command (the ACL keys on the name).
+//! App command ACL regressions run the REAL generated context on Tauri's mock
+//! runtime. Same-named stubs isolate permission routing from OS side effects;
+//! the shared-paste macOS probe additionally reaches production preflight.
 
 use tauri::ipc::{CallbackFn, InvokeBody};
 use tauri::test::{get_ipc_response, mock_builder, MockRuntime, INVOKE_KEY};
@@ -223,6 +222,91 @@ fn stt_execution_is_main_only_and_settings_has_only_inventory() {
             "{command}"
         );
     }
+}
+
+#[tauri::command]
+fn delivery_snapshot_target() {}
+#[tauri::command]
+fn delivery_validate_target() {}
+#[tauri::command]
+fn delivery_insert_text() {}
+#[tauri::command]
+fn delivery_paste_binding() {}
+#[tauri::command]
+fn delivery_paste_text() {}
+#[tauri::command]
+fn delivery_paste_target() {}
+
+#[test]
+fn delivery_commands_are_main_only() {
+    for command in [
+        "delivery_snapshot_target",
+        "delivery_validate_target",
+        "delivery_insert_text",
+        "delivery_paste_binding",
+        "delivery_paste_text",
+        "delivery_paste_target",
+    ] {
+        let app = mock_builder()
+            .invoke_handler(tauri::generate_handler![
+                delivery_snapshot_target,
+                delivery_validate_target,
+                delivery_insert_text,
+                delivery_paste_binding,
+                delivery_paste_text,
+                delivery_paste_target
+            ])
+            .build(crate::app_context())
+            .expect("mock app");
+        assert_eq!(
+            invoke_command(&app, "main", "index.html", command),
+            Ok(()),
+            "{command} must be reachable from main",
+        );
+        for (label, page) in [("settings", "settings.html"), (OVERLAY, "overlay.html")] {
+            let denied = invoke_command(&app, label, page, command).unwrap_err();
+            assert!(
+                denied.contains("not allowed"),
+                "{label}: {command}: {denied}"
+            );
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn shared_paste_ipc_reaches_native_preflight_from_main() {
+    // Use the production handler and generated app authority. A missing token
+    // exits before OS observation, clipboard access or key-event dispatch.
+    let app = mock_builder()
+        .invoke_handler(tauri::generate_handler![
+            crate::delivery::delivery_paste_target
+        ])
+        .build(crate::app_context())
+        .expect("mock app");
+    let window = WebviewWindowBuilder::new(&app, "main", WebviewUrl::App("index.html".into()))
+        .build()
+        .expect("main window");
+    let response = get_ipc_response(
+        &window,
+        InvokeRequest {
+            cmd: "delivery_paste_target".into(),
+            callback: CallbackFn(0),
+            error: CallbackFn(1),
+            url: window.url().expect("url"),
+            body: InvokeBody::Json(serde_json::json!({
+                "text": "synthetic ACL fixture",
+                "intended": crate::delivery::TargetSnapshotDto::unavailable("ACL fixture", 1),
+            })),
+            headers: Default::default(),
+            invoke_key: INVOKE_KEY.to_string(),
+        },
+    );
+    assert_eq!(
+        response.expect_err("missing native authority must refuse before dispatch"),
+        serde_json::json!("delivery-safe-refusal:completion token required"),
+        "main IPC must reach native preflight, not be rejected by the command ACL",
+    );
 }
 
 #[test]

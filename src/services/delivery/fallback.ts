@@ -27,26 +27,24 @@ export function failOutcome(
 }
 
 /**
- * Native write happened but could not be proven complete: the text may already
- * be (partly) in the field. Never claim Inserted, never imply nothing happened
- * — including when the Copy fallback itself fails or is disabled.
+ * Possible native mutation, never proven complete: the text may already be
+ * (partly) in the destination. Never claim Inserted or dispatch Copy/retry,
+ * regardless of the Clipboard fallback setting or current session lease.
  */
-export async function mayHaveInserted(
-  platform: DeliverOptions['platform'],
+export function mayHaveInserted(
   text: string,
-  clipboardFallback: boolean,
   report: InsertReport,
-): Promise<DeliveryOutcome> {
+): DeliveryOutcome {
   const detail = `unverified insert: ${report.detail ?? 'read-back failed'}`;
-  if (!clipboardFallback) {
-    const failed = failOutcome(text, detail);
-    return { ...failed, mayHaveInserted: true, message: `May have been inserted — ${failed.message}` };
-  }
-  const copied = await copyFallback(platform, text, detail);
-  if (copied.status === 'copied') {
-    return { ...copied, mayHaveInserted: true, message: 'May have been inserted — also copied' };
-  }
-  return { ...copied, mayHaveInserted: true, message: `May have been inserted — ${copied.message}` };
+  return {
+    clipboardRestored: false,
+    detail,
+    mayHaveInserted: true,
+    message: `May have been inserted — input not verified. Inspect before retrying. ${MANUAL_RECOVERY_HINT}`,
+    restoreSkippedReason: null,
+    status: 'unverified',
+    text,
+  };
 }
 
 /**

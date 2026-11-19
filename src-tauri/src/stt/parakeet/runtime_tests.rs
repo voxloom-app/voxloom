@@ -108,6 +108,51 @@ fn one_active_one_pending_fifo_busy_and_pending_cancel_never_kills_active() {
         "x"
     );
 }
+fn wait_for_pid(
+    mut read: impl FnMut() -> std::io::Result<String>,
+    timeout: Duration,
+) -> Option<i32> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        // Creating the marker precedes publishing its contents. Only a parsed,
+        // positive PID is readiness; never pass zero/negative PIDs to kill.
+        if let Some(pid) = read()
+            .ok()
+            .and_then(|content| content.parse::<i32>().ok())
+            .filter(|pid| *pid > 0)
+        {
+            return Some(pid);
+        }
+        if Instant::now() >= deadline {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+#[test]
+fn pid_readiness_waits_for_positive_content_after_file_creation() {
+    let path = fixture("").with_extension("pid");
+    fs::write(&path, "").unwrap();
+    assert!(path.exists());
+    let mut reads = 0;
+    let pid = wait_for_pid(
+        || {
+            let content = fs::read_to_string(&path);
+            // Publish only after the reader has observed each incomplete phase.
+            let next = ["0", "-1", "not-a-pid", "12345"];
+            if reads < next.len() {
+                fs::write(&path, next[reads]).unwrap();
+            }
+            reads += 1;
+            content
+        },
+        Duration::from_secs(1),
+    );
+    assert_eq!(pid, Some(12345));
+    assert_eq!(reads, 5);
+}
+
 #[test]
 fn abandoned_preparation_has_a_finite_audio_wait_and_reaps_before_next_recording() {
     let path = fixture(&format!(
@@ -115,13 +160,23 @@ fn abandoned_preparation_has_a_finite_audio_wait_and_reaps_before_next_recording
     ));
     let rt = ParakeetRuntime::with_short_audio_wait(path.clone());
     prepare(&rt, "abandoned").unwrap();
-    wait(|| path.with_extension("pid").exists());
-    let pid = fs::read_to_string(path.with_extension("pid"))
-        .unwrap()
-        .parse::<i32>()
-        .unwrap();
+    let pid = wait_for_pid(
+        || fs::read_to_string(path.with_extension("pid")),
+        Duration::from_secs(4),
+    );
+    if pid.is_none() {
+        // Settle the sole worker owner before a readiness assertion can unwind.
+        // idle() becomes true only after run() has dropped/killed/waited its child.
+        let _ = rt.cancel(rt.epoch(), "abandoned");
+        wait(|| rt.idle());
+    }
+    let pid = pid.expect("worker did not publish a positive PID before the deadline");
     wait(|| rt.idle());
     assert_eq!(unsafe { libc::kill(pid, 0) }, -1);
+    assert_eq!(
+        std::io::Error::last_os_error().raw_os_error(),
+        Some(libc::ESRCH)
+    );
     assert_eq!(
         rt.transcribe(
             rt.epoch(),

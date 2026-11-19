@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { deliverTranscript } from '../../../src/services/delivery/deliver';
 import { TERMINAL_COPY_MESSAGE } from '../../../src/services/delivery/messages';
 import { planDelivery } from '../../../src/services/delivery/policy';
+import { InsertError } from '../../../src/services/delivery/types';
 import type {
   DeliveryPlatformAdapter,
   TargetSnapshot,
@@ -108,13 +109,13 @@ describe('terminal Copy hint', () => {
   it('a failed native insert in a terminal copies with the hint', async () => {
     const insertable = snap({ appName: 'iTerm2', knownTerminal: true });
     const outcome = await deliver(insertable, {
-      insertText: vi.fn().mockRejectedValue(new Error('AX write ignored')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX write ignored', false)),
     });
     expect(outcome.status).toBe('copied');
     expect(outcome.message).toBe('Copied. Press ⌘V to paste.');
     expect(outcome.detail).toBe('insert failed: AX write ignored');
     const elsewhere = await deliver(snap(), {
-      insertText: vi.fn().mockRejectedValue(new Error('AX write ignored')),
+      insertText: vi.fn().mockRejectedValue(new InsertError('AX write ignored', false)),
     });
     expect(elsewhere.message).toBe('Copied — insert failed: AX write ignored');
   });
@@ -139,7 +140,8 @@ describe('terminal Copy hint', () => {
     const unverified = await deliver(snap({ knownTerminal: true }), {
       insertText: vi.fn().mockResolvedValue({ detail: 'read-back differs', typed: false, unverified: true }),
     });
-    expect(unverified.message).toBe('May have been inserted — also copied');
+    expect(unverified.status).toBe('unverified');
+    expect(unverified.message).toContain('Inspect before retrying');
     expect(unverified.message).not.toContain('press ⌘V');
     // Terminal dispatch (Terminal.app Unicode route): unchanged.
     const dispatched = await deliver(snap({ knownTerminal: true }), {

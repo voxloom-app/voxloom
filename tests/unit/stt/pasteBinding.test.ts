@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
-// The terminal a paste may go to is the one in front when dictation starts:
-// captured at start(), read at delivery, never re-derived after transcription.
+// Shared paste binds at completion; the recording-start API remains legacy-only.
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -43,11 +42,18 @@ function stubCapture(state: CaptureState): UseCaptureStateResult {
 }
 
 /** Dictate with `atStart` in front, switch to `atDelivery` during transcription. */
-async function dictate(atStart: App, atDelivery: App) {
+async function dictate(atStart: App, atDelivery: App, shared = false, afterCleanup?: App) {
   const store = createMockSttModelStore();
   await store.download('whisper-tiny.en');
   let front: App = atStart;
   let board = 'prior';
+  const snapshot = () => shared
+    ? { ...APPS[front], sharedPasteToken: `completion-${front}`, pasteTerminal: false, pasteApp: null }
+    : APPS[front];
+  let enterCleanup!: () => void;
+  let finishCleanup!: () => void;
+  const cleanupEntered = new Promise<void>((resolve) => { enterCleanup = resolve; });
+  const cleanupGate = new Promise<void>((resolve) => { finishCleanup = resolve; });
   const pasteBinding = vi.fn(async () => {
     const app = APPS[front];
     return app.pasteTerminal && app.appPid != null && app.pasteApp
@@ -61,8 +67,9 @@ async function dictate(atStart: App, atDelivery: App) {
     insertText: vi.fn().mockResolvedValue(undefined),
     pasteBinding,
     pasteText: vi.fn().mockResolvedValue({ clipboardRestored: true, restoreSkippedReason: null }),
-    snapshotTarget: vi.fn(async () => APPS[front]),
-    validateTarget: vi.fn(async () => APPS[front]),
+    pasteTarget: vi.fn().mockResolvedValue({ clipboardRestored: true, restoreSkippedReason: null }),
+    snapshotTarget: vi.fn(async () => snapshot()),
+    validateTarget: vi.fn(async () => snapshot()),
   };
   let resolveStt!: (value: { text: string; language: string }) => void;
   const transcribe = vi.fn(() => new Promise<{ text: string; language: string }>((resolve) => {
@@ -71,6 +78,11 @@ async function dictate(atStart: App, atDelivery: App) {
   const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({
     ...options,
     createEngine: (modelId) => ({ ...createMockSttEngine({ modelId }), transcribe }),
+    ...(afterCleanup ? { cleanup: async (text: string) => {
+      enterCleanup();
+      await cleanupGate;
+      return { status: 'cleaned' as const, finalText: text, reason: null };
+    } } : {}),
   });
   const toasts: string[] = [];
   const records: Array<{ status: string }> = [];
@@ -90,12 +102,42 @@ async function dictate(atStart: App, atDelivery: App) {
   await waitFor(() => expect(transcribe).toHaveBeenCalledOnce());
   front = atDelivery;
   await act(async () => { resolveStt({ language: 'en', text: 'hello there' }); });
+  if (afterCleanup) {
+    await cleanupEntered;
+    expect(platform.snapshotTarget).not.toHaveBeenCalled();
+    front = afterCleanup;
+    await act(async () => { finishCleanup(); });
+  }
   await waitFor(() => expect(result.current.phase).toBe('success'));
   await waitFor(() => expect(records).toHaveLength(1));
   return { pasteBinding, platform, records, result, toasts };
 }
 
-describe('paste binding captured at hold start', () => {
+describe('shared completion binding and legacy recording-start compatibility', () => {
+  it.each([
+    ['notes', 'wezterm'], ['wezterm', 'ghostty'],
+  ] as const)('%s at recording start → %s at completion: shared paste, no automatic Copy', async (start, completion) => {
+    const { platform, records, result, toasts } = await dictate(start, completion, true);
+    expect(platform.pasteTarget).toHaveBeenCalledExactlyOnceWith('hello there', expect.objectContaining({
+      appPid: APPS[completion].appPid, sharedPasteToken: `completion-${completion}`,
+    }));
+    expect(platform.pasteText).not.toHaveBeenCalled();
+    expect(platform.insertText).not.toHaveBeenCalled();
+    expect(platform.clipboardWrite).not.toHaveBeenCalled();
+    expect(records[0].status).toBe('unverified');
+    expect(result.current.message).toBeNull();
+    expect(toasts.filter((t) => /paste|clipboard|inserted|copied/i.test(t))).toEqual([]);
+  });
+
+  it('A at start → B after release → C after cleanup: selects C only at completion', async () => {
+    const { platform, records } = await dictate('notes', 'wezterm', true, 'ghostty');
+    expect(platform.pasteTarget).toHaveBeenCalledExactlyOnceWith('hello there', expect.objectContaining({
+      appPid: APPS.ghostty.appPid, sharedPasteToken: 'completion-ghostty',
+    }));
+    expect(platform.clipboardWrite).not.toHaveBeenCalled();
+    expect(records[0].status).toBe('unverified');
+  });
+
   it('Notes at hold start, WezTerm at delivery: copies, never pastes', async () => {
     const { platform, records } = await dictate('notes', 'wezterm');
     expect(platform.pasteText).not.toHaveBeenCalled();

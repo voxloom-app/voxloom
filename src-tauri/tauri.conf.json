@@ -32,7 +32,8 @@
   "bundle": {
     "active": true,
     "resources": {
-      "licenses/whisper/THIRD-PARTY-NOTICES.txt": "licenses/whisper/THIRD-PARTY-NOTICES.txt"
+      "licenses/whisper/THIRD-PARTY-NOTICES.txt": "licenses/whisper/THIRD-PARTY-NOTICES.txt",
+      "licenses/insertion/THIRD-PARTY-NOTICES.txt": "licenses/insertion/THIRD-PARTY-NOTICES.txt"
     },
     "targets": [
       "app",

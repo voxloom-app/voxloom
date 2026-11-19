@@ -19,6 +19,9 @@ pub fn snapshot_target() -> Result<TargetSnapshotDto, String> {
 pub fn validate_target(intended: TargetSnapshotDto) -> Result<TargetSnapshotDto, String> {
     Ok(TargetSnapshotDto {
         insertable: false,
+        shared_paste_token: None,
+        paste_terminal: false,
+        paste_app: None,
         kind: if intended.kind == "insertable" {
             "unavailable".into()
         } else {
@@ -37,7 +40,18 @@ pub fn insert_text(
     _text: &str,
     _intended: &TargetSnapshotDto,
 ) -> Result<super::decide::InsertReport, String> {
-    Err("insert unavailable on this platform (macOS AX adapter required)".into())
+    Err(super::decide::shared_target::refused(
+        "insert unavailable on this platform (macOS AX adapter required)",
+    ))
+}
+
+pub fn paste_target(
+    _text: &str,
+    _intended: &TargetSnapshotDto,
+) -> Result<super::decide::report::PasteReport, String> {
+    Err(super::decide::shared_target::refused(
+        "paste unavailable on this platform",
+    ))
 }
 
 pub fn paste_binding() -> Option<PasteBindingDto> {
@@ -48,5 +62,7 @@ pub fn paste_text(
     _text: &str,
     _bound: &PasteBindingDto,
 ) -> Result<super::decide::report::PasteReport, String> {
-    Err("paste unavailable on this platform (macOS adapter required)".into())
+    Err(super::decide::shared_target::refused(
+        "paste unavailable on this platform (macOS adapter required)",
+    ))
 }

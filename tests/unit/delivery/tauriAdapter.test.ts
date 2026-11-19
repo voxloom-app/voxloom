@@ -10,11 +10,23 @@ const clipboard = { readText: vi.fn(), writeText: vi.fn() } as never;
 const target = {} as never;
 
 describe('tauri insertText errors', () => {
-  it('a native Err string means nothing was written', async () => {
-    invoke.mockRejectedValueOnce('AXValue unreadable before insert — insert skipped');
+  it('an explicitly tagged native refusal means nothing was written', async () => {
+    invoke.mockRejectedValueOnce('delivery-safe-refusal: AXValue unreadable before insert — insert skipped');
     const error = await createTauriDeliveryAdapter(clipboard).insertText('hi', target).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(InsertError);
     expect((error as InstanceType<typeof InsertError>).writeStarted).toBe(false);
+  });
+
+  it('a tagged refusal reaches the user without the protocol tag', async () => {
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:AX set failed');
+    const error = await createTauriDeliveryAdapter(clipboard).insertText('hi', target).catch((e: unknown) => e);
+    expect((error as Error).message).toBe('AX set failed');
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:completion destination changed or unavailable');
+    const validated = await createTauriDeliveryAdapter(clipboard).validateTarget({} as never);
+    expect(validated.reason).toBe('native validate failed: completion destination changed or unavailable');
+    invoke.mockRejectedValueOnce('delivery-safe-refusal:target registry unavailable');
+    const snapshot = await createTauriDeliveryAdapter(clipboard).snapshotTarget();
+    expect(snapshot.reason).toBe('native snapshot failed: target registry unavailable');
   });
 
   it('any other failure may have hit mid-write', async () => {
@@ -70,8 +82,8 @@ describe('tauri pasteText', () => {
     expect(invoke).toHaveBeenCalledWith('delivery_paste_text', { bound, text: 'hi' });
   });
 
-  it('a native Err string means ⌘V was not posted', async () => {
-    invoke.mockRejectedValueOnce('Secure Keyboard Entry is on — paste skipped');
+  it('an explicitly tagged native refusal means ⌘V was not posted', async () => {
+    invoke.mockRejectedValueOnce('delivery-safe-refusal: Secure Keyboard Entry is on — paste skipped');
     const error = await createTauriDeliveryAdapter(clipboard).pasteText!('hi', bound).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(InsertError);
     expect((error as InstanceType<typeof InsertError>).writeStarted).toBe(false);
