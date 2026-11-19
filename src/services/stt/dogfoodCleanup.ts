@@ -31,6 +31,8 @@ export function prepareDogfoodCleanup(input: {
   onStart: () => void;
   requestId: string;
   settings: DogfoodCleanupSettings;
+  /** Remaining cleanup budget inside the overall stop safety net. */
+  timeoutMs?: () => number;
   userCancelled: () => boolean;
 }): DogfoodCleanup {
   if (!input.settings.active) return { provenance: async () => undefined };
@@ -50,6 +52,7 @@ export function prepareDogfoodCleanup(input: {
         requestId: input.requestId,
         signal: signalFor(input.controller),
         snapshot,
+        timeoutMs: input.timeoutMs?.(),
         userCancelled: input.userCancelled,
       });
     },

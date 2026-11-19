@@ -9,6 +9,7 @@ import type { PasteBinding } from '../delivery';
 import { beginCancelScope } from '../shortcut/cancelScope';
 import { errorText } from './dogfoodModel';
 import { prepareSttSession } from './prepareSession';
+import { CAPTURE_CANCELLED_NOTHING } from './stopBudget';
 import type { DogfoodOrigin, DogfoodPhase, DogfoodViewActions } from './dogfoodPhase';
 import type { Cancellation, DogfoodLiveSession } from './dogfoodSessionState';
 import type { OwnFieldDeliveryGuard } from './dogfoodPath';
@@ -144,6 +145,7 @@ export function useDogfoodSession({
   const stop = useCallback(async () => {
     const session = live.session;
     live.stopRequested = true;
+    live.cancellation.captureStopped = true;
     try {
       await capture.stopFullCapture();
     } catch (error: unknown) {
@@ -154,24 +156,36 @@ export function useDogfoodSession({
   }, [actions, capture, live]);
 
   const cancel = useCallback(() => {
+    // After stop, Escape must not discard the clip or abort native STT.
+    // Cleanup and delivery still abort; a late transcript goes to History.
+    const keepTranscript = live.cancellation.transcribing === true
+      || live.cancellation.captureStopped === true;
     live.active = false;
     setScopeReady(false);
     setHudReady(false);
     live.cancellation.cancelled = true;
-    void live.cancellation.preparation?.cancel().catch(() => {});
+    if (!keepTranscript) {
+      void live.cancellation.preparation?.cancel().catch(() => {});
+    }
     // After `cancelled` is set, so the cleanup stage reports a user cancel.
     live.processing?.abort();
     void live.cancellation.scope?.dispose().catch(() => {});
     live.session += 1;
     live.pasteBinding = null;
     live.stopRequested = true;
-    live.handledAudioId = null;
+    // Keep handledAudioId after stop so the stopped effect does not start a
+    // second run and overwrite the pending/saved note.
+    if (!keepTranscript) live.handledAudioId = null;
     setIntendedTarget(null);
+    setPhase('cancelled');
+    if (keepTranscript) {
+      void live.cancellation.retainOnCancel?.();
+      return;
+    }
     try {
       capture.cancelActiveCapture();
     } finally {
-      setPhase('cancelled');
-      setMessage('Capture cancelled — nothing transcribed.');
+      setMessage(CAPTURE_CANCELLED_NOTHING);
     }
   }, [actions, capture, live]);
 

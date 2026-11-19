@@ -87,10 +87,10 @@ describe.each(['parakeet-tdt-0.6b-v2', 'parakeet-tdt-0.6b-v3', 'whisper-large-v3
     rerender({ state: { kind: 'stopped', audio } });
     await waitFor(() => expect(result.current.phase).toBe('transcribing'));
     act(() => result.current.cancel());
+    // Cancel after stop still transcribes; release waits until that run settles.
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith('stt_transcribe', expect.objectContaining({ requestId })));
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('stt_release', { requestId, bufferId: audio.id }));
-    expect(invoke.mock.calls.filter(([c]) => c === 'stt_transcribe')).toHaveLength(0);
-    expect(history).not.toHaveBeenCalled();
-    expect(copy).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith('stt_cancel', { requestId });
     expect(result.current.phase).toBe('cancelled');
   });
   it.each(['supersede', 'cancel', 'failure'] as const)('settles a stopped request after %s without losing History or cancelling its successor', async (ending) => {
@@ -120,15 +120,16 @@ describe.each(['parakeet-tdt-0.6b-v2', 'parakeet-tdt-0.6b-v3', 'whisper-large-v3
     });
     await waitFor(() => expect(invoke).toHaveBeenCalledWith('stt_release', { requestId, bufferId: audio.id }));
     expect(invoke.mock.calls.filter(([c]) => c === 'stt_transcribe')).toHaveLength(1);
-    expect(invoke.mock.calls.filter(([c]) => c === 'stt_cancel' || c === 'stt_release')).toEqual(ending === 'cancel'
-      ? [['stt_cancel', { requestId }], ['stt_release', { requestId, bufferId: audio.id }]]
-      : [['stt_release', { requestId, bufferId: audio.id }]]);
-    if (ending === 'supersede') {
+    expect(invoke).not.toHaveBeenCalledWith('stt_cancel', { requestId });
+    expect(invoke.mock.calls.filter(([c]) => c === 'stt_release')).toEqual(
+      [['stt_release', { requestId, bufferId: audio.id }]],
+    );
+    if (ending === 'supersede' || ending === 'cancel') {
       await waitFor(() => expect(history).toHaveBeenCalledWith(expect.objectContaining({ text: 'earlier transcript', model: modelId })));
-      expect(result.current.phase).toBe('recording');
+      expect(result.current.phase).toBe(ending === 'cancel' ? 'cancelled' : 'recording');
     } else {
       expect(history).not.toHaveBeenCalled();
-      expect(result.current.phase).toBe(ending === 'cancel' ? 'cancelled' : 'error');
+      expect(result.current.phase).toBe('error');
     }
     expect(copy).not.toHaveBeenCalled();
   });

@@ -1,8 +1,8 @@
 /// Optional local LLM cleanup between STT and delivery (BUS-16 PR 2c).
 /// It never throws and never loses the transcript: a failure, timeout,
 /// native abort or validator reject falls back to the raw text. Only the
-/// user's own cancel returns `cancelled`, which delivers nothing, as a cancel
-/// during transcription already does.
+/// user's own cancel returns `cancelled`; the dogfood path still keeps the
+/// STT text for History (BUS-255).
 
 import type { CleanupEngine } from '../cleanup/contracts';
 import { CLEANUP_BUDGET_MS, tooLongToClean } from '../cleanup/budget';

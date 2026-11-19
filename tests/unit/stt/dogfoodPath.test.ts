@@ -406,3 +406,26 @@ describe('completion snapshot failures', () => {
     expect(clip.copy).not.toHaveBeenCalled();
   });
 });
+
+describe('BUS-255 transcript retention', () => {
+  it('reports STT text through onTranscript and keeps it when cleanup is cancelled', async () => {
+    const seen: string[] = [];
+    const clip = clipboard();
+    const result = await dogfoodTranscribeAndCopy({
+      audio: { duration_ms: 100, id: 'pcm-keep-cancel', sample_rate_hz: 16_000 },
+      clipboard: clip,
+      modelId: 'whisper-tiny.en',
+      createEngine: (modelId) => createMockSttEngine({
+        modelId,
+        transcriptText: 'keep this',
+      }),
+      cleanup: async () => ({ status: 'cancelled', reason: 'cancelled' }),
+      onTranscript: (transcript) => { seen.push(transcript.text); },
+    });
+    expect(seen).toContain('keep this');
+    expect(result.transcript.text).toBe('keep this');
+    expect(result.cleanup?.status).toBe('cancelled');
+    expect(result.delivery.status).toBe('failed');
+    expect(clip.copy).not.toHaveBeenCalled();
+  });
+});

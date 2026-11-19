@@ -17,6 +17,7 @@ import type { UseCaptureStateResult } from '../../../src/services/capture/useCap
 import { createStubDeliveryAdapter } from '../../../src/services/delivery';
 import { parseSettingsJson } from '../../../src/services/settings';
 import { dogfoodTranscribeAndCopy } from '../../../src/services/stt/dogfoodPath';
+import { STOP_CANCELLED_SAVED } from '../../../src/services/stt/stopBudget';
 import { createMockSttEngine, createMockSttModelStore } from '../../../src/services/stt/mockStt';
 import {
   useDogfoodCapture,
@@ -162,16 +163,16 @@ describe('useDogfoodCapture cleanup', () => {
     });
   });
 
-  it('cancel during cleanup delivers nothing and records nothing', async () => {
+  it('cancel during cleanup saves the STT text to History and the clipboard', async () => {
     const engine = fakeEngine(() => new Promise(() => {}));
     const { copy, hook, onHistoryRecord } = await setup({ cleanupActive: true, cleanupEngine: engine });
     await waitFor(() => expect(hook.result.current.phase).toBe('cleaning'));
     act(() => { hook.result.current.cancel(); });
     await waitFor(() => expect(engine.cancel).toHaveBeenCalledWith('cleanup-pcm-1'));
-    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => expect(hook.result.current.message).toBe(STOP_CANCELLED_SAVED));
     expect(hook.result.current.phase).toBe('cancelled');
-    expect(copy).not.toHaveBeenCalled();
-    expect(onHistoryRecord).not.toHaveBeenCalled();
+    expect(copy).toHaveBeenCalledWith(RAW);
+    expect(onHistoryRecord).toHaveBeenCalledWith(expect.objectContaining({ text: RAW, status: 'copied' }));
   });
 
   it('a new start supersedes cleanup: the old run keeps its raw text in History', async () => {
@@ -250,7 +251,8 @@ describe('useDogfoodCapture cleanup', () => {
     expect(result.current.scopeReady).toBe(true);
     act(() => { result.current.cancel(); });
     await waitFor(() => expect(engine.cancel).toHaveBeenCalledWith('cleanup-pcm-hud'));
-    expect(clipboard.copy).not.toHaveBeenCalled();
+    await waitFor(() => expect(clipboard.copy).toHaveBeenCalledWith(RAW));
+    expect(result.current.phase).toBe('cancelled');
   });
 
   it('cleanup and the History row use the style captured at stop', async () => {

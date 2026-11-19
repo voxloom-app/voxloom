@@ -1,7 +1,8 @@
 /// Wire full capture stop → dogfoodTranscribeAndCopy on the main UI.
 /// Automatic STT + optional local cleanup (BUS-16) + delivery after a clean
-/// stop; cancel discards with no STT, and a cancel during cleanup delivers
-/// nothing either.
+/// stop. Cancel while listening still discards. Escape or the 15s safety net
+/// after stop keeps any transcript (History, and the clipboard when text is
+/// already in hand); a late result is saved to History (BUS-255).
 /// Snapshots intended target after final transcription (ADR §4). The one
 /// thing captured at hold start is the paste terminal (pid + app path) a
 /// terminal paste is later bound to.
@@ -65,9 +66,15 @@ export interface UseDogfoodCaptureOptions {
   now?: () => number;
   /**
    * Session History append after a non-blank dogfood transcript.
-   * Cancel / blank audio / STT errors never call this.
+   * Blank audio and STT errors never call this. Escape or the safety net
+   * after stop still appends when a transcript (including a late one) exists.
    */
   onHistoryRecord?: (record: DictationRecord) => void;
+  /**
+   * Test seam: stop safety-net duration in ms (defaults to STOP_BUDGET_MS).
+   * Production callers must leave this unset.
+   */
+  stopBudgetMs?: number;
   /** Toast / announce callback for loading / success / error. */
   onToast?: (message: string) => void;
   /** Preferred mic id; system default means omit and let native pick. */
