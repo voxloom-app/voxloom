@@ -143,6 +143,35 @@ fn setup_readiness_reports_unavailable_engine_instead_of_missing_download() {
 }
 
 #[test]
+fn setup_readiness_only_reads_state_and_never_starts_a_download() {
+    // The models dir does not exist: a read-only check must not create it,
+    // open a partial file or take the single-flight download slot.
+    let (store, dir) = temp_store("setup-read-only");
+    let state = crate::stt::SttState::new(
+        store,
+        Arc::new(crate::capture::pcm_store::PcmBufferStore::new()),
+    );
+    let models = state.models.clone();
+    let app = tauri::test::mock_builder()
+        .manage(state)
+        .build(crate::app_context())
+        .unwrap();
+    let wire = readiness(&app, "whisper-base.en");
+    assert_eq!(wire["ready"], false);
+    let expected = if cfg!(all(
+        any(target_os = "macos", target_os = "windows"),
+        feature = "whisper"
+    )) {
+        "missing"
+    } else {
+        "unavailable"
+    };
+    assert_eq!(wire["status"], expected);
+    assert!(!dir.exists(), "readiness must not create the models dir");
+    assert!(models.inflight.lock().unwrap().is_none());
+}
+
+#[test]
 fn setup_readiness_answers_a_known_verdict_without_waiting_on_the_hashing_lock() {
     let (store, dir) = temp_store("setup-known-verdict");
     fs::create_dir_all(&dir).unwrap();
