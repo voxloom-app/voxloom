@@ -152,11 +152,11 @@ pub(crate) fn touch_count() -> usize {
     TOUCHES.with(std::cell::Cell::get)
 }
 
-/// Restart the idle window of the resident Whisper model. Called at
-/// recording start and Turbo prepare so a recording is never idle time.
-/// No-op without whisper.cpp, and before the first Whisper load (there
-/// is nothing resident, and this must not create the cache or sweeper).
-pub(crate) fn touch_resident() {
+/// Restart the idle window of the resident Whisper model. Called when a
+/// Turbo prepare is admitted. No-op without whisper.cpp, and before the
+/// first Whisper load (there is nothing resident, and this must not
+/// create the cache or sweeper).
+pub(super) fn touch_resident() {
     #[cfg(test)]
     TOUCHES.with(|count| count.set(count.get() + 1));
     #[cfg(feature = "whisper")]

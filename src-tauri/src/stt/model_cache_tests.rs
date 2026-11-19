@@ -560,361 +560,12 @@ fn just_under_idle() -> Duration {
     IDLE_TIMEOUT - Duration::from_nanos(1)
 }
 
-#[test]
-fn idle_timeout_is_ten_minutes() {
-    assert_eq!(IDLE_TIMEOUT, Duration::from_secs(10 * 60));
-}
-
-/// Mutation checks for the idle comparison: evict at the timeout,
-/// not a nanosecond before, and not when the operator is inverted.
-#[test]
-fn idle_expired_is_true_at_and_after_the_timeout() {
-    let start = Instant::now();
-    assert!(!idle_expired(start, start, IDLE_TIMEOUT));
-    assert!(!idle_expired(
-        start,
-        start + just_under_idle(),
-        IDLE_TIMEOUT
-    ));
-    assert!(idle_expired(start, start + IDLE_TIMEOUT, IDLE_TIMEOUT));
-    assert!(idle_expired(
-        start,
-        start + IDLE_TIMEOUT + Duration::from_secs(1),
-        IDLE_TIMEOUT
-    ));
-}
-
-#[test]
-fn sweep_evicts_after_the_idle_timeout_but_not_before() {
-    let path = temp_file("idle-boundary", b"weights");
-    let clock = FakeClock::new();
-    let cache = cache_on(&clock);
-    let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    run_ok(&cache, "tiny", &path, &dropped, &loads);
-    clock.advance(just_under_idle());
-    cache.sweep();
-    assert!(
-        !cache.is_empty(),
-        "must stay resident a nanosecond under the timeout"
-    );
-    assert!(!dropped.load(Ordering::SeqCst));
-    clock.advance(Duration::from_nanos(1));
-    cache.sweep();
-    assert!(cache.is_empty());
-    assert!(dropped.load(Ordering::SeqCst));
-    cleanup(&path);
-}
-
-#[test]
-fn a_request_resets_the_idle_timer() {
-    let path = temp_file("idle-reset", b"weights");
-    let clock = FakeClock::new();
-    let cache = cache_on(&clock);
-    let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    run_ok(&cache, "tiny", &path, &dropped, &loads);
-    clock.advance(just_under_idle());
-    // A request at 10m-1ns must restart the idle window.
-    let mid = run_ok(&cache, "tiny", &path, &dropped, &loads);
-    assert!(mid.load_ms.is_none(), "still a cache hit");
-    clock.advance(just_under_idle());
-    cache.sweep();
-    assert!(
-        !cache.is_empty(),
-        "idle time is measured from the last request, not the first"
-    );
-    clock.advance(Duration::from_nanos(1));
-    cache.sweep();
-    assert!(cache.is_empty());
-    cleanup(&path);
-}
-
-#[test]
-fn reload_after_idle_eviction_reports_load_ms() {
-    let path = temp_file("idle-reload", b"weights");
-    let clock = FakeClock::new();
-    let cache = cache_on(&clock);
-    let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    run_ok(&cache, "tiny", &path, &dropped, &loads);
-    clock.advance(IDLE_TIMEOUT);
-    cache.sweep();
-    assert!(cache.is_empty());
-    let timed = run_ok(&cache, "tiny", &path, &dropped, &loads);
-    assert_eq!(loads.load(Ordering::SeqCst), 2);
-    assert!(
-        timed.load_ms.is_some(),
-        "a transcribe after idle eviction must log load_ms=<n>, not cached"
-    );
-    cleanup(&path);
-}
-
-#[test]
-fn sweep_does_not_evict_while_inference_holds_the_lock() {
-    let path = temp_file("idle-locked", b"weights");
-    let clock = FakeClock::new();
-    let cache = Arc::new(cache_on(&clock));
-    let dropped = Arc::new(AtomicBool::new(false));
-    let (entered_tx, entered) = mpsc::channel();
-    let (finish, finish_rx) = mpsc::channel();
-    let runner = std::thread::spawn({
-        let cache = cache.clone();
-        let path = path.clone();
-        let dropped = dropped.clone();
-        move || {
-            cache.with_context(
-                "tiny",
-                &path,
-                None,
-                || Ok(Ctx(dropped)),
-                |_| {
-                    entered_tx.send(()).unwrap();
-                    finish_rx.recv().unwrap();
-                    Ok(())
-                },
-            )
-        }
-    });
-    entered.recv_timeout(Duration::from_secs(2)).unwrap();
-    clock.advance(IDLE_TIMEOUT + Duration::from_secs(1));
-    // The inference holds the lock, so a sweep has to wait for it.
-    assert!(
-        matches!(
-            cache.inner.try_lock(),
-            Err(std::sync::TryLockError::WouldBlock)
-        ),
-        "the inference must hold the cache lock"
-    );
-    let sweeping = std::thread::spawn({
-        let cache = cache.clone();
-        move || cache.sweep()
-    });
-    finish.send(()).unwrap();
-    runner.join().unwrap().unwrap();
-    sweeping.join().unwrap();
-    assert!(
-        !cache.is_empty(),
-        "the request's end touch restarts the idle window"
-    );
-    assert!(!dropped.load(Ordering::SeqCst));
-    cleanup(&path);
-}
-
 fn loaded_cache(clock: &Arc<FakeClock>, name: &str) -> (ModelCache<Ctx>, PathBuf, Arc<AtomicBool>) {
     let path = temp_file(name, b"weights");
     let cache = cache_on(clock);
     let dropped = Arc::new(AtomicBool::new(false));
     run_ok(&cache, "tiny", &path, &dropped, &AtomicUsize::new(0));
     (cache, path, dropped)
-}
-
-#[test]
-fn a_touch_at_recording_start_restarts_the_idle_window() {
-    let clock = FakeClock::new();
-    let (cache, path, _) = loaded_cache(&clock, "touch-restarts");
-    clock.advance(just_under_idle());
-    cache.touch();
-    clock.advance(just_under_idle());
-    cache.sweep();
-    assert!(!cache.is_empty(), "the touch moved the window forward");
-    clock.advance(Duration::from_nanos(1));
-    cache.sweep();
-    assert!(cache.is_empty(), "and the window still expires");
-    cleanup(&path);
-}
-
-#[test]
-fn a_recording_that_never_reaches_transcribe_still_evicts_after_the_timeout() {
-    // The renderer retired mid-recording, so no cancel and no transcribe
-    // ever arrive. Nothing may pin the model: the touches stop and the
-    // sweep evicts once the timeout has passed.
-    let clock = FakeClock::new();
-    let (cache, path, dropped) = loaded_cache(&clock, "retired");
-    cache.touch(); // stt_prepare / capture start
-    clock.advance(just_under_idle());
-    cache.sweep();
-    assert!(!cache.is_empty());
-    clock.advance(Duration::from_nanos(1));
-    cache.sweep();
-    assert!(cache.is_empty());
-    assert!(dropped.load(Ordering::SeqCst), "the context was released");
-    cleanup(&path);
-}
-
-#[test]
-fn touch_on_an_empty_cache_loads_nothing() {
-    let clock = FakeClock::new();
-    let cache = cache_on(&clock);
-    cache.touch();
-    clock.advance(IDLE_TIMEOUT * 2);
-    cache.sweep();
-    assert!(cache.is_empty());
-}
-
-#[test]
-fn touch_does_not_wait_for_a_running_inference() {
-    let path = temp_file("touch-contended", b"weights");
-    let clock = FakeClock::new();
-    let cache = cache_on(&clock);
-    let dropped = Arc::new(AtomicBool::new(false));
-    cache
-        .with_context(
-            "tiny",
-            &path,
-            None,
-            || Ok(Ctx(dropped.clone())),
-            |_| {
-                // The lock is held here. The contended branch must
-                // return at once instead of blocking on it.
-                cache.touch();
-                Ok(())
-            },
-        )
-        .unwrap();
-    assert!(!cache.is_empty());
-    cleanup(&path);
-}
-
-fn poison(cache: &Arc<ModelCache<Ctx>>, path: &Path, in_load: bool) {
-    panic_in_request(cache, path, in_load);
-    assert!(cache.inner.is_poisoned());
-}
-
-/// A request that panics while holding the cache lock. Does not assert the
-/// poison, since a running sweeper may already have recovered it.
-fn panic_in_request(cache: &Arc<ModelCache<Ctx>>, path: &Path, in_load: bool) {
-    let result = std::thread::spawn({
-        let cache = cache.clone();
-        let path = path.to_owned();
-        move || {
-            let _ = cache.with_context(
-                "tiny",
-                &path,
-                None,
-                || {
-                    if in_load {
-                        panic!("load panicked");
-                    }
-                    Ok(Ctx(Arc::new(AtomicBool::new(false))))
-                },
-                |_| -> Result<(), SttErrorDto> { panic!("inference panicked") },
-            );
-        }
-    })
-    .join();
-    assert!(result.is_err(), "the worker must have panicked");
-}
-
-#[test]
-fn a_panic_in_inference_does_not_wedge_later_requests() {
-    let path = temp_file("poison-infer", b"weights");
-    let clock = FakeClock::new();
-    let cache = Arc::new(cache_on(&clock));
-    poison(&cache, &path, false);
-    // Recovery clears the half-used slot, then the cache works again.
-    assert!(cache.is_empty());
-    assert!(!cache.inner.is_poisoned());
-    let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    let first = run_ok(&cache, "tiny", &path, &dropped, &loads);
-    assert!(first.load_ms.is_some(), "reloaded after the poison");
-    assert!(run_ok(&cache, "tiny", &path, &dropped, &loads)
-        .load_ms
-        .is_none());
-    cleanup(&path);
-}
-
-#[test]
-fn a_panic_in_load_does_not_wedge_later_requests() {
-    let path = temp_file("poison-load", b"weights");
-    let cache = Arc::new(ModelCache::new());
-    poison(&cache, &path, true);
-    let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    assert!(run_ok(&cache, "tiny", &path, &dropped, &loads)
-        .load_ms
-        .is_some());
-    cleanup(&path);
-}
-
-#[test]
-fn touch_and_sweep_recover_from_a_poisoned_lock() {
-    let path = temp_file("poison-touch", b"weights");
-    let clock = FakeClock::new();
-    let cache = Arc::new(cache_on(&clock));
-    poison(&cache, &path, false);
-    cache.touch();
-    assert!(!cache.inner.is_poisoned());
-    poison(&cache, &path, false);
-    cache.sweep();
-    assert!(!cache.inner.is_poisoned());
-    assert!(cache.is_empty());
-    cleanup(&path);
-}
-
-#[test]
-fn a_request_cancelled_while_queued_never_loads_or_evicts() {
-    let path = temp_file("cancel-queued", b"weights");
-    let other = temp_file("cancel-queued-other", b"other weights");
-    let cache = Arc::new(ModelCache::new());
-    let dropped = Arc::new(AtomicBool::new(false));
-    let (entered_tx, entered) = mpsc::channel();
-    let (finish, finish_rx) = mpsc::channel();
-    let running = std::thread::spawn({
-        let (cache, path, dropped) = (cache.clone(), path.clone(), dropped.clone());
-        move || {
-            cache.with_context(
-                "tiny",
-                &path,
-                None,
-                || Ok(Ctx(dropped)),
-                |_| {
-                    entered_tx.send(()).unwrap();
-                    finish_rx.recv().unwrap();
-                    Ok(())
-                },
-            )
-        }
-    });
-    entered.recv_timeout(Duration::from_secs(2)).unwrap();
-    let cancel = Arc::new(AtomicBool::new(false));
-    let loads = Arc::new(AtomicUsize::new(0));
-    let (started_tx, started) = mpsc::channel();
-    let queued = std::thread::spawn({
-        let (cache, other, cancel, loads) =
-            (cache.clone(), other.clone(), cancel.clone(), loads.clone());
-        move || {
-            started_tx.send(()).unwrap();
-            cache.with_context(
-                "turbo",
-                &other,
-                Some(&cancel),
-                || {
-                    loads.fetch_add(1, Ordering::SeqCst);
-                    Ok(Ctx(Arc::new(AtomicBool::new(false))))
-                },
-                |_| Ok(()),
-            )
-        }
-    });
-    started.recv_timeout(Duration::from_secs(2)).unwrap();
-    // Give the queued request time to reach the lock; if it has not,
-    // the pre-lock check rejects it and the assertions still hold.
-    std::thread::sleep(Duration::from_millis(100));
-    cancel.store(true, Ordering::SeqCst);
-    finish.send(()).unwrap();
-    running.join().unwrap().unwrap();
-    assert_eq!(queued.join().unwrap().unwrap_err().code, "cancelled");
-    assert_eq!(
-        loads.load(Ordering::SeqCst),
-        0,
-        "no load for a cancelled request"
-    );
-    assert_eq!(cache.resident_id().as_deref(), Some("tiny"));
-    assert!(!dropped.load(Ordering::SeqCst), "the resident model stayed");
-    cleanup(&path);
-    cleanup(&other);
 }
 
 #[test]
@@ -953,22 +604,73 @@ fn wait_until(what: &str, mut done: impl FnMut() -> bool) {
 }
 
 #[test]
-fn the_background_sweeper_evicts_and_survives_a_poisoned_lock() {
-    let path = temp_file("sweeper", b"weights");
-    let clock = FakeClock::new();
-    let cache = Arc::new(cache_on(&clock));
-    ModelCache::spawn_sweeper_every(cache.clone(), Duration::from_millis(5));
+fn a_request_cancelled_while_queued_never_loads_or_evicts() {
+    let path = temp_file("cancel-queued", b"weights");
+    let other = temp_file("cancel-queued-other", b"other weights");
+    let cache = Arc::new(ModelCache::new());
     let dropped = Arc::new(AtomicBool::new(false));
-    let loads = AtomicUsize::new(0);
-    run_ok(&cache, "tiny", &path, &dropped, &loads);
-    clock.advance(IDLE_TIMEOUT + Duration::from_secs(1));
-    wait_until("the sweeper to evict", || dropped.load(Ordering::SeqCst));
-    wait_until("the slot to clear", || cache.is_empty());
-
-    panic_in_request(&cache, &path, false);
-    run_ok(&cache, "tiny", &path, &dropped, &loads);
-    clock.advance(IDLE_TIMEOUT + Duration::from_secs(1));
-    // is_empty locks the cache; the sweeper must evict again.
-    wait_until("the sweeper to evict after poison", || cache.is_empty());
+    let (entered_tx, entered) = mpsc::channel();
+    let (finish, finish_rx) = mpsc::channel();
+    let running = std::thread::spawn({
+        let (cache, path, dropped) = (cache.clone(), path.clone(), dropped.clone());
+        move || {
+            cache.with_context(
+                "tiny",
+                &path,
+                None,
+                || Ok(Ctx(dropped)),
+                |_| {
+                    entered_tx.send(()).unwrap();
+                    finish_rx.recv().unwrap();
+                    Ok(())
+                },
+            )
+        }
+    });
+    entered.recv_timeout(Duration::from_secs(2)).unwrap();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let loads = Arc::new(AtomicUsize::new(0));
+    let (queued_tx, queued_rx) = mpsc::channel();
+    // Runs after the queued request's pre-lock cancel check and before it
+    // takes the lock, which the running inference still holds.
+    *cache.before_lock.lock().unwrap() = Some(Box::new(move || {
+        queued_tx.send(()).unwrap();
+    }));
+    let queued = std::thread::spawn({
+        let (cache, other, cancel, loads) =
+            (cache.clone(), other.clone(), cancel.clone(), loads.clone());
+        move || {
+            cache.with_context(
+                "turbo",
+                &other,
+                Some(&cancel),
+                || {
+                    loads.fetch_add(1, Ordering::SeqCst);
+                    Ok(Ctx(Arc::new(AtomicBool::new(false))))
+                },
+                |_| Ok(()),
+            )
+        }
+    });
+    queued_rx.recv_timeout(Duration::from_secs(5)).unwrap();
+    // The pre-lock check has passed and the lock is still held, so only
+    // the post-lock check can reject this request.
+    cancel.store(true, Ordering::SeqCst);
+    finish.send(()).unwrap();
+    running.join().unwrap().unwrap();
+    assert_eq!(queued.join().unwrap().unwrap_err().code, "cancelled");
+    assert_eq!(
+        loads.load(Ordering::SeqCst),
+        0,
+        "no load for a cancelled request"
+    );
+    assert_eq!(cache.resident_id().as_deref(), Some("tiny"));
+    assert!(!dropped.load(Ordering::SeqCst), "the resident model stayed");
     cleanup(&path);
+    cleanup(&other);
 }
+
+#[path = "model_cache_idle_tests.rs"]
+mod idle;
+#[path = "model_cache_poison_tests.rs"]
+mod poison;

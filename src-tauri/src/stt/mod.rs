@@ -124,7 +124,8 @@ fn require_main<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
 /// does not load at prepare. The first transcribe loads the selected
 /// Whisper model, which then stays resident until the selection or the
 /// file changes, or until 10 minutes idle. A successful Turbo prepare
-/// restarts the idle timer so a long recording does not evict the model.
+/// restarts the idle timer. A recording start alone does not: Parakeet and
+/// mic tests must not keep a Whisper model resident.
 /// Model failures are returned by transcription using the exact admitted
 /// request token.
 #[tauri::command]
@@ -431,10 +432,6 @@ mod tests {
             "a rejected prepare is not activity"
         );
         prepare_turbo(&state, "rec-1", turbo::MODEL_ID).unwrap();
-        assert_eq!(engine::touch_count(), before + 1);
-        // The renderer retires without cancelling. Nothing is held for
-        // the request, so there is nothing to leak.
-        state.turbo.retire_main("main");
         assert_eq!(engine::touch_count(), before + 1);
     }
 }

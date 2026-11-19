@@ -5,10 +5,13 @@
 //! the on-disk file's identity changes or the file is deleted (see
 //! `file_stamp`). It is also unloaded after [`IDLE_TIMEOUT`] (10
 //! minutes) with no inference in flight and no recorded activity.
-//! Activity is only a timestamp: the owner touches it at recording
-//! start, Turbo prepare, and the start and end of each request. There is
-//! no hold set to leak, so a renderer that retires mid-recording cannot
-//! pin the model; captures are capped at 120 s, far under the timeout.
+//! Activity is only a timestamp: the owner touches it at a successful
+//! Turbo prepare and at the start and end of each request. There is no
+//! hold set to leak, so a renderer that retires mid-recording cannot pin
+//! the model. A recording start deliberately does not touch it: that
+//! would let Parakeet or a mic test keep a Whisper model resident. A
+//! Tiny or Base model can therefore be evicted mid-recording after a
+//! long idle; its reload is sub-second, which is accepted.
 //! Large-class models are ~1.5 GB+; holding a single copy across clips
 //! avoids re-paying load (and Metal setup) without ever keeping two
 //! models in memory.
@@ -24,7 +27,8 @@ use super::engine::check_cancelled;
 use super::error::SttErrorDto;
 use super::file_stamp::{file_stamp, needs_reload, FileStamp};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 use std::time::{Duration, Instant};
 
 #[cfg(test)]
@@ -79,6 +83,10 @@ struct Inner<C> {
 
 pub struct ModelCache<C> {
     inner: Mutex<Inner<C>>,
+    /// One-shot hook that runs just before a request takes the lock, so a
+    /// test can cancel a request that is about to queue.
+    #[cfg(test)]
+    before_lock: Mutex<Option<Box<dyn FnOnce() + Send>>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -99,21 +107,32 @@ impl<C> ModelCache<C> {
                 slot: None,
                 last_used: None,
             }),
+            #[cfg(test)]
+            before_lock: Mutex::new(None),
             clock,
         }
     }
 
-    /// Lock the slot. A poisoned lock means a load or inference
-    /// panicked mid-flight, so the context may be half-built: drop it,
-    /// reset the timer, and carry on rather than panic every later call.
+    /// Lock the slot, recovering from poison (see [`Self::recover`]).
     fn lock_inner(&self) -> MutexGuard<'_, Inner<C>> {
-        self.inner.lock().unwrap_or_else(|poisoned| {
-            let mut inner = poisoned.into_inner();
-            inner.slot = None;
-            inner.last_used = None;
-            self.inner.clear_poison();
-            inner
-        })
+        self.inner
+            .lock()
+            .unwrap_or_else(|poisoned| self.recover(poisoned))
+    }
+
+    /// A poisoned lock means a load or inference panicked mid-flight, so
+    /// the context may be half-built: drop it, reset the timer, clear the
+    /// poison, and carry on rather than panic every later call. Works on
+    /// the guard the caller already holds, so it never locks again.
+    fn recover<'a>(
+        &self,
+        poisoned: PoisonError<MutexGuard<'a, Inner<C>>>,
+    ) -> MutexGuard<'a, Inner<C>> {
+        let mut inner = poisoned.into_inner();
+        inner.slot = None;
+        inner.last_used = None;
+        self.inner.clear_poison();
+        inner
     }
 
     fn touch_locked(&self, inner: &mut Inner<C>) {
@@ -122,19 +141,14 @@ impl<C> ModelCache<C> {
 
     /// Restart the idle window without waiting on an inference. If one
     /// holds the lock, its own start and end touches already cover us.
+    /// Never blocks: a poisoned lock is recovered on the guard already held.
     pub fn touch(&self) {
-        use std::sync::TryLockError;
-        match self.inner.try_lock() {
-            Ok(mut inner) => self.touch_locked(&mut inner),
-            Err(TryLockError::WouldBlock) => {}
-            Err(TryLockError::Poisoned(poisoned)) => {
-                // The error still owns the guard; release it before
-                // `lock_inner` locks again.
-                drop(poisoned);
-                let mut inner = self.lock_inner();
-                self.touch_locked(&mut inner);
-            }
-        }
+        let mut inner = match self.inner.try_lock() {
+            Ok(inner) => inner,
+            Err(TryLockError::WouldBlock) => return,
+            Err(TryLockError::Poisoned(poisoned)) => self.recover(poisoned),
+        };
+        self.touch_locked(&mut inner);
     }
 
     /// Drop the resident context if it has been idle for [`IDLE_TIMEOUT`].
@@ -174,6 +188,10 @@ impl<C> ModelCache<C> {
         infer: impl FnOnce(&C) -> Result<T, SttErrorDto>,
     ) -> Result<Timed<T>, SttErrorDto> {
         check_cancelled(cancel)?;
+        #[cfg(test)]
+        if let Some(hook) = self.before_lock.lock().unwrap().take() {
+            hook();
+        }
         let mut inner = self.lock_inner();
         // Queued behind another inference: a request cancelled while
         // waiting must not evict the resident model with a wasted load.
@@ -239,25 +257,43 @@ impl<C> ModelCache<C> {
 
 #[cfg(any(test, feature = "whisper"))]
 impl<C: Send + 'static> ModelCache<C> {
-    /// Background tick used by the process-wide cache. Test caches use
-    /// an injectable clock and a short interval via
-    /// [`Self::spawn_sweeper_every`], or call [`Self::sweep`] directly.
+    /// Background tick used by the process-wide cache. It is never
+    /// stopped. Test caches use an injectable clock and call
+    /// [`Self::sweep`] directly, or run [`Self::spawn_sweeper`] with a
+    /// short interval and a stop flag.
     #[cfg(feature = "whisper")]
     pub(super) fn spawn_idle_sweeper(cache: Arc<Self>) {
-        Self::spawn_sweeper_every(cache, IDLE_SWEEP_INTERVAL);
+        let never_stopped = Arc::new(AtomicBool::new(false));
+        drop(Self::spawn_sweeper(
+            cache,
+            IDLE_SWEEP_INTERVAL,
+            never_stopped,
+        ));
     }
 
-    fn spawn_sweeper_every(cache: Arc<Self>, interval: Duration) {
+    /// Sweep every `interval` until `stop` is set. Returns the handle so a
+    /// test can join it. A spawn failure is logged and returns `None`.
+    pub(super) fn spawn_sweeper(
+        cache: Arc<Self>,
+        interval: Duration,
+        stop: Arc<AtomicBool>,
+    ) -> Option<std::thread::JoinHandle<()>> {
         let spawned = std::thread::Builder::new()
             .name("stt-model-idle".into())
-            .spawn(move || loop {
-                std::thread::sleep(interval);
-                cache.sweep();
+            .spawn(move || {
+                while !stop.load(Ordering::Acquire) {
+                    std::thread::sleep(interval);
+                    cache.sweep();
+                }
             });
-        if let Err(error) = spawned {
-            // Without the sweeper the model stays resident until the
-            // selection changes; say so rather than fail silently.
-            eprintln!("[stt] idle sweeper failed to start: {error}");
+        match spawned {
+            Ok(handle) => Some(handle),
+            Err(error) => {
+                // Without the sweeper the model stays resident until the
+                // selection changes; say so rather than fail silently.
+                eprintln!("[stt] idle sweeper failed to start: {error}");
+                None
+            }
         }
     }
 }
