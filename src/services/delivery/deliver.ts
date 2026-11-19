@@ -36,10 +36,6 @@ async function readClipboardText(
 }
 
 /**
- * Deliver transcript into the intended target, or Copy / Fail honestly.
- * Never inserts into a wrong / secure / changed app. Never synthesizes Enter.
- */
-/**
  * Notify immediately before the actual insert, terminal paste, or Copy
  * write, so the stop cap can tell a hung snapshot apart from a write.
  */
@@ -67,6 +63,10 @@ function withDeliveryStart(
   };
 }
 
+/**
+ * Deliver transcript into the intended target, or Copy / Fail honestly.
+ * Never inserts into a wrong / secure / changed app. Never synthesizes Enter.
+ */
 export async function deliverTranscript(
   options: DeliverOptions,
 ): Promise<DeliveryOutcome> {
@@ -110,7 +110,9 @@ export async function deliverTranscript(
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
 
   if (plan.action === 'paste') {
-    return pasteInTerminal(options, plan.bound, current, stale);
+    // Pass the wrapped platform: the terminal/Messages paste must also
+    // report onDeliveryStart, or the stop cap would treat it as not started.
+    return pasteInTerminal({ ...options, platform }, plan.bound, current, stale);
   }
 
   if (plan.action === 'insert') {

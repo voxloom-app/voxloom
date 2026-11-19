@@ -10,6 +10,7 @@ import type { UseCaptureStateResult } from
   '../../../src/services/capture/useCaptureState';
 import { dogfoodTranscribeAndCopy } from '../../../src/services/stt/dogfoodPath';
 import { createStubDeliveryAdapter } from '../../../src/services/delivery';
+import { InsertError } from '../../../src/services/delivery/types';
 import type { DogfoodResult } from '../../../src/services/stt/dogfoodPath';
 import {
   createMockSttEngine,
@@ -18,6 +19,7 @@ import {
 import { useDogfoodCapture } from
   '../../../src/services/stt/useDogfoodCapture';
 import * as cancelScopeModule from '../../../src/services/shortcut/cancelScope';
+import type { DictationRecord } from '../../../src/domain/types';
 import type { CleanupEngine } from '../../../src/services/cleanup/contracts';
 import { CLEANUP_MODEL_ID } from '../../../src/services/cleanup/types';
 import {
@@ -1684,6 +1686,301 @@ describe('useDogfoodCapture', () => {
         status: 'failed',
         text: 'escape mid-insert',
       }));
+    });
+
+    type HistoryMock = ReturnType<typeof vi.fn<(record: DictationRecord) => void>>;
+    type ToastMock = ReturnType<typeof vi.fn<(message: string) => void>>;
+
+    describe('terminal route and grace edges (N5, N6)', () => {
+      const bound = { appPid: 42, pasteApp: '/Applications/Terminal.app' };
+      const terminalTarget: TargetSnapshot = {
+        appName: 'Terminal', appPid: 42, capturedAt: 1, elementId: null,
+        elementRole: null, insertable: false, kind: 'unsupported',
+        pasteApp: bound.pasteApp, pasteTerminal: true, reason: null,
+      };
+
+      function terminalPlatform(
+        clip: ReturnType<typeof clipboard>,
+        pasteText: NonNullable<DeliveryPlatformAdapter['pasteText']>,
+      ): DeliveryPlatformAdapter {
+        return {
+          ...createStubDeliveryAdapter({
+            clipboard: clip,
+            snapshot: async () => terminalTarget,
+            validate: async () => terminalTarget,
+          }),
+          pasteBinding: async () => bound,
+          pasteText,
+        };
+      }
+
+      // Dictate in a bound terminal; STT takes 14s so the paste starts just
+      // before the 15s cap.
+      async function startTerminalDictation(
+        platform: DeliveryPlatformAdapter,
+        clip: ReturnType<typeof clipboard>,
+        history: HistoryMock,
+        text: string,
+      ) {
+        const store = createMockSttModelStore();
+        await store.download('whisper-tiny.en');
+        const dogfood: typeof dogfoodTranscribeAndCopy = (options) => dogfoodTranscribeAndCopy({
+          ...options,
+          createEngine: (modelId) => ({
+            ...createMockSttEngine({ modelId }),
+            transcribe: () => new Promise((resolve) => {
+              setTimeout(() => resolve({ language: 'en', text }), 14_000);
+            }),
+          }),
+        });
+        const hook = renderHook(
+          ({ state }: { state: CaptureState }) => useDogfoodCapture({
+            captureApi: stubCapture(state),
+            clipboard: clip,
+            createModelStore: () => store,
+            deliveryPlatform: platform,
+            dogfood,
+            modelId: 'whisper-tiny.en',
+            onHistoryRecord: history,
+          }),
+          { initialProps: { state: { kind: 'idle' } as CaptureState } },
+        );
+        await act(async () => { await hook.result.current.start(); });
+        await act(async () => { await hook.result.current.stop(); });
+        hook.rerender({
+          state: {
+            audio: { duration_ms: 2_000, id: 'pcm-terminal', sample_rate_hz: 16_000 },
+            kind: 'stopped',
+          },
+        });
+        await flush();
+        return hook;
+      }
+
+      it('counts a hung terminal paste as an in-flight delivery across the cap, then saves History only after the grace', async () => {
+        const clip = clipboard();
+        const history = vi.fn();
+        const pasteText = vi.fn(() => new Promise<never>(() => {}));
+        const { result } = await startTerminalDictation(
+          terminalPlatform(clip, pasteText), clip, history, 'terminal words',
+        );
+        await advance(14_000);
+        await flush();
+        expect(pasteText).toHaveBeenCalledOnce();
+        // The cap fires at 15s while the paste is in flight: no clipboard
+        // write, no second delivery, no History row yet.
+        await advance(1_000);
+        expect(clip.copy).not.toHaveBeenCalled();
+        expect(history).not.toHaveBeenCalled();
+        expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED);
+        expect(result.current.message).not.toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+        expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
+        // The grace (10s after the paste began) applies: History only.
+        await advance(DELIVERY_IN_FLIGHT_GRACE_MS - 1_000);
+        expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+        expect(result.current.phase).toBe('success');
+        expect(history).toHaveBeenCalledOnce();
+        expect(history).toHaveBeenCalledWith(expect.objectContaining({
+          status: 'failed',
+          text: 'terminal words',
+        }));
+        expect(clip.copy).not.toHaveBeenCalled();
+        expect(pasteText).toHaveBeenCalledOnce();
+      });
+
+      it('lets a terminal paste that finishes inside the grace stand as the only delivery', async () => {
+        const clip = clipboard();
+        const history = vi.fn();
+        let finishPaste!: () => void;
+        const pasteText = vi.fn(() => new Promise<{
+          clipboardRestored: boolean;
+          restoreSkippedReason: null;
+        }>((ok) => {
+          finishPaste = () => ok({ clipboardRestored: true, restoreSkippedReason: null });
+        }));
+        const { result } = await startTerminalDictation(
+          terminalPlatform(clip, pasteText), clip, history, 'terminal once',
+        );
+        await advance(15_000);
+        await flush();
+        expect(pasteText).toHaveBeenCalledOnce();
+        expect(clip.copy).not.toHaveBeenCalled();
+        expect(history).not.toHaveBeenCalled();
+        await act(async () => { finishPaste(); });
+        await flush();
+        expect(pasteText).toHaveBeenCalledOnce();
+        expect(clip.copy).not.toHaveBeenCalled();
+        expect(history).toHaveBeenCalledOnce();
+        expect(history).toHaveBeenCalledWith(expect.objectContaining({
+          status: 'unverified',
+          text: 'terminal once',
+        }));
+        expect(result.current.phase).toBe('success');
+      });
+
+      it.each([
+        ['an insert that fails before writing', new Error('AX insert refused')],
+        ['an insert error after the write began', new InsertError('IPC died', true)],
+      ])('never writes the clipboard when %s after the grace', async (_label, failure) => {
+        const store = createMockSttModelStore();
+        await store.download('whisper-tiny.en');
+        const clip = clipboard();
+        const history = vi.fn();
+        let failInsert!: () => void;
+        const insert = vi.fn(() => new Promise<void>((_, no) => {
+          failInsert = () => no(failure);
+        }));
+        const { result } = renderHook(() => useDogfoodCapture({
+          captureApi: stubCapture({
+            audio: { duration_ms: 2_000, id: 'pcm-grace-error', sample_rate_hz: 16_000 },
+            kind: 'stopped',
+          }),
+          clipboard: clip,
+          createModelStore: () => store,
+          deliveryPlatform: insertablePlatform(clip, { insert }),
+          dogfood: instantDogfood('grace then error'),
+          modelId: 'whisper-tiny.en',
+          onHistoryRecord: history,
+        }));
+        await flush();
+        await advance(0);
+        await flush();
+        expect(insert).toHaveBeenCalledOnce();
+        await advance(DELIVERY_IN_FLIGHT_GRACE_MS);
+        expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+        expect(history).toHaveBeenCalledOnce();
+        await act(async () => { failInsert(); });
+        await flush();
+        expect(clip.copy).not.toHaveBeenCalled();
+        expect(history).toHaveBeenCalledOnce();
+        expect(insert).toHaveBeenCalledOnce();
+        expect(result.current.phase).toBe('success');
+        expect(result.current.message).toBe(STOP_TAKING_LONGER_SAVED_HISTORY);
+      });
+    });
+
+    describe('guided practice (skipHistory)', () => {
+      const guard = () => ({
+        current: () => true,
+        insert: vi.fn(() => true),
+        result: vi.fn(),
+        validate: async () => true,
+      });
+
+      async function startGuided(
+        dogfood: ReturnType<typeof vi.fn>,
+        spies: {
+          clip: ReturnType<typeof clipboard>;
+          history: HistoryMock;
+          toast: ToastMock;
+        },
+      ) {
+        const store = createMockSttModelStore();
+        await store.download('whisper-tiny.en');
+        const hook = renderHook(
+          ({ state }: { state: CaptureState }) => useDogfoodCapture({
+            captureApi: stubCapture(state),
+            clipboard: spies.clip,
+            createModelStore: () => store,
+            deliveryGuard: guard(),
+            dogfood: dogfood as never,
+            modelId: 'whisper-tiny.en',
+            onHistoryRecord: spies.history,
+            onToast: spies.toast,
+          }),
+          { initialProps: { state: { kind: 'idle' } as CaptureState } },
+        );
+        await act(async () => { await hook.result.current.start('gesture'); });
+        await act(async () => { await hook.result.current.stop(); });
+        return hook;
+      }
+
+      function expectNothingSaved(spies: {
+        clip: ReturnType<typeof clipboard>;
+        history: HistoryMock;
+        toast: ToastMock;
+      }) {
+        expect(spies.history).not.toHaveBeenCalled();
+        expect(spies.clip.copy).not.toHaveBeenCalled();
+        expect(spies.toast).not.toHaveBeenCalledWith(STOP_LATE_SAVED);
+        expect(spies.toast).not.toHaveBeenCalledWith(STOP_LATE_NOTHING_SAVED);
+      }
+
+      const stoppedState = (id: string): CaptureState => ({
+        audio: { duration_ms: 8_000, id, sample_rate_hz: 16_000 },
+        kind: 'stopped',
+      });
+
+      it('shows the existing cancelled note, not the History promise, on Escape in the stop-to-stopped gap', async () => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        let resolve!: (value: DogfoodResult) => void;
+        const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok) => { resolve = ok; }));
+        const { result, rerender } = await startGuided(dogfood, spies);
+        act(() => { result.current.cancel(); });
+        rerender({ state: stoppedState('pcm-guided-gap') });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).not.toBe(STOP_CANCELLED_PENDING);
+        await act(async () => {
+          resolve({
+            copied: false,
+            delivery: deliveryOutcome('failed', 'gap words'),
+            transcript: { language: 'en', text: 'gap words' },
+          });
+        });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expectNothingSaved(spies);
+      });
+
+      it('ends in a terminal phase with no History or clipboard when the cap fires with text in hand', async () => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        const dogfood = vi.fn((options: { onTranscript?: (t: { language: string; text: string }) => void }) => {
+          options.onTranscript?.({ language: 'en', text: 'guided words' });
+          return new Promise<DogfoodResult>(() => {});
+        });
+        const { result, rerender } = await startGuided(dogfood, spies);
+        rerender({ state: stoppedState('pcm-guided-cap-text') });
+        await flush();
+        expect(result.current.phase).toBe('transcribing');
+        await advance(STOP_BUDGET_MS);
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expectNothingSaved(spies);
+      });
+
+      it.each([
+        ['resolves with text', 'resolve'],
+        ['fails', 'reject'],
+      ] as const)('shows no History promise or late toast when the cap fires with no text and the job later %s', async (_label, how) => {
+        const spies = { clip: clipboard(), history: vi.fn<(record: DictationRecord) => void>(), toast: vi.fn<(message: string) => void>() };
+        let settle!: (value?: DogfoodResult) => void;
+        const dogfood = vi.fn(() => new Promise<DogfoodResult>((ok, no) => {
+          settle = how === 'resolve'
+            ? (value) => ok(value as DogfoodResult)
+            : () => no(new Error('native stt hung'));
+        }));
+        const { result, rerender } = await startGuided(dogfood, spies);
+        rerender({ state: stoppedState('pcm-guided-cap-empty') });
+        await flush();
+        await advance(STOP_BUDGET_MS);
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expect(result.current.message).not.toBe(STOP_TAKING_LONGER_PENDING);
+        await act(async () => {
+          settle({
+            copied: false,
+            delivery: deliveryOutcome('failed', 'late guided'),
+            transcript: { language: 'en', text: 'late guided' },
+          });
+        });
+        await flush();
+        expect(result.current.phase).toBe('cancelled');
+        expect(result.current.message).toBe(CAPTURE_CANCELLED_NOTHING);
+        expectNothingSaved(spies);
+      });
     });
   });
 

@@ -23,8 +23,6 @@ export interface Cancellation {
   suppressDelivery?: boolean;
   /** Set just before insert, paste, or Copy so the cap cannot start a second delivery. */
   deliveryInFlight?: boolean;
-  /** performance.now() when deliveryInFlight was set, for the write grace. */
-  deliveryInFlightAt?: number;
   /** Escape during processing: retain any text or show the pending note. */
   retainOnCancel?: () => void;
   scope?: CancelScope;

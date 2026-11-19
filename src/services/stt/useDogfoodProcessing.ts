@@ -214,7 +214,6 @@ export function useDogfoodProcessing({
         modelId,
         onDeliveryStart: () => {
           cancellation.deliveryInFlight = true;
-          cancellation.deliveryInFlightAt = performance.now();
           deliveryGrace.arm();
         },
         onTranscript: (transcript) => { latestText = transcript; },
@@ -237,6 +236,9 @@ export function useDogfoodProcessing({
       if (outcome === 'grace') {
         budget.clear();
         deliveryGrace.clear();
+        // The write may still land, but a later insert or paste error must
+        // not fall back to a clipboard write after we saved to History.
+        cancellation.suppressDelivery = true;
         await settleCancellation();
         if (!cancellation.cancelled && latestText?.text.trim()) {
           await safety.retain(latestText, 'cap');
