@@ -68,6 +68,8 @@ impl<I: PartialEq> Observation<I> {
 struct Entry<I> {
     token: String,
     target: Observation<I>,
+    /// The completion snapshot found an AX-editable field.
+    editable: bool,
     claimed: bool,
 }
 struct State<I> {
@@ -181,6 +183,7 @@ impl<I: Clone + PartialEq> Targets<I> {
             s.entry = Some(Entry {
                 token,
                 target: first,
+                editable: snapshot.insertable,
                 claimed: false,
             });
         }
@@ -277,6 +280,13 @@ impl<I: Clone + PartialEq> Targets<I> {
                 .as_mut()
                 .filter(|e| e.token == token && !e.claimed)
                 .ok_or_else(|| refused("target retired or consumed"))?;
+            // Without an editable field (an unlisted terminal, a canvas) a
+            // pasted line break or tab can act as a command. Known terminals
+            // get the transaction's terminal check; editable fields keep
+            // multi-line paste. Refused before the claim: nothing dispatched.
+            if !e.target.terminal && !e.editable {
+                super::check_typing_text(text).map_err(|err| refused(&err))?;
+            }
             e.claimed = true;
             let target = e.target.clone();
             s.legacy_claimed = true;

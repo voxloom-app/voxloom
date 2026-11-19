@@ -506,3 +506,71 @@ fn field_outside_the_frontmost_app_keeps_ax_route_without_paste_authority() {
         .claim_legacy(1)
         .expect("the AX route can still claim its single use");
 }
+
+fn pasted(_: i32, _: bool, _: &str, guard: &dyn Fn() -> Result<(), String>) -> PasteResult {
+    guard()?;
+    Ok(PasteReport {
+        clipboard_restored: true,
+        restore_skipped_reason: None,
+    })
+}
+type PasteResult = Result<PasteReport, String>;
+
+#[test]
+fn line_breaks_never_paste_into_a_window_without_an_editable_field() {
+    // An unlisted terminal exposes no editable AX field, and a pasted line
+    // break would run the line. Refuse before the claim, so recovery is safe.
+    let targets = Targets::new();
+    let mut obs = observation(None);
+    obs.snapshot = TargetSnapshotDto::unavailable("no AX focus", 1);
+    let token = snapshot(&targets, &obs).shared_paste_token.unwrap();
+    for text in ["ls\nrm -rf build", "a\tb", "a\rb", "a\u{2028}b"] {
+        let err = targets
+            .deliver(
+                &Mutex::new(()),
+                &token,
+                text,
+                || obs.clone(),
+                |_, _, _, _| panic!("no dispatch"),
+            )
+            .unwrap_err();
+        assert!(err.starts_with(SAFE_REFUSAL), "{err}");
+    }
+    let single = targets.deliver(&Mutex::new(()), &token, "ls -la", || obs.clone(), pasted);
+    assert!(single.is_ok(), "single-line text still pastes");
+}
+
+#[test]
+fn editable_fields_and_known_terminals_keep_their_existing_text_rules() {
+    let targets = Targets::new();
+    let obs = observation(Some(1));
+    let token = snapshot(&targets, &obs).shared_paste_token.unwrap();
+    let multi = targets.deliver(
+        &Mutex::new(()),
+        &token,
+        "line one\nline two",
+        || obs.clone(),
+        |pid, terminal, text, guard| {
+            assert_eq!(text, "line one\nline two");
+            pasted(pid, terminal, text, guard)
+        },
+    );
+    assert!(multi.is_ok(), "an editable field accepts multi-line paste");
+    // Known terminals keep the paste transaction's own terminal text check.
+    let targets = Targets::new();
+    let mut obs = observation(None);
+    obs.snapshot = TargetSnapshotDto::unavailable("no AX focus", 1);
+    obs.terminal = true;
+    let token = snapshot(&targets, &obs).shared_paste_token.unwrap();
+    let handed = targets.deliver(
+        &Mutex::new(()),
+        &token,
+        "a\nb",
+        || obs.clone(),
+        |_, terminal, _, _| {
+            assert!(terminal);
+            Err(refused("terminal policy"))
+        },
+    );
+    assert_eq!(handed.unwrap_err(), refused("terminal policy"));
+}
