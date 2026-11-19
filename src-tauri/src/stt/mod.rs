@@ -10,6 +10,8 @@ pub mod catalog;
 pub mod cleanup;
 pub mod engine;
 pub mod error;
+#[cfg(any(test, feature = "whisper"))]
+mod file_stamp;
 pub mod filter_config;
 pub mod gate;
 pub mod initial_prompt;
@@ -122,7 +124,7 @@ fn require_main<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
 /// does not load at prepare. The first transcribe loads the selected
 /// Whisper model, which then stays resident until the selection or the
 /// file changes, or until 10 minutes idle. A successful Turbo prepare
-/// counts as activity so a long recording does not evict the model.
+/// restarts the idle timer so a long recording does not evict the model.
 /// Model failures are returned by transcription using the exact admitted
 /// request token.
 #[tauri::command]
@@ -134,12 +136,7 @@ pub fn stt_prepare<R: Runtime>(
 ) -> Result<(), String> {
     require_main(&webview)?;
     if model_id == turbo::MODEL_ID {
-        state
-            .turbo
-            .prepare(state.turbo.epoch(), &request_id, &model_id)
-            .map_err(err_string)?;
-        engine::begin_resident_activity(&request_id);
-        return Ok(());
+        return prepare_turbo(&state, &request_id, &model_id);
     }
     let epoch = state.parakeet.epoch();
     let spec = parakeet_catalog::find(&model_id)
@@ -159,6 +156,19 @@ pub fn stt_prepare<R: Runtime>(
         })
         .map_err(err_string)
 }
+
+/// Admit a Turbo request, then restart the resident model's idle timer.
+/// Only a timestamp is touched, so a renderer that retires before
+/// cancelling leaves nothing behind to keep the model resident.
+fn prepare_turbo(state: &SttState, request_id: &str, model_id: &str) -> Result<(), String> {
+    state
+        .turbo
+        .prepare(state.turbo.epoch(), request_id, model_id)
+        .map_err(err_string)?;
+    engine::touch_resident();
+    Ok(())
+}
+
 #[tauri::command]
 pub fn stt_cancel<R: Runtime>(
     webview: Webview<R>,
@@ -166,7 +176,6 @@ pub fn stt_cancel<R: Runtime>(
     request_id: String,
 ) -> Result<bool, String> {
     require_main(&webview)?;
-    engine::end_resident_activity(&request_id);
     state
         .turbo
         .cancel(state.turbo.epoch(), &request_id)
@@ -296,11 +305,10 @@ fn transcribe_buffer(
             model_id, &path, &samples, rate, &cfg, dictionary,
         )
     })();
-    if let Some(id) = request_id {
-        if out.is_err() {
+    if out.is_err() {
+        if let Some(id) = request_id {
             let _ = state.parakeet.cancel(epoch, id);
         }
-        engine::end_resident_activity(id);
     }
     out
 }
@@ -407,5 +415,26 @@ mod tests {
             "buffer must be single-use (consumed)"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn prepare_turbo_touches_the_resident_model_only_when_admitted() {
+        let state = SttState::new(
+            ModelStore::new(std::env::temp_dir().join("turbo-prepare-touch")),
+            Arc::new(PcmBufferStore::new()),
+        );
+        let before = engine::touch_count();
+        assert!(prepare_turbo(&state, "", turbo::MODEL_ID).is_err());
+        assert_eq!(
+            engine::touch_count(),
+            before,
+            "a rejected prepare is not activity"
+        );
+        prepare_turbo(&state, "rec-1", turbo::MODEL_ID).unwrap();
+        assert_eq!(engine::touch_count(), before + 1);
+        // The renderer retires without cancelling. Nothing is held for
+        // the request, so there is nothing to leak.
+        state.turbo.retire_main("main");
+        assert_eq!(engine::touch_count(), before + 1);
     }
 }

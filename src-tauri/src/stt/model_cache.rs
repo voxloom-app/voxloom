@@ -2,28 +2,30 @@
 //!
 //! The cache holds at most one model. The previous context is dropped
 //! before a new load when the selected model id or path changes, or when
-//! the on-disk file's identity (dev/ino/size/mtime/ctime) changes or the
-//! file is deleted. It is also unloaded after [`IDLE_TIMEOUT`] (10
-//! minutes) with no inference in flight and no recorded activity. A
-//! pending Turbo prepare counts as activity so a long recording does
-//! not evict the model. Large-class models are ~1.5 GB+; holding a
-//! single copy across clips avoids re-paying load (and Metal setup)
-//! without ever keeping two models in memory.
+//! the on-disk file's identity changes or the file is deleted (see
+//! `file_stamp`). It is also unloaded after [`IDLE_TIMEOUT`] (10
+//! minutes) with no inference in flight and no recorded activity.
+//! Activity is only a timestamp: the owner touches it at recording
+//! start, Turbo prepare, and the start and end of each request. There is
+//! no hold set to leak, so a renderer that retires mid-recording cannot
+//! pin the model; captures are capped at 120 s, far under the timeout.
+//! Large-class models are ~1.5 GB+; holding a single copy across clips
+//! avoids re-paying load (and Metal setup) without ever keeping two
+//! models in memory.
 //!
 //! Access is serialized by a mutex so two inferences never share one
 //! context. The idle sweeper takes that same lock, so it cannot evict
-//! mid-transcription. Whisper's `create_state` / `full` path is not
-//! assumed to be re-entrant. Turbo already admits only one executing
-//! job; this lock also covers Tiny and Base. Cancel reads an
-//! `AtomicBool` and does not need the cache lock.
+//! mid-transcription. A poisoned lock (a panic in load or infer) is
+//! recovered by clearing the slot, so later requests and the sweeper
+//! keep working. Cancel reads an `AtomicBool` and does not need the
+//! cache lock.
 
 use super::engine::check_cancelled;
 use super::error::SttErrorDto;
-use std::collections::HashSet;
-use std::fs;
+use super::file_stamp::{file_stamp, needs_reload, FileStamp};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime};
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::{Duration, Instant};
 
 #[cfg(test)]
 #[path = "model_cache_tests.rs"]
@@ -63,98 +65,6 @@ pub struct Timed<T> {
     pub infer_ms: u128,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct FileStamp {
-    #[cfg(unix)]
-    dev: u64,
-    #[cfg(unix)]
-    ino: u64,
-    len: u64,
-    modified: SystemTime,
-    /// Change-time. Userspace cannot set it back, so it usually
-    /// catches an in-place rewrite that restores mtime. It is only as
-    /// fine as the filesystem clock tick.
-    #[cfg(unix)]
-    ctime_secs: i64,
-    #[cfg(unix)]
-    ctime_nsecs: i64,
-}
-
-pub enum StampError {
-    Missing,
-    NotAFile,
-    Io(String),
-}
-
-impl StampError {
-    fn from_io(error: std::io::Error) -> Self {
-        if error.kind() == std::io::ErrorKind::NotFound {
-            Self::Missing
-        } else {
-            Self::Io(error.to_string())
-        }
-    }
-
-    fn into_dto(self) -> SttErrorDto {
-        match self {
-            Self::Missing => SttErrorDto::new("model-missing", "Model file is missing"),
-            Self::NotAFile => SttErrorDto::new("model-missing", "Model path is not a regular file"),
-            Self::Io(message) => SttErrorDto::new(
-                "model-missing",
-                format!("Cannot read model file: {message}"),
-            ),
-        }
-    }
-}
-
-pub fn file_stamp(path: &Path) -> Result<FileStamp, StampError> {
-    let metadata = fs::metadata(path).map_err(StampError::from_io)?;
-    if !metadata.is_file() {
-        return Err(StampError::NotAFile);
-    }
-    let modified = metadata.modified().map_err(StampError::from_io)?;
-    Ok(FileStamp {
-        #[cfg(unix)]
-        dev: {
-            use std::os::unix::fs::MetadataExt;
-            metadata.dev()
-        },
-        #[cfg(unix)]
-        ino: {
-            use std::os::unix::fs::MetadataExt;
-            metadata.ino()
-        },
-        len: metadata.len(),
-        modified,
-        #[cfg(unix)]
-        ctime_secs: {
-            use std::os::unix::fs::MetadataExt;
-            metadata.ctime()
-        },
-        #[cfg(unix)]
-        ctime_nsecs: {
-            use std::os::unix::fs::MetadataExt;
-            metadata.ctime_nsec()
-        },
-    })
-}
-
-/// True when the resident slot cannot be reused for this request.
-/// A missing stamp (deleted or unreadable file) always reloads.
-pub fn needs_reload(
-    resident_id: &str,
-    resident_path: &Path,
-    resident_stamp: &FileStamp,
-    model_id: &str,
-    path: &Path,
-    stamp: Option<&FileStamp>,
-) -> bool {
-    match stamp {
-        None => true,
-        Some(stamp) => resident_id != model_id || resident_path != path || resident_stamp != stamp,
-    }
-}
-
 struct Resident<C> {
     model_id: String,
     path: PathBuf,
@@ -169,10 +79,6 @@ struct Inner<C> {
 
 pub struct ModelCache<C> {
     inner: Mutex<Inner<C>>,
-    /// Request ids from `stt_prepare` that have not yet finished or
-    /// cancelled. Stored apart from `inner` so cancel does not wait
-    /// on an in-flight inference.
-    holds: Mutex<HashSet<String>>,
     clock: Arc<dyn Clock>,
 }
 
@@ -193,54 +99,48 @@ impl<C> ModelCache<C> {
                 slot: None,
                 last_used: None,
             }),
-            holds: Mutex::new(HashSet::new()),
             clock,
         }
+    }
+
+    /// Lock the slot. A poisoned lock means a load or inference
+    /// panicked mid-flight, so the context may be half-built: drop it,
+    /// reset the timer, and carry on rather than panic every later call.
+    fn lock_inner(&self) -> MutexGuard<'_, Inner<C>> {
+        self.inner.lock().unwrap_or_else(|poisoned| {
+            let mut inner = poisoned.into_inner();
+            inner.slot = None;
+            inner.last_used = None;
+            self.inner.clear_poison();
+            inner
+        })
     }
 
     fn touch_locked(&self, inner: &mut Inner<C>) {
         inner.last_used = Some(self.clock.now());
     }
 
-    /// Mark a pending request so a long recording is not treated as idle.
-    /// The hold set is a separate lock so cancel never waits on inference.
-    pub fn begin_activity(&self, id: &str) {
-        if id.is_empty() {
-            return;
+    /// Restart the idle window without waiting on an inference. If one
+    /// holds the lock, its own start and end touches already cover us.
+    pub fn touch(&self) {
+        use std::sync::TryLockError;
+        match self.inner.try_lock() {
+            Ok(mut inner) => self.touch_locked(&mut inner),
+            Err(TryLockError::WouldBlock) => {}
+            Err(TryLockError::Poisoned(poisoned)) => {
+                // The error still owns the guard; release it before
+                // `lock_inner` locks again.
+                drop(poisoned);
+                let mut inner = self.lock_inner();
+                self.touch_locked(&mut inner);
+            }
         }
-        self.holds.lock().unwrap().insert(id.to_owned());
-        self.try_touch();
-    }
-
-    pub fn end_activity(&self, id: &str) {
-        if id.is_empty() {
-            return;
-        }
-        self.holds.lock().unwrap().remove(id);
-        self.try_touch();
-    }
-
-    fn try_touch(&self) {
-        // If inference holds `inner`, its own start/end touch covers us.
-        if let Ok(mut inner) = self.inner.try_lock() {
-            self.touch_locked(&mut inner);
-        }
-    }
-
-    fn has_holds(&self) -> bool {
-        !self.holds.lock().unwrap().is_empty()
     }
 
     /// Drop the resident context if it has been idle for [`IDLE_TIMEOUT`].
     /// Takes the same lock as inference, so this cannot race a transcribe.
-    fn sweep(&self) {
-        if self.has_holds() {
-            return;
-        }
-        let mut inner = self.inner.lock().unwrap();
-        if self.has_holds() {
-            return;
-        }
+    pub(super) fn sweep(&self) {
+        let mut inner = self.lock_inner();
         let Some(last_used) = inner.last_used else {
             return;
         };
@@ -252,7 +152,7 @@ impl<C> ModelCache<C> {
 
     #[cfg(test)]
     fn is_empty(&self) -> bool {
-        self.inner.lock().unwrap().slot.is_none()
+        self.lock_inner().slot.is_none()
     }
 
     #[cfg(test)]
@@ -274,7 +174,10 @@ impl<C> ModelCache<C> {
         infer: impl FnOnce(&C) -> Result<T, SttErrorDto>,
     ) -> Result<Timed<T>, SttErrorDto> {
         check_cancelled(cancel)?;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.lock_inner();
+        // Queued behind another inference: a request cancelled while
+        // waiting must not evict the resident model with a wasted load.
+        check_cancelled(cancel)?;
         // Reset the idle timer at request start and end.
         self.touch_locked(&mut inner);
         let timed = (|| {
@@ -304,7 +207,6 @@ impl<C> ModelCache<C> {
                 let started = Instant::now();
                 let context = load()?;
                 let load_ms = started.elapsed().as_millis();
-                let stamp = file_stamp(path).unwrap_or(stamp);
                 inner.slot = Some(Resident {
                     model_id: model_id.to_owned(),
                     path: path.to_owned(),
@@ -335,17 +237,28 @@ impl<C> ModelCache<C> {
     }
 }
 
-#[cfg(feature = "whisper")]
+#[cfg(any(test, feature = "whisper"))]
 impl<C: Send + 'static> ModelCache<C> {
-    /// Background tick used by the process-wide cache. Test caches do
-    /// not start this; they call [`Self::sweep`] directly.
+    /// Background tick used by the process-wide cache. Test caches use
+    /// an injectable clock and a short interval via
+    /// [`Self::spawn_sweeper_every`], or call [`Self::sweep`] directly.
+    #[cfg(feature = "whisper")]
     pub(super) fn spawn_idle_sweeper(cache: Arc<Self>) {
-        let _ = std::thread::Builder::new()
+        Self::spawn_sweeper_every(cache, IDLE_SWEEP_INTERVAL);
+    }
+
+    fn spawn_sweeper_every(cache: Arc<Self>, interval: Duration) {
+        let spawned = std::thread::Builder::new()
             .name("stt-model-idle".into())
             .spawn(move || loop {
-                std::thread::sleep(IDLE_SWEEP_INTERVAL);
+                std::thread::sleep(interval);
                 cache.sweep();
             });
+        if let Err(error) = spawned {
+            // Without the sweeper the model stays resident until the
+            // selection changes; say so rather than fail silently.
+            eprintln!("[stt] idle sweeper failed to start: {error}");
+        }
     }
 }
 

@@ -213,3 +213,43 @@ fn status_identifies_active_request_generation_and_mode() {
 }
 
 // Permission states
+
+#[test]
+fn starting_a_recording_touches_the_resident_model_once() {
+    let (p, s) = authorized_backend(vec![]);
+    let c = mk(p, s);
+    let before = crate::stt::engine::touch_count();
+    let (e1, _) = mk_emit();
+    let status = c
+        .start_session(
+            String::from("touch-1"),
+            DeviceSelection::SystemDefault,
+            true,
+            e1,
+        )
+        .unwrap();
+    assert_eq!(crate::stt::engine::touch_count(), before + 1);
+
+    // A busy rejection and a bad id are not recordings.
+    let (e2, _) = mk_emit();
+    assert!(c
+        .start_session(
+            String::from("touch-2"),
+            DeviceSelection::SystemDefault,
+            true,
+            e2,
+        )
+        .is_err());
+    let (e3, _) = mk_emit();
+    assert!(c
+        .start_session(
+            String::from("bad id"),
+            DeviceSelection::SystemDefault,
+            true,
+            e3,
+        )
+        .is_err());
+    assert_eq!(crate::stt::engine::touch_count(), before + 1);
+    c.cancel_request(&status.request_id);
+    idle_wait(&c, Duration::from_secs(3));
+}

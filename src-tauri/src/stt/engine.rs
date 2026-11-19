@@ -4,10 +4,6 @@
 //! CI on Linux can compile without cmake + ggml. On a Mac, build with
 //! `--features whisper` (see README, Local STT).
 
-#[cfg(test)]
-#[path = "engine_cancel_tests.rs"]
-mod engine_cancel_tests;
-
 use super::cleanup::DropReason;
 use super::error::SttErrorDto;
 use super::filter_config::SpeechFilterConfig;
@@ -36,35 +32,6 @@ impl TranscriptDto {
             dropped: None,
         }
     }
-}
-
-#[cfg(any(test, feature = "whisper"))]
-fn with_loaded_model<C, T>(
-    cancel: Option<&AtomicBool>,
-    load: impl FnOnce() -> Result<C, SttErrorDto>,
-    infer: impl FnOnce(&C) -> Result<T, SttErrorDto>,
-) -> Result<T, SttErrorDto> {
-    check_cancelled(cancel)?;
-    #[cfg(test)]
-    let loaded_at = std::time::Instant::now();
-    let context = load();
-    #[cfg(test)]
-    eprintln!(
-        "whisper load_elapsed_ms={}",
-        loaded_at.elapsed().as_millis()
-    );
-    check_cancelled(cancel)?;
-    let context = context?;
-    #[cfg(test)]
-    let inferred_at = std::time::Instant::now();
-    let result = infer(&context);
-    #[cfg(test)]
-    eprintln!(
-        "whisper inference_elapsed_ms={}",
-        inferred_at.elapsed().as_millis()
-    );
-    check_cancelled(cancel)?;
-    result
 }
 
 pub(super) fn check_cancelled(cancel: Option<&AtomicBool>) -> Result<(), SttErrorDto> {
@@ -155,32 +122,47 @@ pub(super) fn transcribe_pcm_cancellable(
 }
 
 #[cfg(feature = "whisper")]
-fn whisper_cache() -> &'static super::model_cache::ModelCache<whisper_rs::WhisperContext> {
-    use std::sync::Arc;
-    static CACHE: std::sync::OnceLock<
-        Arc<super::model_cache::ModelCache<whisper_rs::WhisperContext>>,
-    > = std::sync::OnceLock::new();
-    CACHE
+type WhisperCache = super::model_cache::ModelCache<whisper_rs::WhisperContext>;
+
+#[cfg(feature = "whisper")]
+static WHISPER_CACHE: std::sync::OnceLock<std::sync::Arc<WhisperCache>> =
+    std::sync::OnceLock::new();
+
+/// Created on the first Whisper transcribe, which also starts the idle
+/// sweeper. Nothing else creates it.
+#[cfg(feature = "whisper")]
+fn whisper_cache() -> &'static WhisperCache {
+    WHISPER_CACHE
         .get_or_init(|| {
-            let cache = Arc::new(super::model_cache::ModelCache::new());
-            super::model_cache::ModelCache::spawn_idle_sweeper(Arc::clone(&cache));
+            let cache = std::sync::Arc::new(WhisperCache::new());
+            WhisperCache::spawn_idle_sweeper(std::sync::Arc::clone(&cache));
             cache
         })
         .as_ref()
 }
 
-/// A pending Turbo prepare keeps the resident model from being treated
-/// as idle. No-op in builds without whisper.cpp.
-pub(super) fn begin_resident_activity(id: &str) {
-    let _ = id;
-    #[cfg(feature = "whisper")]
-    whisper_cache().begin_activity(id);
+#[cfg(test)]
+thread_local! {
+    static TOUCHES: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-pub(super) fn end_resident_activity(id: &str) {
-    let _ = id;
+/// Calls to [`touch_resident`] on this thread (tests only).
+#[cfg(test)]
+pub(crate) fn touch_count() -> usize {
+    TOUCHES.with(std::cell::Cell::get)
+}
+
+/// Restart the idle window of the resident Whisper model. Called at
+/// recording start and Turbo prepare so a recording is never idle time.
+/// No-op without whisper.cpp, and before the first Whisper load (there
+/// is nothing resident, and this must not create the cache or sweeper).
+pub(crate) fn touch_resident() {
+    #[cfg(test)]
+    TOUCHES.with(|count| count.set(count.get() + 1));
     #[cfg(feature = "whisper")]
-    whisper_cache().end_activity(id);
+    if let Some(cache) = WHISPER_CACHE.get() {
+        cache.touch();
+    }
 }
 
 #[cfg(feature = "whisper")]

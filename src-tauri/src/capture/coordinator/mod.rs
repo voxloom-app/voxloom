@@ -293,6 +293,10 @@ impl<P: PermissionBackend, S: StreamBackend> Coordinator<P, S> {
             });
             (flag, stop, Arc::clone(&self.state), status)
         };
+        // A recording is not idle time for the resident Whisper model.
+        // Captures are capped far under the 10-minute idle unload, so this
+        // one touch covers the whole recording for every model.
+        crate::stt::engine::touch_resident();
 
         let permission = Arc::clone(&self.permission);
         let runtime = Arc::clone(&self.runtime);
