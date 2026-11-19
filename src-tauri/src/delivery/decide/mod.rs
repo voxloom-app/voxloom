@@ -9,6 +9,7 @@ pub mod paste_key;
 pub mod paste_target;
 pub mod report;
 pub mod retry;
+pub mod shared_target;
 pub mod target;
 pub mod terminal;
 pub mod text;
@@ -39,6 +40,7 @@ pub(crate) mod test_support {
             known_terminal: false,
             paste_terminal: false,
             paste_app: None,
+            shared_paste_token: None,
             reason: if kind == "unavailable" {
                 Some("Accessibility permission denied — insert skipped".into())
             } else {

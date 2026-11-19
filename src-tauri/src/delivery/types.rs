@@ -23,6 +23,9 @@ pub struct TargetSnapshotDto {
     /// `app_pid` it identifies the terminal (the binding itself is `PasteBindingDto`).
     #[serde(default)]
     pub paste_app: Option<String>,
+    /// Lookup key only. Native retained identity and session own authorization.
+    #[serde(default)]
+    pub shared_paste_token: Option<String>,
     pub reason: Option<String>,
 }
 
@@ -48,6 +51,7 @@ impl TargetSnapshotDto {
             known_terminal: false,
             paste_terminal: false,
             paste_app: None,
+            shared_paste_token: None,
             reason: Some(reason.into()),
         }
     }
@@ -68,5 +72,7 @@ mod tests {
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(json["knownTerminal"], false);
         assert_eq!(json["pasteTerminal"], false);
+        assert!(json.as_object().unwrap().contains_key("sharedPasteToken"));
+        assert_eq!(json["sharedPasteToken"], serde_json::Value::Null);
     }
 }

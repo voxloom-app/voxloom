@@ -17,6 +17,14 @@ struct Fake {
     restore_err: bool,
     /// Simulates the user copying something while ⌘V is being handled.
     user_copies_during_wait: Option<&'static str>,
+    copy_during_snapshot: bool,
+    copy_during_post: bool,
+    terminal: bool,
+    publication_stage: u8,
+    now_ms: Cell<u64>,
+    v_dispatched_at: Cell<Option<u64>>,
+    restore_at: Cell<Option<u64>>,
+    slow_guard_ms: u64,
 }
 
 impl Fake {
@@ -32,6 +40,14 @@ impl Fake {
             post_err: false,
             restore_err: false,
             user_copies_during_wait: None,
+            copy_during_snapshot: false,
+            copy_during_post: false,
+            terminal: true,
+            publication_stage: 0,
+            now_ms: Cell::new(0),
+            v_dispatched_at: Cell::new(None),
+            restore_at: Cell::new(None),
+            slow_guard_ms: 0,
         }
     }
     fn log(&self, call: &str) {
@@ -48,13 +64,20 @@ impl Fake {
 
 impl PasteHost for Fake {
     type Saved = String;
+    fn terminal_policy(&self) -> bool {
+        self.terminal
+    }
     fn preflight(&self) -> Result<(), String> {
         self.log("preflight");
         self.preflight_err.map_or(Ok(()), |e| Err(e.into()))
     }
     fn snapshot(&self) -> Option<String> {
         self.log("snapshot");
-        self.can_snapshot.then(|| self.board.borrow().clone())
+        let saved = self.can_snapshot.then(|| self.board.borrow().clone());
+        if self.copy_during_snapshot {
+            self.write("new copy");
+        }
+        saved
     }
     fn write_transient(&self, text: &str) -> Result<i64, String> {
         self.log("write");
@@ -69,16 +92,46 @@ impl PasteHost for Fake {
     }
     fn post_paste(&self) -> Result<(), String> {
         self.log("post");
+        // Command-down is not text dispatch. Model a slow target guard here.
+        self.now_ms.set(self.now_ms.get() + self.slow_guard_ms);
+        if self.copy_during_post {
+            self.write("new copy");
+        }
         if self.post_err {
             return Err("frontmost app changed".into());
         }
+        self.v_dispatched_at.set(Some(self.now_ms.get()));
         Ok(())
+    }
+    fn publish(&self, text: &str, expected: i64) -> Result<i64, PublicationFailure> {
+        if self.publication_stage == 1 {
+            return Err(PublicationFailure::Untouched("preparation refused".into()));
+        }
+        assert_eq!(self.count.get(), expected);
+        let generation = self
+            .write_transient(text)
+            .map_err(PublicationFailure::Unknown)?;
+        if self.publication_stage == 2 {
+            return Err(PublicationFailure::Owned {
+                generation,
+                reason: "partial publication".into(),
+            });
+        }
+        if self.publication_stage == 3 {
+            self.write("new copy");
+            return Err(PublicationFailure::Unknown("publication raced".into()));
+        }
+        if self.publication_stage == 4 {
+            self.write("new copy");
+        }
+        Ok(generation)
     }
     fn change_count(&self) -> i64 {
         self.count.get()
     }
     fn restore(&self, saved: &String) -> Result<(), String> {
         self.log("restore");
+        self.restore_at.set(Some(self.now_ms.get()));
         if self.restore_err {
             return Err("pasteboard busy".into());
         }
@@ -87,6 +140,7 @@ impl PasteHost for Fake {
     }
     fn wait(&self, ms: u64) {
         self.log(&format!("wait {ms}"));
+        self.now_ms.set(self.now_ms.get() + ms);
         if let Some(text) = self.user_copies_during_wait {
             self.write(text);
         }
@@ -104,11 +158,11 @@ fn pastes_then_restores_the_prior_clipboard_after_the_delay() {
             "snapshot",
             "write",
             "post",
-            "wait 500",
+            "wait 1500",
             "restore"
         ]
     );
-    assert_eq!(CLIPBOARD_RESTORE_DELAY_MS, 500);
+    assert_eq!(CLIPBOARD_RESTORE_DELAY_MS, 1500);
     assert_eq!(*host.board.borrow(), "my notes");
     assert_eq!(
         report,
@@ -117,6 +171,43 @@ fn pastes_then_restores_the_prior_clipboard_after_the_delay() {
             restore_skipped_reason: None
         }
     );
+}
+
+#[test]
+fn snapshot_generation_change_refuses_without_overwriting_new_copy() {
+    let mut host = Fake::new("old");
+    host.copy_during_snapshot = true;
+    assert!(paste_text(&host, "transcript").is_err());
+    assert_eq!(host.calls(), ["preflight", "snapshot"]);
+    assert_eq!(*host.board.borrow(), "new copy");
+}
+
+#[test]
+fn editor_payload_allows_multiline_and_tabs_without_terminal_limit() {
+    let mut host = Fake::new("old");
+    host.terminal = false;
+    let text = format!("first\nsecond\t日本語🙂{}", "x".repeat(4097));
+    assert!(paste_text(&host, &text).unwrap().clipboard_restored);
+    assert!(host.calls().contains(&"post".to_string()));
+}
+
+#[test]
+fn full_grace_begins_after_text_dispatch_not_command_down_or_slow_guard() {
+    let mut host = Fake::new("old");
+    host.slow_guard_ms = 900;
+    assert!(paste_text(&host, "hello").unwrap().clipboard_restored);
+    let text_at = host.v_dispatched_at.get().unwrap();
+    assert_eq!(text_at, 900);
+    assert!(host.restore_at.get().unwrap() >= text_at + 1500);
+}
+
+#[test]
+fn identical_text_recopied_during_grace_is_still_a_new_owner() {
+    let mut host = Fake::new("old");
+    host.user_copies_during_wait = Some("hello");
+    assert!(!paste_text(&host, "hello").unwrap().clipboard_restored);
+    assert_eq!(*host.board.borrow(), "hello");
+    assert!(!host.calls().contains(&"restore".into()));
 }
 
 #[test]
@@ -141,17 +232,13 @@ fn a_copy_made_meanwhile_is_never_clobbered() {
 }
 
 #[test]
-fn an_unsavable_clipboard_still_pastes_and_says_it_was_not_restored() {
+fn an_unsavable_clipboard_refuses_before_mutation() {
     let mut host = Fake::new("my notes");
     host.can_snapshot = false;
-    let report = paste_text(&host, "hello").unwrap();
-    assert!(host.calls().contains(&"post".to_string()));
-    assert!(!host.calls().contains(&"restore".to_string()));
-    assert!(!report.clipboard_restored);
-    assert_eq!(
-        report.restore_skipped_reason.as_deref(),
-        Some("prior clipboard could not be saved")
-    );
+    let error = paste_text(&host, "hello").unwrap_err();
+    assert!(error.starts_with("delivery-safe-refusal:"));
+    assert_eq!(host.calls(), ["preflight", "snapshot"]);
+    assert_eq!(*host.board.borrow(), "my notes");
 }
 
 #[test]
@@ -202,22 +289,69 @@ fn a_failed_post_is_an_error_and_puts_the_clipboard_back() {
     host.post_err = true;
     assert_eq!(
         paste_text(&host, "hello").unwrap_err(),
-        "frontmost app changed"
+        "delivery-safe-refusal:frontmost app changed"
     );
     assert_eq!(*host.board.borrow(), "my notes");
     assert!(!host.calls().iter().any(|c| c.starts_with("wait")));
 }
 
 #[test]
-fn a_failed_write_is_an_error_and_puts_the_clipboard_back() {
+fn post_refusal_is_not_safe_when_cleanup_fails_or_ownership_is_lost() {
+    for newer_copy in [false, true] {
+        let mut host = Fake::new("old");
+        host.post_err = true;
+        host.restore_err = !newer_copy;
+        host.copy_during_post = newer_copy;
+        let error = paste_text(&host, "hello").unwrap_err();
+        assert!(!error.starts_with("delivery-safe-refusal:"));
+        assert!(error.contains("clipboard"), "{error}");
+        if newer_copy {
+            assert_eq!(*host.board.borrow(), "new copy");
+            assert!(!host.calls().contains(&"restore".to_string()));
+        }
+    }
+}
+
+#[test]
+fn newer_copy_after_publication_refuses_before_dispatch() {
+    let mut host = Fake::new("old");
+    host.publication_stage = 4;
+    assert!(paste_text(&host, "hello").is_err());
+    assert!(!host.calls().contains(&"post".to_string()));
+    assert!(!host.calls().contains(&"restore".to_string()));
+    assert_eq!(*host.board.borrow(), "new copy");
+}
+
+#[test]
+fn typed_publication_stage_controls_cleanup_and_safe_refusal() {
+    for stage in 1..=3 {
+        for cleanup_fails in [false, true] {
+            let mut host = Fake::new("old");
+            host.publication_stage = stage;
+            host.restore_err = cleanup_fails;
+            let error = paste_text(&host, "hello").unwrap_err();
+            assert_eq!(
+                error.starts_with("delivery-safe-refusal:"),
+                stage == 1 || (stage == 2 && !cleanup_fails)
+            );
+            assert_eq!(host.calls().contains(&"restore".to_string()), stage == 2);
+            assert!(!host.calls().contains(&"post".to_string()));
+            if stage == 3 {
+                assert_eq!(*host.board.borrow(), "new copy");
+            }
+        }
+    }
+}
+
+#[test]
+fn an_unknown_write_failure_does_not_guess_ownership_or_restore() {
     let mut host = Fake::new("my notes");
     host.write_err = true;
-    assert_eq!(
-        paste_text(&host, "hello").unwrap_err(),
-        "pasteboard write failed"
-    );
+    let error = paste_text(&host, "hello").unwrap_err();
+    assert!(!error.starts_with("delivery-safe-refusal:"));
     assert!(!host.calls().contains(&"post".to_string()));
-    assert_eq!(*host.board.borrow(), "my notes");
+    assert!(!host.calls().contains(&"restore".to_string()));
+    assert_eq!(*host.board.borrow(), "hello");
 }
 
 #[test]

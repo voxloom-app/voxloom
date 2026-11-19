@@ -10,12 +10,13 @@ export function mayInsert(validated: TargetSnapshot): boolean {
 }
 
 /**
- * Prefer insert; else Copy when fallback enabled; else fail.
+ * Prefer authorized shared paste when enabled, then legacy paste/AX; else Copy/fail.
  * Does not perform I/O — only classifies the intended action.
  */
 export type DeliveryPlan =
   | { action: 'insert'; target: TargetSnapshot }
   | { action: 'paste'; target: TargetSnapshot; bound: PasteBinding }
+  | { action: 'shared-paste'; target: TargetSnapshot }
   | { action: 'copy'; reason: string; kind: TargetKind; terminal: boolean }
   | { action: 'fail'; reason: string; kind: TargetKind };
 
@@ -55,9 +56,9 @@ export function mayPaste(
 }
 
 /**
- * Paste needs the binding captured at recording start and the Clipboard
- * fallback setting on (the route touches the clipboard). Without either, a
- * terminal behaves as it did before the paste route existed.
+ * Shared paste needs native completion authority and Clipboard fallback enabled.
+ * Recording-start binding remains only for compatibility with legacy adapters.
+ * No rejected shared capability can borrow the legacy app-only route.
  */
 export function planDelivery(
   validated: TargetSnapshot,
@@ -65,7 +66,15 @@ export function planDelivery(
   intended?: TargetSnapshot,
   bound?: PasteBinding | null,
 ): DeliveryPlan {
-  if (clipboardFallback && intended && bound && mayPaste(bound, intended, validated)) {
+  if (clipboardFallback && intended
+    && typeof intended.sharedPasteToken === 'string' && intended.sharedPasteToken.length > 0
+    && intended.sharedPasteToken === validated.sharedPasteToken
+    && PASTE_KINDS.includes(intended.kind) && PASTE_KINDS.includes(validated.kind)) {
+    return { action: 'shared-paste', target: intended };
+  }
+  // A rejected shared capability cannot fall through to old app-only authority.
+  if (clipboardFallback && intended && intended.sharedPasteToken == null && validated.sharedPasteToken == null
+    && bound && mayPaste(bound, intended, validated)) {
     return { action: 'paste', target: validated, bound };
   }
   if (mayInsert(validated)) {

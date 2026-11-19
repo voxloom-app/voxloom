@@ -39,7 +39,13 @@ pub fn insert_selected(
     before: String,
     text: &str,
 ) -> Result<InsertReport, String> {
-    let ax = insert_selected_text_with(text, |a, t| set_ax_string(element, a, t));
+    // Value reads may have blocked or a successor may have armed while queued.
+    // Recheck the native retained generation immediately before the AX mutation.
+    let ax = insert_selected_text_guarded_with(
+        text,
+        || focus_still_matches(validated),
+        |a, t| set_ax_string(element, a, t),
+    )?;
     let after = copy_string_attr(element, "AXValue");
     let role = validated.element_role.clone().unwrap_or_default();
     let has_dom_id = copy_string_attr(element, "AXDOMIdentifier").is_some();
@@ -161,6 +167,17 @@ fn unverified(typed: bool, detail: String) -> Result<InsertReport, String> {
     })
 }
 
+/// Outer errors prove the first setter was never called; inner errors retain
+/// possible-mutation semantics for read-back and must not be safe-refusal tagged.
+fn insert_selected_text_guarded_with(
+    text: &str,
+    guard: impl FnOnce() -> Result<(), String>,
+    set: impl FnOnce(&str, &str) -> Result<(), String>,
+) -> Result<Result<(), String>, String> {
+    guard().map_err(|e| crate::delivery::decide::shared_target::refused(&e))?;
+    Ok(insert_selected_text_with(text, set))
+}
+
 fn insert_selected_text_with(
     text: &str,
     set: impl FnOnce(&str, &str) -> Result<(), String>,
@@ -173,6 +190,57 @@ fn insert_selected_text_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_write_guard_refusal_is_safe_without_calling_setter() {
+        let mut sets = 0;
+        let error = insert_selected_text_guarded_with(
+            "dictation",
+            || Err("target changed".into()),
+            |_, _| {
+                sets += 1;
+                Ok(())
+            },
+        )
+        .unwrap_err();
+        assert_eq!(sets, 0);
+        assert_eq!(error, "delivery-safe-refusal:target changed");
+    }
+
+    #[test]
+    fn guarded_setter_failure_remains_an_untagged_write_result() {
+        let mut attrs = Vec::new();
+        let write = insert_selected_text_guarded_with(
+            "dictation",
+            || Ok(()),
+            |attr, text| {
+                attrs.push((attr.to_string(), text.to_string()));
+                Err("AX set failed".into())
+            },
+        )
+        .expect("guard succeeded; setter failure is not a prewrite refusal");
+        assert_eq!(write, Err("AX set failed".into()));
+        assert_eq!(attrs, [("AXSelectedText".into(), "dictation".into())]);
+    }
+
+    #[test]
+    fn successful_guard_precedes_the_single_selected_text_write() {
+        let calls = std::cell::RefCell::new(Vec::new());
+        let result = insert_selected_text_guarded_with(
+            "dictation",
+            || {
+                calls.borrow_mut().push("guard");
+                Ok(())
+            },
+            |attr, text| {
+                assert_eq!((attr, text), ("AXSelectedText", "dictation"));
+                calls.borrow_mut().push("setter");
+                Ok(())
+            },
+        );
+        assert_eq!(result, Ok(Ok(())));
+        assert_eq!(calls.into_inner(), ["guard", "setter"]);
+    }
 
     #[test]
     fn selected_text_failure_never_attempts_value_write() {

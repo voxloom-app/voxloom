@@ -603,12 +603,20 @@ fn key_chord_posts_one_flagged_press_and_releases_everything() {
     post_key_chord_with(&api, 9, FLAG_COMMAND).unwrap();
     api.assert_released();
     let calls = api.calls.borrow().clone();
-    for (down, id) in [(true, 2), (false, 3)] {
-        assert!(calls.contains(&Call::Keyboard(1, 9, down, id)), "{calls:?}");
-        assert!(calls.contains(&Call::Flags(id, FLAG_COMMAND)), "{calls:?}");
+    for (code, down, id, flags) in [
+        (55, true, 2, FLAG_COMMAND),
+        (9, true, 3, FLAG_COMMAND),
+        (9, false, 4, FLAG_COMMAND),
+        (55, false, 5, 0),
+    ] {
+        assert!(
+            calls.contains(&Call::Keyboard(1, code, down, id)),
+            "{calls:?}"
+        );
+        assert!(calls.contains(&Call::Flags(id, flags)), "{calls:?}");
         assert!(calls.contains(&Call::Post(HID_EVENT_TAP, id)), "{calls:?}");
     }
-    assert_eq!(api.posted(), 2);
+    assert_eq!(api.posted(), 4);
     assert!(!calls.iter().any(|c| matches!(c, Call::Unicode(..))));
 }
 
@@ -627,4 +635,78 @@ fn key_chord_posts_nothing_when_an_event_cannot_be_created() {
     assert!(post_key_chord_with(&no_event, 9, FLAG_COMMAND).is_err());
     assert_eq!(no_event.posted(), 0);
     no_event.assert_released();
+}
+
+#[test]
+fn paste_guard_refusal_after_command_down_releases_command_without_v() {
+    let api = FakeEvents::default();
+    let checks = Cell::new(0);
+    let result = post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || {
+        let n = checks.get() + 1;
+        checks.set(n);
+        if n == 2 {
+            Err("retired".into())
+        } else {
+            Ok(())
+        }
+    });
+    assert!(result.is_err());
+    let posts: Vec<_> = api
+        .calls
+        .borrow()
+        .iter()
+        .filter_map(|c| match c {
+            Call::Post(_, id) => Some(*id),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(posts, [2, 5], "Command-down/up only; no text-key dispatch");
+    api.assert_released();
+}
+
+#[test]
+fn paste_guard_panic_after_command_down_still_cleans_modifier() {
+    let api = FakeEvents::default();
+    let checks = Cell::new(0);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || {
+            checks.set(checks.get() + 1);
+            if checks.get() == 2 {
+                panic!("injected guard unwind");
+            }
+            Ok(())
+        })
+    }));
+    assert!(result.is_err());
+    assert_eq!(api.posted(), 2);
+    api.assert_released();
+}
+
+#[test]
+fn every_paste_allocation_failure_posts_nothing_and_releases_handles() {
+    for failure in 1..=4 {
+        let api = FakeEvents {
+            fail_event: failure,
+            ..Default::default()
+        };
+        assert!(post_key_chord_with(&api, 9, FLAG_COMMAND).is_err());
+        assert_eq!(api.posted(), 0);
+        api.assert_released();
+    }
+}
+
+#[test]
+fn denied_paste_event_access_posts_nothing() {
+    let api = FakeEvents {
+        deny_access_at: 1,
+        ..Default::default()
+    };
+    assert!(
+        post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || panic!(
+            "no target reads after permission denial"
+        ))
+        .is_err()
+    );
+    assert_eq!(api.posted(), 0);
+    api.assert_released();
 }

@@ -239,12 +239,14 @@ describe('terminal paste delivery', () => {
   });
 
   it('an IPC failure after dispatch may have pasted: never "press ⌘V" as if nothing happened', async () => {
-    const { outcome } = await run(wezterm(), {
+    const { outcome, platform } = await run(wezterm(), {
       pasteText: vi.fn().mockRejectedValue(new InsertError('IPC channel closed', true)),
     });
     expect(outcome.mayHaveInserted).toBe(true);
     expect(outcome.message).not.toContain('press ⌘V');
-    expect(outcome.status).toBe('copied');
+    expect(outcome.status).toBe('unverified');
+    expect(outcome.message).toContain('Inspect before retrying');
+    expect(platform.clipboardWrite).not.toHaveBeenCalled();
   });
 
   it('a refusal after the session was superseded fails without touching the clipboard', async () => {

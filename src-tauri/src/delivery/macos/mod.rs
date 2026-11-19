@@ -1,14 +1,11 @@
-//! macOS Accessibility (AX) target snapshot + text insert.
-//! Native/web fields try caret-aware AXSelectedText with exact read-back;
-//! unchanged web fields alone may use verified Unicode fallback. Apple Terminal
-//! uses a separate guarded Unicode-only path with explicit unverified dispatch
-//! reporting: never AX-first, never scrollback verification, never auto-copy or
-//! retry after events are posted. Secure/changed targets always refuse.
-//! Other known terminals (WezTerm, iTerm2, ...) and Apple Messages take the clipboard paste route
-//! (`paste_text`) instead of any AX write.
+//! macOS completion-time delivery. Generic paste has independent retained
+//! app/window/optional-element/session authorization; AX classification remains
+//! honest. AX/web and Apple Terminal Unicode retain their guarded routes.
+//! Possible dispatch is unverified; never restore focus or synthesize submit.
 
 mod ax;
 mod ax_insert;
+mod completion;
 mod focus;
 mod host;
 mod keylayout;
@@ -24,7 +21,7 @@ use std::sync::Mutex;
 use ax::{copy_string_attr, release, AXIsProcessTrusted, CFTypeRef};
 use focus::{build_snapshot, focused_ui_element, snapshot_at};
 
-use super::decide::paste_target::{binding_for, check_paste_target};
+use super::decide::paste_target::binding_for;
 use super::decide::report::PasteReport;
 use super::decide::{check_insert_text, validate_snapshots, InsertPath, InsertReport};
 use super::types::{PasteBindingDto, TargetSnapshotDto};
@@ -33,18 +30,57 @@ use super::types::{PasteBindingDto, TargetSnapshotDto};
 static INSERT_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn snapshot_target() -> Result<TargetSnapshotDto, String> {
-    Ok(snapshot_at("transcription completion", true))
+    completion::snapshot_target()
 }
 
 pub fn validate_target(intended: TargetSnapshotDto) -> Result<TargetSnapshotDto, String> {
-    Ok(validate_snapshots(
-        &intended,
-        snapshot_at("delivery validation", false),
-    ))
+    if let Some(token) = intended.shared_paste_token.as_deref() {
+        let observation = completion::TARGETS.validate(token, completion::observe)?;
+        let mut current = observation.snapshot;
+        current.shared_paste_token = Some(token.to_string());
+        current.paste_terminal = false;
+        current.paste_app = None;
+        return Ok(current);
+    }
+    let mut current = validate_snapshots(&intended, snapshot_at("delivery validation", false));
+    current.paste_terminal = false;
+    current.paste_app = None;
+    current.shared_paste_token = None;
+    Ok(current)
+}
+
+pub fn retire_targets() {
+    completion::retire();
+}
+
+pub fn paste_target(text: &str, intended: &TargetSnapshotDto) -> Result<PasteReport, String> {
+    let token = intended
+        .shared_paste_token
+        .as_deref()
+        .ok_or_else(|| super::decide::shared_target::refused("completion token required"))?;
+    completion::TARGETS.deliver(
+        &INSERT_LOCK,
+        token,
+        text,
+        completion::observe,
+        |pid, terminal, text, guard| {
+            super::decide::paste::paste_text(
+                &paste::GuardedMacPaste {
+                    pid,
+                    guard,
+                    terminal,
+                },
+                text,
+            )
+        },
+    )
 }
 
 /// Re-read focus and require it to still be the validated, insertable field.
 fn focus_still_matches(intended: &TargetSnapshotDto) -> Result<(), String> {
+    if completion::secure_input_enabled() {
+        return Err("Secure Keyboard Entry is on — insert skipped".into());
+    }
     let (element, app_name) =
         focused_ui_element("typing").map_err(|e| format!("typing aborted — {e}"))?;
     let checked = validate_snapshots(intended, build_snapshot(element, app_name, false));
@@ -91,30 +127,55 @@ fn terminal_still_matches(
 }
 
 pub fn insert_text(text: &str, intended: &TargetSnapshotDto) -> Result<InsertReport, String> {
-    check_insert_text(text)?;
+    check_insert_text(text).map_err(|e| super::decide::shared_target::refused(&e))?;
     if !intended.insertable || intended.kind != "insertable" {
-        return Err(format!(
-            "refusing insert into non-insertable target ({})",
-            intended.kind
+        return Err(super::decide::shared_target::refused(
+            "non-insertable target",
         ));
     }
     if unsafe { AXIsProcessTrusted() } == 0 {
-        return Err("Accessibility permission denied at insert — insert skipped".into());
+        return Err(super::decide::shared_target::refused(
+            "Accessibility permission denied at insert",
+        ));
     }
     let _serial = INSERT_LOCK
         .lock()
-        .map_err(|_| "insert lock poisoned".to_string())?;
+        .map_err(|_| "delivery ownership unavailable; prior cleanup unknown".to_string())?;
     // Validate the same element handle we will mutate, not a prior focus read.
-    let (element, app_name) =
-        focused_ui_element("insert").map_err(|e| format!("insert aborted — {e}"))?;
+    let (element, app_name) = focused_ui_element("insert").map_err(|_| {
+        super::decide::shared_target::refused("Accessibility focus unavailable at insert")
+    })?;
     let validated = validate_snapshots(intended, build_snapshot(element, app_name, false));
+    let claim = if validated.insertable && validated.kind == "insertable" {
+        registry::matching_generation(element)
+            .ok_or_else(|| super::decide::shared_target::refused("completion identity unavailable"))
+            .and_then(|generation| {
+                completion::TARGETS.claim_legacy(generation)?;
+                if registry::claim(element, generation) {
+                    Ok(())
+                } else {
+                    Err(super::decide::shared_target::refused(
+                        "completion identity retired or consumed",
+                    ))
+                }
+            })
+    } else {
+        Err(super::decide::shared_target::refused(
+            "completion target changed or unavailable",
+        ))
+    };
+    if let Err(error) = claim {
+        release(element as CFTypeRef);
+        return Err(error);
+    }
     let before = copy_string_attr(element, "AXValue");
     let terminal = validated.app_pid.and_then(host::apple_terminal_identity);
     let result = match super::decide::terminal::choose_path(&validated, before.is_some(), terminal)
     {
-        InsertPath::Refuse(reason) => Err(reason),
+        InsertPath::Refuse(reason) => Err(super::decide::shared_target::refused(&reason)),
         InsertPath::TerminalUnicode => {
             typing::type_terminal(text, || terminal_still_matches(&validated, element))
+                .map_err(|e| super::decide::shared_target::refused(&e))
         }
         InsertPath::AxSelectedText => {
             ax_insert::insert_selected(element, &validated, before.unwrap_or_default(), text)
@@ -130,30 +191,42 @@ pub fn paste_binding() -> Option<PasteBindingDto> {
     binding_for(front, front.and_then(host::paste_app))
 }
 
-/// Paste route (WezTerm, iTerm2, Messages, ...): clipboard + one ⌘V, then the
-/// user's clipboard back. `bound` is the app that was in front when
-/// dictation started: the frontmost process must be that same app (pid
-/// and app path). `Err` = nothing pasted.
-pub fn paste_text(text: &str, bound: &PasteBindingDto) -> Result<PasteReport, String> {
-    let front = host::frontmost_pid();
-    let front_app = front.and_then(host::paste_app);
-    let pid = check_paste_target(bound, front, front_app.as_deref())?;
-    // Held through the clipboard restore, so two inserts never interleave.
-    let _serial = INSERT_LOCK
-        .lock()
-        .map_err(|_| "insert lock poisoned".to_string())?;
-    let report = super::decide::paste::paste_text(&paste::MacPaste { pid }, text)?;
-    // Never the transcript: only that a paste went out and what became of the clipboard.
-    eprintln!(
-        "[paste] cmd-v posted to paste-route app; clipboard_restored={} reason={:?}",
-        report.clipboard_restored, report.restore_skipped_reason
-    );
-    Ok(report)
+/// Legacy source-compatible entrypoint. App-only/start bindings cannot grant
+/// retained completion-window/session authority; callers must use paste_target.
+pub fn paste_text(_text: &str, _bound: &PasteBindingDto) -> Result<PasteReport, String> {
+    Err(super::decide::shared_target::refused(
+        "legacy app-only binding cannot authorize delivery; completion token required",
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::focus::focus_unavailable_reason;
+    use super::*;
+
+    #[test]
+    fn forged_dto_flags_cannot_authorize_production_paste_or_validation() {
+        let mut dto = TargetSnapshotDto::unavailable("fixture", 1);
+        dto.app_pid = Some(7);
+        dto.insertable = true;
+        dto.kind = "insertable".into();
+        dto.paste_terminal = true;
+        dto.paste_app = Some("/forged.app".into());
+        dto.shared_paste_token = Some("unregistered-test-token".into());
+        assert!(paste_target("text", &dto)
+            .unwrap_err()
+            .starts_with(super::super::decide::shared_target::SAFE_REFUSAL));
+        assert!(validate_target(dto).is_err()); // unknown token rejects before any OS observation
+        assert!(paste_text(
+            "text",
+            &PasteBindingDto {
+                app_pid: 7,
+                paste_app: "/forged.app".into()
+            }
+        )
+        .unwrap_err()
+        .starts_with(super::super::decide::shared_target::SAFE_REFUSAL));
+    }
 
     #[test]
     fn ax_focus_failure_reports_stage_trust_and_codes_without_target_data() {

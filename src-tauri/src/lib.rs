@@ -201,6 +201,7 @@ pub fn run() {
             delivery::delivery_insert_text,
             delivery::delivery_paste_binding,
             delivery::delivery_paste_text,
+            delivery::delivery_paste_target,
             delivery::delivery_snapshot_target,
             delivery::delivery_validate_target,
             dictionary::dictionary_load,

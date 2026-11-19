@@ -1,11 +1,8 @@
-//! BUS-14 insertion delivery — platform adapter boundary.
-//! macOS: Accessibility (AX) snapshot + insert. Other OS: honest stubs.
-//! Never synthesizes Enter / Tab as product submit. Command chords: only the
-//! terminal paste route's ⌘V.
-//! macOS inserts via verified AXSelectedText; web fields that ignore it fall back
-//! to Unicode key events (no clipboard, no command chords). Terminals without
-//! an insertable AX field take a separate clipboard + ⌘V route (`paste`). Failures
-//! use the TS Copy policy.
+//! Native delivery boundary. macOS retains completion-time destination/session
+//! authority independently of AX editability. Other platforms remain honest
+//! stubs. Shared paste is unverified Command-V dispatch, not an insertion receipt;
+//! AX/web and Apple Terminal Unicode retain their existing verification rules.
+//! No focus restoration, synthetic Enter/Tab, or alternate route after a write.
 
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod decide;
@@ -43,18 +40,31 @@ pub fn delivery_validate_target(intended: TargetSnapshotDto) -> Result<TargetSna
 /// Insert plain text into the intended target; refuse wrong/secure targets.
 /// Async: typing + read-back polling must not block the main/UI thread.
 ///
-/// Contract relied on by the frontend (`tauriAdapter.insertText`): an `Err`
-/// means nothing was written. Every error path returns before the first AX
-/// write or key event, or after a read-back proves the field is unchanged.
-/// Once anything may have landed (a partial typing run, a changed but
-/// unconfirmed AX value) the command returns `Ok` with `unverified: true`,
-/// never `Err`. So the UI may only say "maybe inserted" for `Ok(unverified)`.
+/// Only the fixed `delivery-safe-refusal:` prefix grants safe pre-dispatch
+/// recovery. Untagged errors remain uncertain at IPC; never infer no mutation
+/// from a string's type or an AX error code. Partial dispatch returns an
+/// unverified report rather than inviting another transport.
 #[tauri::command(async)]
 pub fn delivery_insert_text(
     text: String,
     intended: TargetSnapshotDto,
 ) -> Result<decide::InsertReport, String> {
     platform::insert_text(&text, &intended)
+}
+
+/// Retire undispatched completion targets without waiting for insertion cleanup.
+#[cfg(target_os = "macos")]
+pub fn retire_targets() {
+    platform::retire_targets();
+}
+
+/// Paste using native retained completion app/window/observable-field authority.
+#[tauri::command(async)]
+pub fn delivery_paste_target(
+    text: String,
+    intended: TargetSnapshotDto,
+) -> Result<decide::report::PasteReport, String> {
+    platform::paste_target(&text, &intended)
 }
 
 /// The paste terminal in front right now (pid + app path), taken when
@@ -65,11 +75,9 @@ pub fn delivery_paste_binding() -> Option<PasteBindingDto> {
     platform::paste_binding()
 }
 
-/// Paste into a terminal through the clipboard (⌘V), then restore the user's
-/// clipboard. Same contract as `delivery_insert_text`: `Err` means nothing was
-/// pasted; `Ok` means ⌘V was posted, which is not proof the terminal took it.
-/// `bound` is the terminal that was in front when dictation started; the app in front must be it.
-/// Async: the clipboard restore waits, which must not block the UI thread.
+/// Source-compatible legacy paste entrypoint. macOS refuses app-only start
+/// bindings; callers must supply retained completion authority to paste_target.
+/// Async so no platform delivery work can block the UI thread.
 #[tauri::command(async)]
 pub fn delivery_paste_text(
     text: String,

@@ -1,5 +1,5 @@
 /**
- * Orchestrate insert-preferring delivery with truthful Copy fallback + restore.
+ * Select delivery before mutation, with truthful dispatch uncertainty and recovery.
  * ADR: docs/decisions/native-shortcut-cancel-focus.md §§4–6.
  */
 
@@ -9,7 +9,9 @@ import {
   restoreSkippedSuffix,
 } from './messages';
 import { copyFallback, failOutcome, mayHaveInserted } from './fallback';
-import { pasteInTerminal } from './paste';
+import { pasteInTerminal, pasteInTarget } from './paste';
+import { isInsertReport } from './reports';
+import { deliveryErrorDetail } from './errors';
 import {
   planDelivery,
   shouldRestoreClipboard,
@@ -36,7 +38,7 @@ async function readClipboardText(
 }
 
 /**
- * Deliver transcript into the intended target, or Copy / Fail honestly.
+ * Deliver transcript into the intended target, or Copy / Fail / Unverified honestly.
  * Never inserts into a wrong / secure / changed app. Never synthesizes Enter.
  */
 export async function deliverTranscript(
@@ -69,10 +71,13 @@ export async function deliverTranscript(
   try {
     validated = await platform.validateTarget(intended);
   } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = deliveryErrorDetail(error);
     validated = {
       ...intended,
       insertable: false,
+      sharedPasteToken: null,
+      pasteTerminal: false,
+      pasteApp: null,
       kind: 'unavailable',
       reason: `validate failed: ${detail}`,
     };
@@ -81,6 +86,9 @@ export async function deliverTranscript(
   if (!current()) return stale();
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
 
+  if (plan.action === 'shared-paste') {
+    return pasteInTarget(options, plan.target, current, stale);
+  }
   if (plan.action === 'paste') {
     return pasteInTerminal(options, plan.bound, current, stale);
   }
@@ -89,15 +97,16 @@ export async function deliverTranscript(
     let report: InsertReport | void;
     try {
       report = await platform.insertText(text, plan.target);
+      // Void remains the declared legacy test/stub contract, never a Tauri reply.
+      if (report !== undefined && !isInsertReport(report)) {
+        throw new InsertError('adapter insert reply malformed or contradictory', true);
+      }
     } catch (error: unknown) {
-      const insertFail = error instanceof Error
-        ? error.message
-        : String(error);
-      if (error instanceof InsertError && error.writeStarted) {
+      const insertFail = deliveryErrorDetail(error);
+      if (!(error instanceof InsertError) || error.writeStarted) {
         // The write may have landed: never say "Couldn't insert" (mayHaveInserted).
         const report = { detail: `insert error after write began: ${insertFail}`, typed: false, unverified: true };
-        if (!current()) return mayHaveInserted(platform, text, false, report);
-        return mayHaveInserted(platform, text, options.clipboardFallback, report);
+        return mayHaveInserted(text, report);
       }
       if (!current()) return stale();
       // Insert API failed after a valid-looking target → Copy + toast if enabled.
@@ -126,8 +135,7 @@ export async function deliverTranscript(
     }
     if (report?.unverified) {
       // An in-flight native write cannot be undone; preserve its uncertainty.
-      if (!current()) return mayHaveInserted(platform, text, false, report);
-      return mayHaveInserted(platform, text, options.clipboardFallback, report);
+      return mayHaveInserted(text, report);
     }
     return {
       clipboardRestored: false,
@@ -175,7 +183,7 @@ export async function restoreAfterPaste(input: {
     await input.platform.clipboardRestore(input.priorText);
     return { restored: true, skipReason: null };
   } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = deliveryErrorDetail(error);
     return { restored: false, skipReason: `restore failed: ${detail}` };
   }
 }

@@ -1,6 +1,6 @@
 /**
  * BUS-14 delivery types — ADR native-shortcut-cancel-focus §§4–6.
- * Platform adapters produce TargetSnapshot; pure policy decides insert vs Copy.
+ * Platform adapters produce completion evidence; policy selects a route before mutation.
  */
 
 /** Why a target is or is not insertable. */
@@ -14,7 +14,7 @@ export type TargetKind =
 
 /**
  * Transcription-completion-time snapshot of the intended insertion target
- * (frontmost app + focused AX element insertability).
+ * (frontmost app + honest AX classification + optional native retained paste authority).
  */
 export interface TargetSnapshot {
   /** Frontmost application name when known. */
@@ -45,6 +45,8 @@ export interface TargetSnapshot {
    * `appPid` it identifies the app (the binding itself is `PasteBinding`).
    */
   pasteApp?: string | null;
+  /** Native retained completion app/window + observable element authority. */
+  sharedPasteToken?: string | null;
   /** Human-readable limitation or refusal reason (never empty for refusals). */
   reason: string | null;
   /** Epoch ms when the snapshot was taken. */
@@ -65,9 +67,9 @@ export interface DeliveryOutcome {
   restoreSkippedReason: string | null;
   status: DeliveryStatus;
   /**
-   * A native write happened but could not be confirmed: the text may already be
-   * (partly) in the field, whatever `status` says (copied, or failed when the
-   * Copy fallback is off or failed). Consumers read this, never the message.
+   * A native write may have happened but could not be confirmed. The transcript
+   * stays Unverified with manual recovery, never automatic Copy or retry.
+   * Consumers read this evidence flag, never infer it from the message.
    */
   mayHaveInserted?: boolean;
   /** Always the transcript text for manual recovery (even if history is off). */
@@ -75,10 +77,10 @@ export interface DeliveryOutcome {
 }
 
 /**
- * insertText failed after the write may already have started (e.g. the IPC
- * call died mid-flight). Plain errors mean nothing was written: the native
- * side reports refusals and verified no-ops as errors, and unconfirmed
- * mutations as `InsertReport.unverified`.
+ * Exceptions after invocation are uncertain unless an adapter explicitly
+ * supplies InsertError(writeStarted=false), backed by native safe refusal
+ * evidence or a known pre-invoke failure. Never infer no mutation from an
+ * arbitrary error string or an absent/malformed native report.
  */
 export class InsertError extends Error {
   readonly writeStarted: boolean;
@@ -147,6 +149,8 @@ export interface DeliveryPlatformAdapter {
    * Insert plain text into the intended target (macOS: AX selected-text only;
    * no full-field value replacement).
    * Must refuse rather than insert into a different app.
+   * Void is only the explicit legacy mock/stub contract; native replies must
+   * contain a validated report. Refusals must use InsertError(false).
    */
   insertText(
     text: string,
@@ -164,6 +168,8 @@ export interface DeliveryPlatformAdapter {
    * elsewhere). Rejects when nothing was pasted, including when the app in front is not `bound`.
    */
   pasteText?(text: string, bound: PasteBinding): Promise<PasteReport>;
+  /** Paste only into the native-retained completion destination; never retarget. */
+  pasteTarget?(text: string, intended: TargetSnapshot): Promise<PasteReport>;
   /** Snapshot frontmost app + focused element insertability. */
   snapshotTarget(): Promise<TargetSnapshot>;
   /**
@@ -187,7 +193,8 @@ export interface DeliverOptions {
   intended: TargetSnapshot | null;
   /**
    * The paste-route app in front when dictation started. Without it (dictation
-   * started elsewhere, or it was not captured) nothing is ever pasted.
+   * started elsewhere, or it was not captured) the legacy route cannot paste.
+   * Shared paste uses completion-time authority instead.
    */
   pasteBinding?: PasteBinding | null;
   /** Transcript text to deliver. */

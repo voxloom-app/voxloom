@@ -190,6 +190,7 @@ impl Drop for Tap {
 
 pub fn arm(app: AppHandle, session: String) -> Result<(), String> {
     main_thread()?;
+    crate::delivery::retire_targets();
     close();
     let tap = Tap::install(app, session)?;
     ACTIVE.with(|slot| *slot.borrow_mut() = Some(tap));

@@ -3,7 +3,7 @@
 
 use super::ax::AXIsProcessTrusted;
 use super::{host, keylayout, pasteboard, typing};
-use crate::delivery::decide::paste::PasteHost;
+use crate::delivery::decide::paste::{PasteHost, PublicationFailure};
 
 #[link(name = "Carbon", kind = "framework")]
 extern "C" {
@@ -13,6 +13,25 @@ extern "C" {
 pub struct MacPaste {
     /// The terminal that was frontmost when the paste began.
     pub pid: i32,
+}
+
+/// Exact retained app/window/element/session guard supplied by coordinator.
+/// Cleanup never invokes the guard, so retirement cannot strand cleanup.
+pub struct GuardedMacPaste<F> {
+    pub pid: i32,
+    pub guard: F,
+    pub terminal: bool,
+}
+
+fn post_owned(expected: i64, guard: impl Fn() -> Result<(), String>) -> Result<(), String> {
+    let keycode = keylayout::v_keycode();
+    typing::post_key_chord_guarded(keycode, typing::FLAG_COMMAND, || {
+        crate::delivery::decide::paste::pasteboard_policy::before_dispatch(
+            expected,
+            &guard,
+            pasteboard::change_count,
+        )
+    })
 }
 
 impl MacPaste {
@@ -49,12 +68,16 @@ impl PasteHost for MacPaste {
         pasteboard::write_transient(text)
     }
 
+    fn publish(&self, text: &str, expected: i64) -> Result<i64, PublicationFailure> {
+        pasteboard::publish(text, expected)
+    }
+
     fn post_paste(&self) -> Result<(), String> {
-        let keycode = keylayout::v_keycode();
-        // CGEventPost targets whatever is frontmost: check right before it.
-        // The check/post race is unavoidable, as for Terminal typing.
-        self.still_frontmost()?;
-        typing::post_key_chord(keycode, typing::FLAG_COMMAND)
+        self.post_paste_owned(self.change_count())
+    }
+
+    fn post_paste_owned(&self, expected: i64) -> Result<(), String> {
+        post_owned(expected, || self.preflight())
     }
 
     fn change_count(&self) -> i64 {
@@ -63,6 +86,59 @@ impl PasteHost for MacPaste {
 
     fn restore(&self, saved: &Self::Saved) -> Result<(), String> {
         pasteboard::restore(saved)
+    }
+
+    fn restore_owned(&self, saved: &Self::Saved, expected: i64) -> Result<(), String> {
+        pasteboard::restore_owned(saved, expected)
+    }
+
+    fn wait(&self, ms: u64) {
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+    }
+}
+
+impl<F: Fn() -> Result<(), String>> PasteHost for GuardedMacPaste<F> {
+    type Saved = pasteboard::Snapshot;
+
+    fn terminal_policy(&self) -> bool {
+        self.terminal
+    }
+
+    fn preflight(&self) -> Result<(), String> {
+        MacPaste { pid: self.pid }.preflight()?;
+        (self.guard)()
+    }
+
+    fn snapshot(&self) -> Option<Self::Saved> {
+        pasteboard::snapshot()
+    }
+
+    fn write_transient(&self, text: &str) -> Result<i64, String> {
+        pasteboard::write_transient(text)
+    }
+
+    fn publish(&self, text: &str, expected: i64) -> Result<i64, PublicationFailure> {
+        pasteboard::publish(text, expected)
+    }
+
+    fn post_paste(&self) -> Result<(), String> {
+        self.post_paste_owned(self.change_count())
+    }
+
+    fn post_paste_owned(&self, expected: i64) -> Result<(), String> {
+        post_owned(expected, || self.preflight())
+    }
+
+    fn change_count(&self) -> i64 {
+        pasteboard::change_count()
+    }
+
+    fn restore(&self, saved: &Self::Saved) -> Result<(), String> {
+        pasteboard::restore(saved)
+    }
+
+    fn restore_owned(&self, saved: &Self::Saved, expected: i64) -> Result<(), String> {
+        pasteboard::restore_owned(saved, expected)
     }
 
     fn wait(&self, ms: u64) {
