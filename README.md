@@ -67,11 +67,23 @@ is not a universal no-execution guarantee. See
 `docs/decisions/apple-terminal-delivery.md` for guards, evidence and remaining
 live checks.
 
+### Shared paste (default)
+
+With **Clipboard fallback** on (the default), Voxloom inserts by clipboard paste
+into the app that was in front when transcription finished, in any app, before
+it tries AX insertion (see [PRIVACY.md](PRIVACY.md#clipboard)). The transcript
+is on the clipboard for about 1.5 s (`CLIPBOARD_RESTORE_DELAY_MS`), then your
+previous clipboard is restored unless you copied something meanwhile. Fields
+macOS marks as secure get Copy, but password fields that aren't marked secure
+may be pasted into. With the setting off, the shared route doesn't run.
+Third-party notices for the insertion code are under Settings → Privacy →
+Licenses.
+
 ### Other terminals and Messages (paste route)
 
 WezTerm, Alacritty, kitty, Ghostty, iTerm2 and Apple Messages take a clipboard
 paste instead:
-the transcript goes on the clipboard for about 500 ms (marked transient), Voxloom
+the transcript goes on the clipboard for about 1.5 s (marked transient), Voxloom
 presses ⌘V once, and your previous clipboard is restored unless you copied
 something meanwhile. It runs only when **Clipboard fallback** is on, and only
 into the app that was in front when you started dictating (the Voxloom
