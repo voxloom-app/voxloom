@@ -19,7 +19,7 @@ it('queries without requests and sends explicit permission/settings and model ID
 
 // These strings show only outside the Tauri shell (browser preview); inside the
 // desktop app, on any platform, setup always goes to the native commands.
-it('names macOS and Windows, not one platform, when setup runs outside the desktop app', async () => {
+it('uses platform-neutral copy when setup runs outside the desktop app', async () => {
   shell.native = false;
   const io = createSetupBoundary();
   const guided = 'Real guided setup requires the Voxloom desktop app.';
