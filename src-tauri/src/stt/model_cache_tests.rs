@@ -3,9 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
-    mpsc, Arc,
+    mpsc, Arc, Mutex,
 };
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 fn stamp(len: u64, modified_secs: u64) -> FileStamp {
     FileStamp {
@@ -525,5 +525,203 @@ fn inferences_on_one_context_are_serialized() {
         !overlaps.load(Ordering::SeqCst),
         "two inferences must not overlap on one context"
     );
+    cleanup(&path);
+}
+
+struct FakeClock {
+    epoch: Instant,
+    offset: Mutex<Duration>,
+}
+
+impl FakeClock {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            epoch: Instant::now(),
+            offset: Mutex::new(Duration::ZERO),
+        })
+    }
+
+    fn advance(&self, d: Duration) {
+        *self.offset.lock().unwrap() += d;
+    }
+}
+
+impl Clock for FakeClock {
+    fn now(&self) -> Instant {
+        self.epoch + *self.offset.lock().unwrap()
+    }
+}
+
+fn cache_on(clock: &Arc<FakeClock>) -> ModelCache<Ctx> {
+    ModelCache::with_clock(clock.clone())
+}
+
+fn just_under_idle() -> Duration {
+    IDLE_TIMEOUT - Duration::from_nanos(1)
+}
+
+#[test]
+fn idle_timeout_is_ten_minutes() {
+    assert_eq!(IDLE_TIMEOUT, Duration::from_secs(10 * 60));
+}
+
+/// Mutation checks for the idle comparison: evict at the timeout,
+/// not a nanosecond before, and not when the operator is inverted.
+#[test]
+fn idle_expired_is_true_at_and_after_the_timeout() {
+    let start = Instant::now();
+    assert!(!idle_expired(start, start, IDLE_TIMEOUT));
+    assert!(!idle_expired(
+        start,
+        start + just_under_idle(),
+        IDLE_TIMEOUT
+    ));
+    assert!(idle_expired(start, start + IDLE_TIMEOUT, IDLE_TIMEOUT));
+    assert!(idle_expired(
+        start,
+        start + IDLE_TIMEOUT + Duration::from_secs(1),
+        IDLE_TIMEOUT
+    ));
+}
+
+#[test]
+fn sweep_evicts_after_the_idle_timeout_but_not_before() {
+    let path = temp_file("idle-boundary", b"weights");
+    let clock = FakeClock::new();
+    let cache = cache_on(&clock);
+    let dropped = Arc::new(AtomicBool::new(false));
+    let loads = AtomicUsize::new(0);
+    run_ok(&cache, "tiny", &path, &dropped, &loads);
+    clock.advance(just_under_idle());
+    cache.sweep();
+    assert!(
+        !cache.is_empty(),
+        "must stay resident a nanosecond under the timeout"
+    );
+    assert!(!dropped.load(Ordering::SeqCst));
+    clock.advance(Duration::from_nanos(1));
+    cache.sweep();
+    assert!(cache.is_empty());
+    assert!(dropped.load(Ordering::SeqCst));
+    cleanup(&path);
+}
+
+#[test]
+fn a_request_resets_the_idle_timer() {
+    let path = temp_file("idle-reset", b"weights");
+    let clock = FakeClock::new();
+    let cache = cache_on(&clock);
+    let dropped = Arc::new(AtomicBool::new(false));
+    let loads = AtomicUsize::new(0);
+    run_ok(&cache, "tiny", &path, &dropped, &loads);
+    clock.advance(just_under_idle());
+    // A request at 10m-1ns must restart the idle window.
+    let mid = run_ok(&cache, "tiny", &path, &dropped, &loads);
+    assert!(mid.load_ms.is_none(), "still a cache hit");
+    clock.advance(just_under_idle());
+    cache.sweep();
+    assert!(
+        !cache.is_empty(),
+        "idle time is measured from the last request, not the first"
+    );
+    clock.advance(Duration::from_nanos(1));
+    cache.sweep();
+    assert!(cache.is_empty());
+    cleanup(&path);
+}
+
+#[test]
+fn reload_after_idle_eviction_reports_load_ms() {
+    let path = temp_file("idle-reload", b"weights");
+    let clock = FakeClock::new();
+    let cache = cache_on(&clock);
+    let dropped = Arc::new(AtomicBool::new(false));
+    let loads = AtomicUsize::new(0);
+    run_ok(&cache, "tiny", &path, &dropped, &loads);
+    clock.advance(IDLE_TIMEOUT);
+    cache.sweep();
+    assert!(cache.is_empty());
+    let timed = run_ok(&cache, "tiny", &path, &dropped, &loads);
+    assert_eq!(loads.load(Ordering::SeqCst), 2);
+    assert!(
+        timed.load_ms.is_some(),
+        "a transcribe after idle eviction must log load_ms=<n>, not cached"
+    );
+    cleanup(&path);
+}
+
+#[test]
+fn sweep_does_not_evict_while_inference_holds_the_lock() {
+    let path = temp_file("idle-locked", b"weights");
+    let clock = FakeClock::new();
+    let cache = Arc::new(cache_on(&clock));
+    let dropped = Arc::new(AtomicBool::new(false));
+    let (entered_tx, entered) = mpsc::channel();
+    let (finish, finish_rx) = mpsc::channel();
+    let runner = std::thread::spawn({
+        let cache = cache.clone();
+        let path = path.clone();
+        let dropped = dropped.clone();
+        move || {
+            cache.with_context(
+                "tiny",
+                &path,
+                None,
+                || Ok(Ctx(dropped)),
+                |_| {
+                    entered_tx.send(()).unwrap();
+                    finish_rx.recv().unwrap();
+                    Ok(())
+                },
+            )
+        }
+    });
+    entered.recv_timeout(Duration::from_secs(2)).unwrap();
+    clock.advance(IDLE_TIMEOUT + Duration::from_secs(1));
+    let sweeping = std::thread::spawn({
+        let cache = cache.clone();
+        move || cache.sweep()
+    });
+    // The sweeper must be blocked on the inference lock, not evicting.
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !dropped.load(Ordering::SeqCst),
+        "must not evict mid-transcription"
+    );
+    finish.send(()).unwrap();
+    runner.join().unwrap().unwrap();
+    sweeping.join().unwrap();
+    assert!(
+        !cache.is_empty(),
+        "the request's end touch restarts the idle window"
+    );
+    assert!(!dropped.load(Ordering::SeqCst));
+    cleanup(&path);
+}
+
+#[test]
+fn a_pending_request_hold_prevents_idle_eviction() {
+    let path = temp_file("idle-hold", b"weights");
+    let clock = FakeClock::new();
+    let cache = cache_on(&clock);
+    let dropped = Arc::new(AtomicBool::new(false));
+    let loads = AtomicUsize::new(0);
+    run_ok(&cache, "tiny", &path, &dropped, &loads);
+    cache.begin_activity("rec-1");
+    clock.advance(IDLE_TIMEOUT + Duration::from_secs(1));
+    cache.sweep();
+    assert!(
+        !cache.is_empty(),
+        "a prepared / in-flight request is not idle"
+    );
+    cache.end_activity("rec-1");
+    cache.sweep();
+    assert!(
+        !cache.is_empty(),
+        "ending the hold resets the timer, so it is not yet expired"
+    );
+    clock.advance(IDLE_TIMEOUT);
+    cache.sweep();
+    assert!(cache.is_empty());
     cleanup(&path);
 }

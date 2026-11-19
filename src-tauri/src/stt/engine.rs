@@ -156,9 +156,31 @@ pub(super) fn transcribe_pcm_cancellable(
 
 #[cfg(feature = "whisper")]
 fn whisper_cache() -> &'static super::model_cache::ModelCache<whisper_rs::WhisperContext> {
-    static CACHE: std::sync::OnceLock<super::model_cache::ModelCache<whisper_rs::WhisperContext>> =
-        std::sync::OnceLock::new();
-    CACHE.get_or_init(super::model_cache::ModelCache::new)
+    use std::sync::Arc;
+    static CACHE: std::sync::OnceLock<
+        Arc<super::model_cache::ModelCache<whisper_rs::WhisperContext>>,
+    > = std::sync::OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            let cache = Arc::new(super::model_cache::ModelCache::new());
+            super::model_cache::ModelCache::spawn_idle_sweeper(Arc::clone(&cache));
+            cache
+        })
+        .as_ref()
+}
+
+/// A pending Turbo prepare keeps the resident model from being treated
+/// as idle. No-op in builds without whisper.cpp.
+pub(super) fn begin_resident_activity(id: &str) {
+    let _ = id;
+    #[cfg(feature = "whisper")]
+    whisper_cache().begin_activity(id);
+}
+
+pub(super) fn end_resident_activity(id: &str) {
+    let _ = id;
+    #[cfg(feature = "whisper")]
+    whisper_cache().end_activity(id);
 }
 
 #[cfg(feature = "whisper")]

@@ -121,8 +121,10 @@ fn require_main<R: Runtime>(webview: &Webview<R>) -> Result<(), String> {
 /// Fast admission only. Parakeet loads on its background runner; Turbo
 /// does not load at prepare. The first transcribe loads the selected
 /// Whisper model, which then stays resident until the selection or the
-/// file changes. Model failures are returned by transcription using the
-/// exact admitted request token.
+/// file changes, or until 10 minutes idle. A successful Turbo prepare
+/// counts as activity so a long recording does not evict the model.
+/// Model failures are returned by transcription using the exact admitted
+/// request token.
 #[tauri::command]
 pub fn stt_prepare<R: Runtime>(
     webview: Webview<R>,
@@ -132,10 +134,12 @@ pub fn stt_prepare<R: Runtime>(
 ) -> Result<(), String> {
     require_main(&webview)?;
     if model_id == turbo::MODEL_ID {
-        return state
+        state
             .turbo
             .prepare(state.turbo.epoch(), &request_id, &model_id)
-            .map_err(err_string);
+            .map_err(err_string)?;
+        engine::begin_resident_activity(&request_id);
+        return Ok(());
     }
     let epoch = state.parakeet.epoch();
     let spec = parakeet_catalog::find(&model_id)
@@ -162,6 +166,7 @@ pub fn stt_cancel<R: Runtime>(
     request_id: String,
 ) -> Result<bool, String> {
     require_main(&webview)?;
+    engine::end_resident_activity(&request_id);
     state
         .turbo
         .cancel(state.turbo.epoch(), &request_id)
@@ -291,10 +296,11 @@ fn transcribe_buffer(
             model_id, &path, &samples, rate, &cfg, dictionary,
         )
     })();
-    if out.is_err() {
-        if let Some(id) = request_id {
+    if let Some(id) = request_id {
+        if out.is_err() {
             let _ = state.parakeet.cancel(epoch, id);
         }
+        engine::end_resident_activity(id);
     }
     out
 }

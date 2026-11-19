@@ -3,27 +3,56 @@
 //! The cache holds at most one model. The previous context is dropped
 //! before a new load when the selected model id or path changes, or when
 //! the on-disk file's identity (dev/ino/size/mtime/ctime) changes or the
-//! file is deleted. There is no idle timeout: Large-class models are
-//! ~1.5 GB+, and holding a single copy until the user switches models
-//! avoids re-paying load (and Metal setup) on every clip, without ever
-//! keeping two models in memory.
+//! file is deleted. It is also unloaded after [`IDLE_TIMEOUT`] (10
+//! minutes) with no inference in flight and no recorded activity. A
+//! pending Turbo prepare counts as activity so a long recording does
+//! not evict the model. Large-class models are ~1.5 GB+; holding a
+//! single copy across clips avoids re-paying load (and Metal setup)
+//! without ever keeping two models in memory.
 //!
 //! Access is serialized by a mutex so two inferences never share one
-//! context. Whisper's `create_state` / `full` path is not assumed to be
-//! re-entrant. Turbo already admits only one executing job; this lock
-//! also covers Tiny and Base. Cancel reads an `AtomicBool` and does not
-//! need the cache lock.
+//! context. The idle sweeper takes that same lock, so it cannot evict
+//! mid-transcription. Whisper's `create_state` / `full` path is not
+//! assumed to be re-entrant. Turbo already admits only one executing
+//! job; this lock also covers Tiny and Base. Cancel reads an
+//! `AtomicBool` and does not need the cache lock.
 
 use super::engine::check_cancelled;
 use super::error::SttErrorDto;
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::time::{Instant, SystemTime};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, SystemTime};
 
 #[cfg(test)]
 #[path = "model_cache_tests.rs"]
 mod tests;
+
+/// Unload the resident context after this much idle time. Not a setting.
+pub const IDLE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// How often the background sweeper checks for an idle resident model.
+#[cfg(feature = "whisper")]
+const IDLE_SWEEP_INTERVAL: Duration = Duration::from_secs(30);
+
+/// Injectable clock so idle tests can advance time without waiting.
+pub(super) trait Clock: Send + Sync + 'static {
+    fn now(&self) -> Instant;
+}
+
+struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now(&self) -> Instant {
+        Instant::now()
+    }
+}
+
+/// True when `last_used` is at least `timeout` before `now`.
+pub fn idle_expired(last_used: Instant, now: Instant, timeout: Duration) -> bool {
+    now.saturating_duration_since(last_used) >= timeout
+}
 
 /// Outcome of a cached or freshly loaded inference.
 #[derive(Debug)]
@@ -133,15 +162,23 @@ struct Resident<C> {
     context: C,
 }
 
+struct Inner<C> {
+    slot: Option<Resident<C>>,
+    last_used: Option<Instant>,
+}
+
 pub struct ModelCache<C> {
-    slot: Mutex<Option<Resident<C>>>,
+    inner: Mutex<Inner<C>>,
+    /// Request ids from `stt_prepare` that have not yet finished or
+    /// cancelled. Stored apart from `inner` so cancel does not wait
+    /// on an in-flight inference.
+    holds: Mutex<HashSet<String>>,
+    clock: Arc<dyn Clock>,
 }
 
 impl<C> Default for ModelCache<C> {
     fn default() -> Self {
-        Self {
-            slot: Mutex::new(None),
-        }
+        Self::with_clock(Arc::new(SystemClock))
     }
 }
 
@@ -150,16 +187,80 @@ impl<C> ModelCache<C> {
         Self::default()
     }
 
+    fn with_clock(clock: Arc<dyn Clock>) -> Self {
+        Self {
+            inner: Mutex::new(Inner {
+                slot: None,
+                last_used: None,
+            }),
+            holds: Mutex::new(HashSet::new()),
+            clock,
+        }
+    }
+
+    fn touch_locked(&self, inner: &mut Inner<C>) {
+        inner.last_used = Some(self.clock.now());
+    }
+
+    /// Mark a pending request so a long recording is not treated as idle.
+    /// The hold set is a separate lock so cancel never waits on inference.
+    pub fn begin_activity(&self, id: &str) {
+        if id.is_empty() {
+            return;
+        }
+        self.holds.lock().unwrap().insert(id.to_owned());
+        self.try_touch();
+    }
+
+    pub fn end_activity(&self, id: &str) {
+        if id.is_empty() {
+            return;
+        }
+        self.holds.lock().unwrap().remove(id);
+        self.try_touch();
+    }
+
+    fn try_touch(&self) {
+        // If inference holds `inner`, its own start/end touch covers us.
+        if let Ok(mut inner) = self.inner.try_lock() {
+            self.touch_locked(&mut inner);
+        }
+    }
+
+    fn has_holds(&self) -> bool {
+        !self.holds.lock().unwrap().is_empty()
+    }
+
+    /// Drop the resident context if it has been idle for [`IDLE_TIMEOUT`].
+    /// Takes the same lock as inference, so this cannot race a transcribe.
+    fn sweep(&self) {
+        if self.has_holds() {
+            return;
+        }
+        let mut inner = self.inner.lock().unwrap();
+        if self.has_holds() {
+            return;
+        }
+        let Some(last_used) = inner.last_used else {
+            return;
+        };
+        if !idle_expired(last_used, self.clock.now(), IDLE_TIMEOUT) {
+            return;
+        }
+        inner.slot = None;
+    }
+
     #[cfg(test)]
     fn is_empty(&self) -> bool {
-        self.slot.lock().unwrap().is_none()
+        self.inner.lock().unwrap().slot.is_none()
     }
 
     #[cfg(test)]
     fn resident_id(&self) -> Option<String> {
-        self.slot
+        self.inner
             .lock()
             .unwrap()
+            .slot
             .as_ref()
             .map(|resident| resident.model_id.clone())
     }
@@ -173,52 +274,78 @@ impl<C> ModelCache<C> {
         infer: impl FnOnce(&C) -> Result<T, SttErrorDto>,
     ) -> Result<Timed<T>, SttErrorDto> {
         check_cancelled(cancel)?;
-        let mut slot = self.slot.lock().unwrap();
-        let stamp = match file_stamp(path) {
-            Ok(stamp) => stamp,
-            Err(error) => {
-                *slot = None;
-                return Err(error.into_dto());
-            }
-        };
-        let hit = slot.as_ref().is_some_and(|resident| {
-            !needs_reload(
-                &resident.model_id,
-                &resident.path,
-                &resident.stamp,
-                model_id,
-                path,
-                Some(&stamp),
-            )
-        });
-        let load_ms = if hit {
-            None
-        } else {
-            // Drop the previous model before loading so two Large
-            // contexts are never resident together.
-            *slot = None;
-            let started = Instant::now();
-            let context = load()?;
-            let load_ms = started.elapsed().as_millis();
-            let stamp = file_stamp(path).unwrap_or(stamp);
-            *slot = Some(Resident {
-                model_id: model_id.to_owned(),
-                path: path.to_owned(),
-                stamp,
-                context,
+        let mut inner = self.inner.lock().unwrap();
+        // Reset the idle timer at request start and end.
+        self.touch_locked(&mut inner);
+        let timed = (|| {
+            let stamp = match file_stamp(path) {
+                Ok(stamp) => stamp,
+                Err(error) => {
+                    inner.slot = None;
+                    return Err(error.into_dto());
+                }
+            };
+            let hit = inner.slot.as_ref().is_some_and(|resident| {
+                !needs_reload(
+                    &resident.model_id,
+                    &resident.path,
+                    &resident.stamp,
+                    model_id,
+                    path,
+                    Some(&stamp),
+                )
             });
-            Some(load_ms)
-        };
-        check_cancelled(cancel)?;
-        let inferred_at = Instant::now();
-        let result = infer(&slot.as_ref().expect("resident after load or hit").context);
-        let infer_ms = inferred_at.elapsed().as_millis();
-        check_cancelled(cancel)?;
-        result.map(|value| Timed {
-            value,
-            load_ms,
-            infer_ms,
-        })
+            let load_ms = if hit {
+                None
+            } else {
+                // Drop the previous model before loading so two Large
+                // contexts are never resident together.
+                inner.slot = None;
+                let started = Instant::now();
+                let context = load()?;
+                let load_ms = started.elapsed().as_millis();
+                let stamp = file_stamp(path).unwrap_or(stamp);
+                inner.slot = Some(Resident {
+                    model_id: model_id.to_owned(),
+                    path: path.to_owned(),
+                    stamp,
+                    context,
+                });
+                Some(load_ms)
+            };
+            check_cancelled(cancel)?;
+            let inferred_at = Instant::now();
+            let result = infer(
+                &inner
+                    .slot
+                    .as_ref()
+                    .expect("resident after load or hit")
+                    .context,
+            );
+            let infer_ms = inferred_at.elapsed().as_millis();
+            check_cancelled(cancel)?;
+            result.map(|value| Timed {
+                value,
+                load_ms,
+                infer_ms,
+            })
+        })();
+        self.touch_locked(&mut inner);
+        timed
+    }
+}
+
+#[cfg(feature = "whisper")]
+impl<C: Send + 'static> ModelCache<C> {
+    /// Background tick used by the process-wide cache. Test caches do
+    /// not start this; they call [`Self::sweep`] directly.
+    pub(super) fn spawn_idle_sweeper(cache: Arc<Self>) {
+        let _ = std::thread::Builder::new()
+            .name("stt-model-idle".into())
+            .spawn(move || loop {
+                std::thread::sleep(IDLE_SWEEP_INTERVAL);
+                cache.sweep();
+            });
     }
 }
 
