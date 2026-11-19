@@ -36,6 +36,34 @@ async function readClipboardText(
 }
 
 /**
+ * Notify immediately before the actual insert, terminal paste, or Copy
+ * write, so the stop cap can tell a hung snapshot apart from a write.
+ */
+function withDeliveryStart(
+  platform: DeliverOptions['platform'],
+  onStart?: () => void,
+): DeliverOptions['platform'] {
+  if (!onStart) return platform;
+  return {
+    ...platform,
+    async clipboardWrite(text) {
+      onStart();
+      return platform.clipboardWrite(text);
+    },
+    insertText: ((...args: Parameters<DeliverOptions['platform']['insertText']>) => {
+      onStart();
+      return platform.insertText(...args);
+    }) as DeliverOptions['platform']['insertText'],
+    pasteText: platform.pasteText
+      ? ((...args: Parameters<NonNullable<DeliverOptions['platform']['pasteText']>>) => {
+        onStart();
+        return platform.pasteText!(...args);
+      }) as DeliverOptions['platform']['pasteText']
+      : platform.pasteText,
+  };
+}
+
+/**
  * Deliver transcript into the intended target, or Copy / Fail honestly.
  * Never inserts into a wrong / secure / changed app. Never synthesizes Enter.
  */
@@ -44,7 +72,7 @@ export async function deliverTranscript(
 ): Promise<DeliveryOutcome> {
   const text = options.text;
   const now = options.now ?? Date.now;
-  const platform = options.platform;
+  const platform = withDeliveryStart(options.platform, options.onDeliveryStart);
   const current = () => options.isCurrent?.() ?? true;
   const stale = () => failOutcome(text, 'session cancelled or superseded; delivery skipped');
 
@@ -82,7 +110,9 @@ export async function deliverTranscript(
   const plan = planDelivery(validated, options.clipboardFallback, intended, options.pasteBinding);
 
   if (plan.action === 'paste') {
-    return pasteInTerminal(options, plan.bound, current, stale);
+    // Pass the wrapped platform: the terminal/Messages paste must also
+    // report onDeliveryStart, or the stop cap would treat it as not started.
+    return pasteInTerminal({ ...options, platform }, plan.bound, current, stale);
   }
 
   if (plan.action === 'insert') {

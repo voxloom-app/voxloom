@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDogfoodCapture } from '../../src/services/stt/useDogfoodCapture';
 import { createMockSttEngine, createMockSttModelStore } from '../../src/services/stt/mockStt';
 import { dogfoodTranscribeAndCopy } from '../../src/services/stt/dogfoodPath';
+import { STOP_LATE_SAVED } from '../../src/services/stt/stopBudget';
 import { createStubDeliveryAdapter } from '../../src/services/delivery';
 import type { CaptureState } from '../../src/services/capture/types';
 import type { UseCaptureStateResult } from '../../src/services/capture/useCaptureState';
@@ -143,8 +144,13 @@ describe('BUS-43 pending acquisition ownership', () => {
     expect(insert).not.toHaveBeenCalled();
     expect(clip.copy).not.toHaveBeenCalled();
     if (mode === 'cancelled') {
-      expect.soft(history).not.toHaveBeenCalled();
-      expect.soft(toast.mock.calls.filter(([text]) => text !== 'Listening…')).toHaveLength(0);
+      if (outcome === 'success') {
+        expect(history).toHaveBeenCalledWith(expect.objectContaining({ text: 'A transcript' }));
+        expect(toast).toHaveBeenCalledWith(STOP_LATE_SAVED);
+      } else {
+        expect(history).not.toHaveBeenCalled();
+        expect.soft(toast.mock.calls.filter(([text]) => text !== 'Listening…')).toHaveLength(0);
+      }
     } else {
       expect(toast.mock.calls.filter(([text]) => text !== 'Listening…')).toHaveLength(1);
       expect(history).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);

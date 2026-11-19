@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDogfoodCapture } from '../../src/services/stt/useDogfoodCapture';
 import { createMockSttModelStore, createMockSttEngine } from '../../src/services/stt/mockStt';
 import { dogfoodTranscribeAndCopy } from '../../src/services/stt/dogfoodPath';
+import { STOP_CANCELLED_SAVED } from '../../src/services/stt/stopBudget';
 import { createStubDeliveryAdapter } from '../../src/services/delivery';
 import type { UseCaptureStateResult } from '../../src/services/capture/useCaptureState';
 import type { CaptureState } from '../../src/services/capture/types';
@@ -104,9 +105,18 @@ describe('BUS-43 native cancellation integration', () => {
     expect(native.finish).toHaveBeenCalledTimes(mode === 'event' ? 0 : 1);
     expect(snapshot).not.toHaveBeenCalled();
     expect(insert).not.toHaveBeenCalled();
-    expect(clip.copy).not.toHaveBeenCalled();
-    expect(history).not.toHaveBeenCalled();
     expect(result.current.phase).toBe('cancelled');
-    expect(result.current.transcript).toBeNull();
+    if (mode === 'event') {
+      // Escape arrived before STT finished: late History only, no clipboard.
+      expect(clip.copy).not.toHaveBeenCalled();
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({ text: 'discard me' }));
+      expect(result.current.transcript).toBeNull();
+    } else {
+      // finish() ran after STT: text was already in hand, so History + clipboard.
+      expect(clip.copy).toHaveBeenCalledWith('discard me');
+      expect(history).toHaveBeenCalledWith(expect.objectContaining({ text: 'discard me', status: 'copied' }));
+      expect(result.current.transcript?.text).toBe('discard me');
+      expect(result.current.message).toBe(STOP_CANCELLED_SAVED);
+    }
   });
 });

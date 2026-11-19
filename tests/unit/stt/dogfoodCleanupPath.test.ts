@@ -54,9 +54,12 @@ describe('dogfood path with cleanup', () => {
     expect(done.cleanup).toMatchObject({ reason: 'runtime-error', status: 'fallback' });
   });
 
-  it('a user cancel during cleanup delivers nothing', async () => {
+  it('a user cancel during cleanup still returns the STT transcript and skips delivery', async () => {
     const { beforeDelivery, clip, result } = run(async () => ({ reason: 'cancelled', status: 'cancelled' }));
-    await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    const done = await result;
+    expect(done.transcript.text).toBe('um send it');
+    expect(done.cleanup).toMatchObject({ reason: 'cancelled', status: 'cancelled' });
+    expect(done.delivery.status).toBe('failed');
     expect(beforeDelivery).not.toHaveBeenCalled();
     expect(clip.copy).not.toHaveBeenCalled();
   });

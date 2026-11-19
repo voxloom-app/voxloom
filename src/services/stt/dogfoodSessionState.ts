@@ -15,6 +15,16 @@ export interface Cancellation {
   modelId?: string;
   preparation?: PreparedSttSession;
   transcribing?: boolean;
+  /** Set when stop() is called, so Escape after stop cannot discard the clip. */
+  captureStopped?: boolean;
+  /** True once this run has written a History row (avoids duplicates). */
+  retained?: boolean;
+  /** Cap or Escape: do not insert; a late result still goes to History. */
+  suppressDelivery?: boolean;
+  /** Set just before insert, paste, or Copy so the cap cannot start a second delivery. */
+  deliveryInFlight?: boolean;
+  /** Escape during processing: retain any text or show the pending note. */
+  retainOnCancel?: () => void;
   scope?: CancelScope;
   settle?: () => Promise<void>;
 }

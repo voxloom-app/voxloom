@@ -57,9 +57,21 @@ export interface DogfoodTranscribeOptions {
   /**
    * Optional local cleanup of the final transcript (BUS-16). Runs only for a
    * current session with text. Must not throw; any failure must come back as
-   * a raw-text fallback. `cancelled` (the user's cancel) delivers nothing.
+   * a raw-text fallback. `cancelled` skips delivery but still returns the
+   * transcript so History can keep it (BUS-255).
    */
   cleanup?: (text: string) => Promise<CleanupOutcome>;
+  /**
+   * Called as soon as STT text is in hand, and again after cleanup updates
+   * it. Used by the stop safety net to retain a partial or full transcript.
+   */
+  onTranscript?: (transcript: Transcript) => void;
+  /**
+   * Called immediately before an insert, terminal paste, or Copy write
+   * inside deliverTranscript. The stop cap must not start a second
+   * delivery or write the clipboard after this.
+   */
+  onDeliveryStart?: () => void;
   /**
    * The user's dictionary words (BUS-138). Entries are spelled exactly as
    * saved in the transcript, right after STT and again after cleanup. History
@@ -89,7 +101,7 @@ export interface DogfoodTranscribeOptions {
 }
 
 export interface DogfoodResult {
-  /** Present when cleanup ran (never `cancelled`: that throws AbortError). */
+  /** Present when cleanup ran, including a user-cancelled outcome. */
   cleanup?: CleanupOutcome;
   /**
    * True when Copy (clipboard write) completed successfully.
@@ -156,9 +168,23 @@ export async function dogfoodTranscribeAndCopy(
     }),
     options.dictionary,
   );
+  options.onTranscript?.(sttTranscript);
   const cleanup = await cleanUp(options, sttTranscript);
   if (cleanup?.status === 'cancelled') {
-    throw new DOMException('Dictation cancelled', 'AbortError');
+    // Keep the STT text; the caller retains it and skips delivery.
+    return {
+      cleanup,
+      copied: false,
+      delivery: {
+        clipboardRestored: false,
+        detail: 'cancelled',
+        message: '',
+        restoreSkippedReason: null,
+        status: 'failed',
+        text: sttTranscript.text,
+      },
+      transcript: sttTranscript,
+    };
   }
   // History keeps the engine output; delivery uses the cleaned text. The
   // dictionary runs again because cleanup may have undone a spelling.
@@ -169,6 +195,7 @@ export async function dogfoodTranscribeAndCopy(
         text: cleanup.finalText,
       }, options.dictionary)
     : sttTranscript;
+  options.onTranscript?.(transcript);
   if (options.isCurrent?.() ?? true) await options.beforeDelivery?.();
 
   const platform = resolvePlatform(
@@ -213,6 +240,7 @@ export async function dogfoodTranscribeAndCopy(
         clipboardFallback,
         isCurrent: options.isCurrent,
         intended,
+        onDeliveryStart: options.onDeliveryStart,
         pasteBinding: options.pasteBinding,
         platform,
         text: transcript.text,

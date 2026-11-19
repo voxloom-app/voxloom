@@ -192,4 +192,9 @@ export interface DeliverOptions {
   pasteBinding?: PasteBinding | null;
   /** Transcript text to deliver. */
   text: string;
+  /**
+   * Called immediately before an insert, terminal paste, or Copy write.
+   * The stop cap uses this to avoid a second delivery or clipboard write.
+   */
+  onDeliveryStart?: () => void;
 }

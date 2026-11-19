@@ -1,7 +1,13 @@
 /// Post-stop processing for dogfood capture: STT → optional local cleanup
 /// (BUS-16) → delivery → History record. Runs on every clean stop (user stop
 /// or the 120s/capacity bound) with the same completion-time target policy
-/// (ADR §4). A cancel during cleanup delivers nothing.
+/// (ADR §4).
+///
+/// A 15s safety net (BUS-255) is not an STT abort: when it fires, any text
+/// already in hand is saved to History and the clipboard with a plain note.
+/// If nothing is ready yet, transcription keeps running and a late result is
+/// saved to History. Escape during processing does the same. If delivery
+/// has already started, the cap leaves that outcome alone.
 
 import { useCallback, useEffect, useRef } from 'react';
 import { createDogfoodRecord } from '../../domain/records';
@@ -16,9 +22,12 @@ import {
 } from '../delivery';
 import { prepareDogfoodCleanup } from './dogfoodCleanup';
 import { errorText } from './dogfoodModel';
-import { dogfoodTranscribeAndCopy, type CaptureAudioMeta } from './dogfoodPath';
+import { dogfoodTranscribeAndCopy, type CaptureAudioMeta, type DogfoodResult } from './dogfoodPath';
 import { hudResultFor, type DogfoodViewActions } from './dogfoodPhase';
 import type { DogfoodLiveSession } from './dogfoodSessionState';
+import { remainingCleanupBudgetMs, STOP_BUDGET_MS, CAPTURE_CANCELLED_NOTHING } from './stopBudget';
+import { createDeliveryGrace, createSafetyNet, startStopBudget } from './stopSafetyNet';
+import type { Transcript } from './types';
 import type { UseDogfoodCaptureOptions } from './useDogfoodCapture';
 
 function resolvePlatform(
@@ -74,7 +83,16 @@ export function useDogfoodProcessing({
     const cancellation = live.cancellation;
     const guard = cancellation.deliveryGuard;
     cancellation.transcribing = true;
+    cancellation.retained = false;
+    cancellation.suppressDelivery = cancellation.cancelled;
+    cancellation.deliveryInFlight = false;
+    let latestText: Transcript | undefined;
     const current = () => session === live.session && !cancellation.cancelled;
+    const canDeliver = () =>
+      current() && !cancellation.suppressDelivery && (!guard || guard.current());
+    // Cancel bumps `session` immediately; identity of this cancellation still
+    // owns the status line until a newer start replaces it.
+    const ownsUi = () => live.cancellation === cancellation;
     const platform = platformRef.current;
     let settlement: Promise<void> | undefined;
     // Both STT success and failure must consult the native latch, whose
@@ -97,15 +115,48 @@ export function useDogfoodProcessing({
     const processing = new AbortController();
     live.processing = processing;
     let stopWaitingForBinding: (() => void) | undefined;
+    let lateInFlight = false;
+    let finished = false;
+    const startedAt = performance.now();
+    // Arm before ensureModel / paste-binding awaits so a stall cannot skip the cap.
+    const budget = startStopBudget(STOP_BUDGET_MS, startedAt);
+    const deliveryGrace = createDeliveryGrace();
     // Snapshot at stop: a settings change mid-dictation applies to the next
     // one. The same style goes to cleanup and onto the History row.
     const latest = optionsRef.current;
     const style = latest.style ?? 'formal';
+    let modelId = cancellation.modelId ?? 'unknown';
+
+    const safety = createSafetyNet({
+      actions,
+      audio,
+      cancellation,
+      clipboard: () => optionsRef.current.clipboard,
+      clipboardFallback: () => optionsRef.current.clipboardFallback !== false,
+      modelId: () => modelId,
+      now: () => (optionsRef.current.now ?? Date.now)(),
+      onHistoryRecord: () => optionsRef.current.onHistoryRecord,
+      ownsUi,
+      skipClipboard: Boolean(guard),
+      skipHistory: Boolean(guard),
+      style,
+    });
+    safety.wireRetainOnCancel(() => latestText, () => finished);
+
+    const releaseResources = async () => {
+      if (stopWaitingForBinding) {
+        processing.signal.removeEventListener('abort', stopWaitingForBinding);
+      }
+      await cancellation.preparation?.release(audio.id).catch(() => {});
+      if (live.processing === processing) live.processing = null;
+      await cancellation.scope?.dispose().catch(() => {});
+    };
+
     const cleanup = prepareDogfoodCleanup({
       controller: processing,
       engine: cleanupEngine,
       onStart: () => {
-        if (!current()) return;
+        if (!ownsUi() || cancellation.suppressDelivery) return;
         setPhase('cleaning');
         announce('Cleaning up…');
       },
@@ -116,15 +167,20 @@ export function useDogfoodProcessing({
         modelId: latest.cleanupModelId ?? null,
         style,
       },
+      timeoutMs: () => remainingCleanupBudgetMs(startedAt, performance.now()),
       userCancelled: () => cancellation.cancelled,
     });
-    setPhase('transcribing');
-    announce('Transcribing…');
+    // Escape in the stop→stopped gap already cancelled; do not clobber the
+    // cancelled phase with "Transcribing…". Still run STT for History.
+    if (cancellation.cancelled) {
+      safety.showPending('cancel');
+    } else {
+      setPhase('transcribing');
+      announce('Transcribing…');
+    }
     try {
-      const modelId = cancellation.modelId ?? await ensureModel();
-      // A cancelled run stops here; `finally` releases the prepared request and
-      // its stopped PCM (native discards the buffer).
-      if (cancellation.cancelled) return;
+      modelId = cancellation.modelId ?? await ensureModel();
+      // Escape after stop must still start STT so a late result can reach History.
       // Abort (cancel or supersede) stops waiting on a stalled start-binding
       // lookup, so a prepared request's stopped PCM is never held behind it.
       const binding = cancellation.preparation
@@ -134,16 +190,15 @@ export function useDogfoodProcessing({
         })])
         : startBinding;
       const pasteBinding = (await binding) ?? null;
-      if (cancellation.cancelled) return;
       const dogfood = optionsRef.current.dogfood ?? dogfoodTranscribeAndCopy;
-      const result = await dogfood({
+      const dogfoodPromise = dogfood({
         audio,
         cleanup: cleanup.stage,
         clipboard: optionsRef.current.clipboard,
         clipboardFallback: optionsRef.current.clipboardFallback !== false,
         deliveryPlatform: platform,
         dictionary: latest.dictionary,
-        isCurrent: () => current() && (!guard || guard.current()),
+        isCurrent: canDeliver,
         onlyOwnField: Boolean(guard),
         insertOwnField: guard ? (text) => guard.insert(text) : undefined,
         pasteBinding,
@@ -157,45 +212,119 @@ export function useDogfoodProcessing({
           return target;
         },
         modelId,
+        onDeliveryStart: () => {
+          cancellation.deliveryInFlight = true;
+          deliveryGrace.arm();
+        },
+        onTranscript: (transcript) => { latestText = transcript; },
         requestId: cancellation.preparation?.requestId,
       });
+
+      let outcome: DogfoodResult | 'budget' | 'grace' = await Promise.race([
+        budget.against(dogfoodPromise),
+        deliveryGrace.promise,
+      ]);
+      // The 15s cap fired while a write is in flight: wait for the write
+      // or the 10s grace, and never start a second delivery or clipboard write.
+      if (outcome === 'budget' && cancellation.deliveryInFlight) {
+        outcome = await Promise.race([
+          dogfoodPromise,
+          deliveryGrace.promise,
+        ]);
+      }
+
+      if (outcome === 'grace') {
+        budget.clear();
+        deliveryGrace.clear();
+        // The write may still land, but a later insert or paste error must
+        // not fall back to a clipboard write after we saved to History.
+        cancellation.suppressDelivery = true;
+        await settleCancellation();
+        if (!cancellation.cancelled && latestText?.text.trim()) {
+          await safety.retain(latestText, 'cap');
+        } else if (!cancellation.cancelled) {
+          safety.showPending('cap');
+        }
+        lateInFlight = true;
+        safety.finishLate(dogfoodPromise, settleCancellation, releaseResources);
+        return;
+      }
+
+      if (outcome === 'budget') {
+        budget.clear();
+        cancellation.suppressDelivery = true;
+        // Abort cleanup and delivery only. Do not cancel native STT.
+        processing.abort();
+        await settleCancellation();
+        if (!cancellation.cancelled) {
+          if (latestText?.text.trim()) {
+            await safety.retain(latestText, 'cap');
+          } else {
+            safety.showPending('cap');
+          }
+        }
+        lateInFlight = true;
+        safety.finishLate(dogfoodPromise, settleCancellation, releaseResources);
+        return;
+      }
+
+      budget.clear();
+      finished = true;
       // A stale successful path skips beforeDelivery, but still needs the
       // saved cancellation decision before publishing History or a toast.
       await settleCancellation();
-      if (cancellation.cancelled) return;
+      if (cancellation.retained) return;
+      if (cancellation.cancelled || cancellation.suppressDelivery) {
+        if (outcome.transcript.text.trim() && !guard) {
+          await safety.retain(
+            outcome.transcript,
+            ownsUi() && cancellation.cancelled && !cancellation.suppressDelivery
+              ? 'cancel'
+              : 'late',
+          );
+        } else {
+          safety.toastIfPendingFailed();
+        }
+        return;
+      }
       if (current()) {
-        guard?.result(result);
-        setTranscript(result.transcript);
-        setHudResult(hudResultFor(result.delivery));
+        guard?.result(outcome);
+        setTranscript(outcome.transcript);
+        setHudResult(hudResultFor(outcome.delivery));
         setPhase('success');
       }
-      const provenance = await cleanup.provenance(result.cleanup);
+      const provenance = await cleanup.provenance(outcome.cleanup);
       const record = createDogfoodRecord({
         cleanup: provenance,
         durationMs: audio.duration_ms,
         id: `dogfood-${audio.id}`,
-        mayHaveInserted: result.delivery.mayHaveInserted,
+        mayHaveInserted: outcome.delivery.mayHaveInserted,
         model: modelId,
         now: (optionsRef.current.now ?? Date.now)(),
-        rawText: result.transcript.rawText,
-        status: result.delivery.status,
+        rawText: outcome.transcript.rawText,
+        status: outcome.delivery.status,
         style,
-        text: result.transcript.text,
+        text: outcome.transcript.text,
       });
       if (record) {
+        cancellation.retained = true;
         optionsRef.current.onHistoryRecord?.(record);
       }
       // Stale session: evidence still surfaces as a toast, phase untouched.
       // An empty message is a clean terminal paste: silent, no status line, no
       // toast (History keeps the Unverified record). Clear the stale status.
-      const said = result.delivery.message;
+      const said = outcome.delivery.message;
       if (!said) {
         if (current()) setMessage(null);
       } else if (current()) announce(said);
       else toast(said);
     } catch (error: unknown) {
+      finished = true;
       await settleCancellation();
-      if (cancellation.cancelled) return;
+      if (cancellation.cancelled || cancellation.suppressDelivery) {
+        safety.toastIfPendingFailed();
+        return;
+      }
       if (current()) {
         setHudResult('transcribe-failed');
         setPhase('error');
@@ -204,18 +333,19 @@ export function useDogfoodProcessing({
         toast(errorText(error));
       }
     } finally {
-      if (stopWaitingForBinding) processing.signal.removeEventListener('abort', stopWaitingForBinding);
-      await cancellation.preparation?.release(audio.id).catch(() => {});
-      if (live.processing === processing) live.processing = null;
-      await cancellation.scope?.dispose().catch(() => {});
+      budget.clear();
+      deliveryGrace.clear();
+      if (!lateInFlight) await releaseResources();
     }
   }, [actions, cleanupEngine, ensureModel, live]);
 
   useEffect(() => {
     const { announce, setMessage, setPhase } = actions;
     if (captureState.kind === 'cancelled') {
+      // Escape after stop keeps the in-flight run; do not overwrite its note.
+      if (live.cancellation.transcribing || live.cancellation.captureStopped) return;
       setPhase('cancelled');
-      setMessage('Capture cancelled — nothing transcribed.');
+      setMessage(CAPTURE_CANCELLED_NOTHING);
       return;
     }
     if (captureState.kind === 'error') {
@@ -235,8 +365,14 @@ export function useDogfoodProcessing({
     // Guided practice consumes only audio from its own guarded session.
     const unowned = optionsRef.current.ownedCaptureOnly === true
       && !live.cancellation.deliveryGuard;
-    if (live.cancellation.cancelled || unowned) {
-      // A late stopped event must dispose PCM without restarting cancelled STT.
+    if (unowned) {
+      void live.cancellation.preparation?.release(audio.id).catch(() => {});
+      return;
+    }
+    if (live.cancellation.cancelled && !live.cancellation.captureStopped
+      && !live.cancellation.transcribing) {
+      // Cancelled while listening: a late stopped event must dispose PCM
+      // without starting STT.
       void live.cancellation.preparation?.release(audio.id).catch(() => {});
       return;
     }
