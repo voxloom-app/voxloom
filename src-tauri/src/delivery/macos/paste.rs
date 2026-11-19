@@ -23,15 +23,28 @@ pub struct GuardedMacPaste<F> {
     pub terminal: bool,
 }
 
-fn post_owned(expected: i64, guard: impl Fn() -> Result<(), String>) -> Result<(), String> {
+fn post_owned(
+    pid: i32,
+    expected: i64,
+    guard: impl Fn() -> Result<(), String>,
+) -> Result<(), String> {
+    use crate::delivery::decide::paste::pasteboard_policy::before_dispatch;
     let keycode = keylayout::v_keycode();
-    typing::post_key_chord_guarded(keycode, typing::FLAG_COMMAND, || {
-        crate::delivery::decide::paste::pasteboard_policy::before_dispatch(
-            expected,
-            &guard,
-            pasteboard::change_count,
-        )
-    })
+    typing::post_key_chord_guarded(
+        keycode,
+        typing::FLAG_COMMAND,
+        || before_dispatch(expected, &guard, pasteboard::change_count),
+        // Command is down: no AX reads, only single cheap calls.
+        || before_dispatch(expected, || still_safe(pid), pasteboard::change_count),
+    )
+}
+
+/// The last check before V: Secure Keyboard Entry and the frontmost app.
+fn still_safe(pid: i32) -> Result<(), String> {
+    if unsafe { IsSecureEventInputEnabled() } != 0 {
+        return Err("Secure Keyboard Entry is on — paste skipped".into());
+    }
+    MacPaste { pid }.still_frontmost()
 }
 
 impl MacPaste {
@@ -77,7 +90,7 @@ impl PasteHost for MacPaste {
     }
 
     fn post_paste_owned(&self, expected: i64) -> Result<(), String> {
-        post_owned(expected, || self.preflight())
+        post_owned(self.pid, expected, || self.preflight())
     }
 
     fn change_count(&self) -> i64 {
@@ -126,7 +139,7 @@ impl<F: Fn() -> Result<(), String>> PasteHost for GuardedMacPaste<F> {
     }
 
     fn post_paste_owned(&self, expected: i64) -> Result<(), String> {
-        post_owned(expected, || self.preflight())
+        post_owned(self.pid, expected, || self.preflight())
     }
 
     fn change_count(&self) -> i64 {

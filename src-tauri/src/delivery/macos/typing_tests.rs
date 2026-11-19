@@ -638,18 +638,32 @@ fn key_chord_posts_nothing_when_an_event_cannot_be_created() {
 }
 
 #[test]
+fn full_target_guard_never_runs_while_command_is_held() {
+    let api = FakeEvents::default();
+    let last_saw = Cell::new(None);
+    post_key_chord_guarded_with(
+        &api,
+        9,
+        FLAG_COMMAND,
+        || {
+            assert_eq!(api.posted(), 0, "AX target reads with Command down");
+            Ok(())
+        },
+        || {
+            last_saw.set(Some(api.posted()));
+            Ok(())
+        },
+    )
+    .unwrap();
+    assert_eq!(last_saw.get(), Some(1), "cheap check between Command and V");
+    assert_eq!(api.posted(), 4);
+}
+
+#[test]
 fn paste_guard_refusal_after_command_down_releases_command_without_v() {
     let api = FakeEvents::default();
-    let checks = Cell::new(0);
-    let result = post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || {
-        let n = checks.get() + 1;
-        checks.set(n);
-        if n == 2 {
-            Err("retired".into())
-        } else {
-            Ok(())
-        }
-    });
+    let result =
+        post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || Ok(()), || Err("retired".into()));
     assert!(result.is_err());
     let posts: Vec<_> = api
         .calls
@@ -667,15 +681,14 @@ fn paste_guard_refusal_after_command_down_releases_command_without_v() {
 #[test]
 fn paste_guard_panic_after_command_down_still_cleans_modifier() {
     let api = FakeEvents::default();
-    let checks = Cell::new(0);
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || {
-            checks.set(checks.get() + 1);
-            if checks.get() == 2 {
-                panic!("injected guard unwind");
-            }
-            Ok(())
-        })
+        post_key_chord_guarded_with(
+            &api,
+            9,
+            FLAG_COMMAND,
+            || Ok(()),
+            || panic!("injected guard unwind"),
+        )
     }));
     assert!(result.is_err());
     assert_eq!(api.posted(), 2);
@@ -701,12 +714,14 @@ fn denied_paste_event_access_posts_nothing() {
         deny_access_at: 1,
         ..Default::default()
     };
-    assert!(
-        post_key_chord_guarded_with(&api, 9, FLAG_COMMAND, || panic!(
-            "no target reads after permission denial"
-        ))
-        .is_err()
-    );
+    assert!(post_key_chord_guarded_with(
+        &api,
+        9,
+        FLAG_COMMAND,
+        || panic!("no target reads after permission denial"),
+        || panic!("no target reads after permission denial"),
+    )
+    .is_err());
     assert_eq!(api.posted(), 0);
     api.assert_released();
 }

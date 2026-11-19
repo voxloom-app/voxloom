@@ -132,23 +132,26 @@ pub const FLAG_COMMAND: u64 = 0x0010_0000;
 /// One key press (down, up) with `flags` held, from a private event source so
 /// physically held modifiers do not leak in. The caller picks the keycode.
 pub fn post_key_chord(keycode: u16, flags: u64) -> Result<(), String> {
-    post_key_chord_guarded(keycode, flags, || Ok(()))
+    post_key_chord_guarded(keycode, flags, || Ok(()), || Ok(()))
 }
 
-/// All events preallocated; target checked after layout/main-queue waits and
-/// immediately before V. A Command-only refusal always releases Command,
-/// including unwinding. Once V is posted there are no fallible operations.
+/// All events preallocated. `ready`, the full target check, runs after
+/// layout/main-queue waits and before Command-down. Only `last`, which must be
+/// cheap (no AX reads), runs while Command is held, immediately before V. A
+/// Command-only refusal always releases Command, including unwinding. Once V
+/// is posted there are no fallible operations.
 pub fn post_key_chord_guarded(
     keycode: u16,
     flags: u64,
-    guard: impl Fn() -> Result<(), String>,
+    ready: impl FnOnce() -> Result<(), String>,
+    last: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
-    post_key_chord_guarded_with(&NativeEvents, keycode, flags, guard)
+    post_key_chord_guarded_with(&NativeEvents, keycode, flags, ready, last)
 }
 
 #[cfg(test)]
 fn post_key_chord_with(api: &impl Events, keycode: u16, flags: u64) -> Result<(), String> {
-    post_key_chord_guarded_with(api, keycode, flags, || Ok(()))
+    post_key_chord_guarded_with(api, keycode, flags, || Ok(()), || Ok(()))
 }
 
 struct CommandHeld<'a, E: Events> {
@@ -165,7 +168,8 @@ fn post_key_chord_guarded_with(
     api: &impl Events,
     keycode: u16,
     flags: u64,
-    guard: impl Fn() -> Result<(), String>,
+    ready: impl FnOnce() -> Result<(), String>,
+    last: impl FnOnce() -> Result<(), String>,
 ) -> Result<(), String> {
     if flags != FLAG_COMMAND {
         return Err("only Command paste chords are supported".into());
@@ -191,14 +195,14 @@ fn post_key_chord_guarded_with(
     if !api.post_access() {
         return Err("event-posting permission denied".into());
     }
-    guard()?;
+    ready()?;
     api.post(HID_EVENT_TAP, command_down.1);
     let held = CommandHeld {
         api,
         up: command_up.1,
     };
-    // No waits, TIS calls or physically queried modifier state here.
-    guard()?;
+    // No waits, AX reads, TIS calls or physically queried modifier state here.
+    last()?;
     api.post(HID_EVENT_TAP, down.1);
     api.post(HID_EVENT_TAP, up.1);
     drop(held);
