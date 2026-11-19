@@ -22,13 +22,13 @@ it('queries without requests and sends explicit permission/settings and model ID
 it('names macOS and Windows, not one platform, when setup runs outside the desktop app', async () => {
   shell.native = false;
   const io = createSetupBoundary();
-  const guided = 'Real guided setup requires the Voxloom desktop app on macOS or Windows.';
+  const guided = 'Real guided setup requires the Voxloom desktop app.';
   await expect(io.request('microphone')).rejects.toThrow(guided);
   await expect(io.openSettings('accessibility')).rejects.toThrow(guided);
   expect(await io.readiness('whisper-base.en')).toEqual({
     modelId: 'whisper-base.en',
     ready: false,
-    reason: 'Real dictation practice requires the Voxloom desktop app on macOS or Windows.',
+    reason: 'Real dictation practice requires the Voxloom desktop app.',
   });
   expect(await io.query()).toEqual({ microphone: 'unsupported', accessibility: 'unsupported' });
   expect(invoke).not.toHaveBeenCalled();
