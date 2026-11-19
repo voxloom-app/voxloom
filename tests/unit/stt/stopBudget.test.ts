@@ -31,7 +31,7 @@ describe('stopBudget', () => {
 
   it('names the late-failure placeholder for UI/UX review', () => {
     expect(STOP_LATE_NOTHING_SAVED).toBe(
-      'Transcription didn\'t finish — nothing was saved.',
+      'Your last dictation didn’t come through — nothing was saved.',
     );
   });
 

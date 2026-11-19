@@ -37,7 +37,7 @@ export const STOP_LATE_SAVED = 'Your last dictation was saved to History.';
 
 /** Placeholder: shown when a pending late result never arrives. UI/UX review. */
 export const STOP_LATE_NOTHING_SAVED =
-  'Transcription didn\'t finish — nothing was saved.';
+  'Your last dictation didn’t come through — nothing was saved.';
 
 export const CAPTURE_CANCELLED_NOTHING =
   'Capture cancelled — nothing transcribed.';
