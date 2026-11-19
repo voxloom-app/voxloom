@@ -15,7 +15,13 @@ pub struct Observation<I> {
     pub process: Option<String>,
     pub window: Option<I>,
     pub element: Option<I>,
+    /// Accessibility trust, read at the start and end of the observation.
     pub trusted: bool,
+    /// Element, window and process agreed with the frontmost app throughout
+    /// the observation. Only shared paste needs this: a focused field owned by
+    /// another process (a non-activating panel such as Spotlight) keeps the
+    /// verified AX route, as before shared paste existed.
+    pub coherent: bool,
     pub secure_input: bool,
     pub snapshot: TargetSnapshotDto,
     pub terminal: bool,
@@ -25,6 +31,7 @@ pub struct Observation<I> {
 impl<I: PartialEq> Observation<I> {
     fn eligible(&self) -> bool {
         self.trusted
+            && self.coherent
             && !self.secure_input
             && self.snapshot.kind != "secure"
             && self.pid.is_some_and(|p| p > 0)

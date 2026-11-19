@@ -110,8 +110,11 @@ pub(super) fn observe() -> Observation<Identity> {
         .unwrap_or_else(|| {
             TargetSnapshotDto::unavailable("Accessibility focus unavailable", focus::now_ms())
         });
-    snapshot.app_pid = pid;
-    snapshot.known_terminal = host::terminal_flags(pid).known;
+    // The focused element's own process, else the frontmost one (as
+    // `flag_terminal` does). They differ only for an incoherent observation,
+    // which never mints paste authority; the AX route needs the element's pid.
+    snapshot.app_pid = snapshot.app_pid.or(pid);
+    snapshot.known_terminal = host::terminal_flags(snapshot.app_pid).known;
     let element_in_window = element.as_ref().is_none_or(|e| {
         element_pid(e.raw()) == pid
             && window.as_ref().is_none_or(|w| {
@@ -128,15 +131,16 @@ pub(super) fn observe() -> Observation<Identity> {
     // Recheck independently after all potentially slow AX/process reads.
     let coherent = element_in_window
         && host::frontmost_pid() == pid
-        && pid.and_then(process_identity) == process
-        && unsafe { AXIsProcessTrusted() } != 0;
+        && pid.and_then(process_identity) == process;
+    let trusted = trusted && unsafe { AXIsProcessTrusted() } != 0;
     let secure_input = secure_input || unsafe { IsSecureEventInputEnabled() } != 0;
     Observation {
         pid,
         process,
         window,
         element,
-        trusted: trusted && coherent,
+        trusted,
+        coherent,
         secure_input,
         snapshot,
         terminal: pid.and_then(host::executable_path).is_some_and(|exe| {

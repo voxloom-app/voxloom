@@ -8,6 +8,7 @@ fn observation(element: Option<usize>) -> Observation<usize> {
         window: Some(11),
         element,
         trusted: true,
+        coherent: true,
         secure_input: false,
         snapshot: super::super::test_support::target("insertable", Some(7), Some("old")),
         terminal: false,
@@ -467,4 +468,41 @@ fn newer_arm_retires_a_queued_delivery_without_waiting_for_serial_lock() {
     drop(held);
     retire.join().unwrap();
     assert!(queued.join().unwrap().is_err());
+}
+
+#[test]
+fn field_outside_the_frontmost_app_keeps_ax_route_without_paste_authority() {
+    // Spotlight-style panel: AX focus is a field in another process while a
+    // different app stays frontmost. Paste would go to the key window, so no
+    // token; the AX route keeps its classification and legacy registration.
+    let targets = Targets::new();
+    let mut obs = observation(Some(1));
+    obs.coherent = false;
+    obs.snapshot.app_pid = Some(42);
+    let published = AtomicUsize::new(0);
+    let snap = targets
+        .snapshot(
+            "nonce".into(),
+            || obs.clone(),
+            |o| (o.snapshot.clone(), o.element),
+            || {},
+            |e| {
+                assert_eq!(e, Some(&1));
+                published.fetch_add(1, Ordering::SeqCst);
+                Some(1)
+            },
+        )
+        .unwrap();
+    assert!(snap.insertable);
+    assert_eq!(snap.kind, "insertable");
+    assert_eq!(
+        snap.app_pid,
+        Some(42),
+        "AX validation compares the field's pid"
+    );
+    assert!(snap.shared_paste_token.is_none());
+    assert_eq!(published.load(Ordering::SeqCst), 1);
+    targets
+        .claim_legacy(1)
+        .expect("the AX route can still claim its single use");
 }

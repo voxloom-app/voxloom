@@ -16,6 +16,7 @@ fn reserved_publication_protects_real_legacy_cf_slot_and_retains() {
         window: Identity::owned(unsafe { CFRetain(window.0) }),
         element: Identity::owned(unsafe { CFRetain(element.0) }),
         trusted: true,
+        coherent: true,
         secure_input: false,
         terminal: false,
         apple_terminal: false,
