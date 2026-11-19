@@ -235,6 +235,8 @@ mod integrity_tests;
 #[cfg(test)]
 mod parakeet_tests;
 #[cfg(test)]
+mod path_tests;
+#[cfg(test)]
 mod recovery_tests;
 #[cfg(test)]
 mod session_tests;

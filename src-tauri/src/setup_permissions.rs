@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+mod readiness;
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum PermissionKind {
@@ -241,7 +243,7 @@ pub async fn setup_model_readiness(
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
         let engine = if crate::stt::catalog::find(&model_id).is_some() {
-            cfg!(all(target_os = "macos", feature = "whisper"))
+            readiness::WHISPER_SETUP_ENGINE
         } else {
             crate::stt::parakeet_catalog::find(&model_id).is_some()
                 && crate::stt::parakeet_catalog::is_supported()
@@ -249,24 +251,21 @@ pub async fn setup_model_readiness(
         };
         let verified = engine && state.models.setup_verified(&model_id);
         let info = state.models.status(&model_id);
-        let status = if !engine {
-            "unavailable"
-        } else if info.as_ref().is_some_and(|info| info.status == "downloading") {
-            "downloading"
-        } else if verified {
-            "available"
-        } else if info.as_ref().is_some_and(|info| info.status == "available") {
-            "pending"
-        } else {
-            "missing"
-        };
-        let ready = status == "available";
-        ModelReadiness { model_id, ready, status, reason: if ready { None } else if !engine {
-            Some("The selected speech engine is unavailable in this build or on this Mac.".into())
-        } else if status == "pending" {
-            Some("The selected voice pack is still being verified. Check again when verification finishes.".into())
-        } else { Some("The selected voice pack is missing, downloading or not verified. Check or retry the download.".into()) } }
-    }).await.map_err(|e| e.to_string())
+        let decision = readiness::decide(
+            engine,
+            info.as_ref().map(|info| info.status.as_str()),
+            verified,
+            readiness::ENGINE_UNAVAILABLE_REASON,
+        );
+        ModelReadiness {
+            model_id,
+            ready: decision.status == "available",
+            status: decision.status,
+            reason: decision.reason.map(Into::into),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
