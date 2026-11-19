@@ -20,6 +20,8 @@ pub struct DeliveryDiag {
     /// The AXSelectedText write error, if any.
     pub ax_error: Option<String>,
     pub readback: &'static str,
+    /// `fallback::AX_WRITE_SKIPPED_LABEL` when the AX write was skipped.
+    pub ax_write: &'static str,
     /// none, paste, or why the paste was skipped.
     pub fallback: String,
     pub readback_ms: u128,
@@ -42,7 +44,7 @@ impl DeliveryDiag {
         let opt = |v: &Option<String>| v.clone().unwrap_or_else(|| "-".into());
         format!(
             "[insert] delivery bundle={} role={} subrole={} value={} settable=[{}] gate={} \
-             reason={:?} ax_error={:?} readback={} fallback={} readback_ms={} paste_ms={} total_ms={}",
+             reason={:?} ax_error={:?} ax_write={} readback={} fallback={} readback_ms={} paste_ms={} total_ms={}",
             opt(&self.bundle_id),
             opt(&self.role),
             opt(&self.subrole),
@@ -51,6 +53,7 @@ impl DeliveryDiag {
             self.gate,
             opt(&self.reason),
             opt(&self.ax_error),
+            if self.ax_write.is_empty() { "-" } else { self.ax_write },
             if self.readback.is_empty() { "-" } else { self.readback },
             if self.fallback.is_empty() { "none" } else { &self.fallback },
             self.readback_ms,

@@ -29,8 +29,9 @@ use focus::{edit_facts, focused_ui_element, resolve_focus, snapshot_at};
 
 use super::decide::diag::DeliveryDiag;
 use super::decide::fallback::{
-    after_ax_refusal, field_unchanged, in_web_content, may_paste, poll_readback, under_grid,
-    AxAttempt, PasteFacts, ValueStatus,
+    after_ax_refusal, field_unchanged, in_web_content, may_paste, poll_readback, skip_ax_write,
+    under_grid, AxAttempt, PasteFacts, ValueStatus, AX_WRITE_SKIPPED_LABEL,
+    AX_WRITE_SKIPPED_REASON,
 };
 use super::decide::paste_target::{binding_for, check_paste_target};
 use super::decide::report::PasteReport;
@@ -129,12 +130,13 @@ pub fn insert_text(
     let validated = validate_snapshots(intended, current);
     let before = ax::read_value(element);
     let terminal = validated.app_pid.and_then(host::apple_terminal_identity);
+    let facts = edit_facts(element);
     let mut diag = DeliveryDiag {
         bundle_id: validated.app_pid.and_then(host::bundle_id),
         role: validated.element_role.clone(),
         subrole: copy_string_attr(element, "AXSubrole"),
         value: before.label(),
-        settable: edit_facts(element).label(),
+        settable: facts.label(),
         ..Default::default()
     };
     let path = super::decide::terminal::choose_path(&validated, before.text().is_some(), terminal);
@@ -151,7 +153,25 @@ pub fn insert_text(
         }
         InsertPath::AxSelectedText => {
             diag.gate = "ax";
-            ax_insert::insert_selected(element, &validated, &before, text, &mut diag, &mut attempt)
+            let web_host = validated
+                .app_pid
+                .and_then(host::web_ax_activation)
+                .is_some();
+            if skip_ax_write(facts.selected_text, &before, web_host) {
+                // BUS-223 H4b: nothing is written, so `attempt` stays empty
+                // (write-free) and `paste_after_refusal` decides on ⌘V.
+                diag.ax_write = AX_WRITE_SKIPPED_LABEL;
+                Err(AX_WRITE_SKIPPED_REASON.to_string())
+            } else {
+                ax_insert::insert_selected(
+                    element,
+                    &validated,
+                    &before,
+                    text,
+                    &mut diag,
+                    &mut attempt,
+                )
+            }
         }
     };
     let result = if terminal_path {

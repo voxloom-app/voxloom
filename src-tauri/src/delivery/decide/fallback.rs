@@ -73,6 +73,24 @@ pub fn readback_text(before: &ValueStatus, after: &ValueStatus) -> Option<String
     after.text().map(str::to_string)
 }
 
+/// BUS-223 H4b: the `ax_write=` log label and the refusal reason when the
+/// AX write is skipped.
+pub const AX_WRITE_SKIPPED_LABEL: &str = "skipped(selected_text-unsettable)";
+pub const AX_WRITE_SKIPPED_REASON: &str =
+    "AXSelectedText not settable and AXValue empty — AX write skipped";
+
+/// Skip the AXSelectedText write when it cannot work and cannot be checked:
+/// the selection is not settable (an OK return is then a silent no-op in
+/// every app that showed it: Excel, Weather, Podcasts, Word, Journal) and
+/// AXValue reads no-value, so no read-back could ever tell. Writing anyway
+/// ends as Unverified with no paste (Journal). With nothing written the
+/// refusal is write-free, and `may_paste` decides on ⌘V. A readable value
+/// keeps the strict write and read-back; a Chromium/Electron host keeps its
+/// own typing route.
+pub fn skip_ax_write(selected_text_settable: bool, before: &ValueStatus, web_host: bool) -> bool {
+    !selected_text_settable && *before == ValueStatus::NoValue && !web_host
+}
+
 /// AX errors returned before the app touched the field: unsupported
 /// attribute, illegal argument, not implemented, API disabled, invalid
 /// element. Any other error (-25204 CannotComplete, -25200 Failure, ...) may
