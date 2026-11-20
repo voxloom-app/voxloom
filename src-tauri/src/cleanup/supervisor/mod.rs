@@ -14,6 +14,7 @@ mod handoff;
 mod prewarm;
 mod reservation;
 mod response;
+mod watch;
 
 pub use disarm::Disarmed;
 pub use prewarm::LowPowerMode;
@@ -31,6 +32,9 @@ const CANCELLED_REQUEST_LIMIT: usize = 16;
 
 struct ActiveWorker {
     process: Option<ProcessHandle>,
+    /// Handed over to the prewarm's worker instead (handoff.rs): a cancel
+    /// goes here, and the load is kept for the next dictation (BUS-120).
+    handed: Option<std::sync::mpsc::Sender<watch::Delivery>>,
     request_id: String,
     cancelled: bool,
 }
@@ -120,6 +124,7 @@ impl WorkerSupervisor {
         handoff::on_reserve(&mut state.prewarm);
         state.active = Some(ActiveWorker {
             process: None,
+            handed: None,
             cancelled: false,
             request_id: request_id.clone(),
         });
@@ -139,6 +144,9 @@ impl WorkerSupervisor {
         let mut state = self.shared.state.lock().unwrap();
         if let Some(active) = state.active.as_mut().filter(|a| a.request_id == request_id) {
             active.cancelled = true;
+            if let Some(handed) = &active.handed {
+                let _ = handed.send(watch::Delivery::Cancelled);
+            }
             active.process.clone()
         } else {
             if !state.cancelled.iter().any(|id| id == request_id) {
