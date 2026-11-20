@@ -39,6 +39,12 @@ ureq = { version = "2.12.1", default-features = false, features = ["tls"] }
 whisper-rs = { version = "=0.13.2", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# Whole-document history encryption; other platforms retain their existing store.
+ring = "=0.17.14"
+base64 = "0.22"
+zeroize = "1"
+security-framework = "=3.7.0"
+core-foundation = "0.10"
 whisper-rs = { version = "=0.13.2", optional = true, features = ["metal"] }
 block2 = "0.6"
 objc2 = "0.6"

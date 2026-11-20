@@ -148,9 +148,9 @@ For documentation-only changes, check links, commands, Markdown rendering and
 
 ## Store backwards-compatibility rule
 
-Voxloom keeps user data in JSON stores (`settings.json`, `history.json`,
-`dictionary.json`). Any change to what these files hold must stay backwards
-compatible:
+Voxloom keeps user data in stores (`settings.json`, `history.json`,
+`dictionary.json`). History's inner JSON schema is independent of its macOS
+encryption envelope. Any change to these stores must stay backwards compatible:
 
 1. **Every new setting or store field has a default.** A file written before
    the field existed must load with that default filled in.
@@ -171,6 +171,56 @@ compatible:
 
 Why: BUS-42. A history file saved in a newer sibling version by an unmerged branch was
 rejected as unreadable, and History came up empty.
+
+## macOS history encryption and recovery
+
+`history_load`, `history_save` and `store_backup({ store: 'history' })` keep
+their IPC contract. The macOS native boundary encrypts the entire serialized
+history document using ring AES-256-GCM. The outer JSON has `format` =
+`voxloom-history-encrypted`, `envelopeVersion` = 1, `algorithm` = `AES-256-GCM`,
+`role` (`history` or `preservation`), a base64 12-byte nonce, and base64
+ciphertext including the 16-byte tag. The fixed format/version/algorithm/role
+header is authenticated. It deliberately has no inner `version` or `records`,
+so older plaintext readers reject it. Unknown older **and** newer envelope
+versions block reads/writes; none predates envelope v1 in a shipped format.
+Inner history v1/v2, retention, settings hydration and error gates are unchanged.
+
+Each seal uses a fresh OS-random 96-bit nonce under a random 256-bit key: a
+probabilistic bounded-volume policy, not a deterministic uniqueness guarantee.
+Key bytes are never stored beside history. The dedicated file-Keychain generic
+password uses service `com.voxloom.prototype.history`, account `encryption-key`,
+and the default file Keychain resolved once for matching read/add operations.
+The adapter uses restricted lookup and **add-only** creation; do not substitute
+`set_generic_password` (an upsert), change ACLs, or delete/reset the item.
+Read back and validate the persisted key before encrypting. Missing keys with
+ciphertext/unknown encrypted artifacts must never trigger reprovisioning.
+
+Native transactions use an OS-backed `history.lock`, revalidate the current
+source/schema and run filesystem/Keychain work on blocking workers, not the UI
+thread. New same-directory staging is exclusive, 0600 and ciphertext-only;
+verify, sync and publish atomically. A post-publication directory-sync failure
+means changed-but-durability-uncertain, not "nothing changed." The lock orders
+cooperating app processes; this is not protection from arbitrary same-user
+malware changing files concurrently.
+
+Before a supported plaintext primary is rewritten, preserve its original bytes
+in an encrypted archive. Migrate owned numeric `history.json.unreadable-*.bak`
+names independently and restartably, including corrupt/non-UTF8 contents.
+Quarantine legacy `history.json.tmp` before removing it; never restore stale
+staging or archives. Normal retention/Off/delete does not prune archival copies
+or delete their key. Unknown ciphertext stays opaque; a backup is never permission
+to overwrite unreadable history. Recovery requires the original usable Keychain
+key; do not advise key deletion, automatic reset or speculative restoration.
+See [Privacy](PRIVACY.md#transcript-encryption-on-macos) for limitations.
+
+Windows/Linux explicitly retain existing plaintext storage; there is no macOS
+plaintext fallback. Dictionary/settings encryption is out of scope. Tests inject
+synthetic key operations while compiling the real adapter; never run them against
+personal data or the real Keychain. Use a disposable explicit `TMPDIR` for storage
+tests. The encrypted fixture uses a public synthetic `[7; 32]` key and decrypts to
+the existing v2 fixture. Signed-app Keychain approval and upgrade trust continuity
+need a separately authorized isolated native acceptance check; unit tests do not
+establish them.
 
 ## Releases
 

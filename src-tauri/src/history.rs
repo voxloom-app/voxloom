@@ -1,15 +1,17 @@
 //! Durable History / Recent transcript store (`app_data_dir/history.json`).
-//!
-//! Atomic write: temp file + rename. Load failures are returned to the
-//! frontend — callers must not silently wipe a corrupt file.
-
-use std::fs;
-use std::path::PathBuf;
-
+//! macOS encrypts at this native boundary; Windows/Linux retain existing JSON
+//! storage. Errors never authorize the frontend to overwrite unreadable data.
+use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
-const HISTORY_FILE_NAME: &str = "history.json";
+#[cfg(target_os = "macos")]
+mod encrypted;
+#[cfg(target_os = "macos")]
+mod keychain;
+#[cfg(not(target_os = "macos"))]
+mod plain;
 
+const HISTORY_FILE_NAME: &str = "history.json";
 fn history_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -19,51 +21,48 @@ fn history_path(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(dir.join(HISTORY_FILE_NAME))
 }
 
-/// Read raw history JSON. Returns `null` only when the file does not exist;
-/// a directory or unreadable path is an error (BUS-42).
+/// Returns null only for an absent primary after any archival migration.
+/// Blocking filesystem and Keychain work never runs on the UI thread.
 #[tauri::command]
-pub fn history_load(app: AppHandle) -> Result<Option<String>, String> {
-    let path = history_path(&app)?;
-    crate::store_read::read_store(&path, "history.json")
+pub async fn history_load(app: AppHandle) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = history_path(&app)?;
+        #[cfg(target_os = "macos")]
+        {
+            let keys = keychain::SystemKeys::new()?;
+            encrypted::Store::new(path.parent().ok_or("Invalid history directory")?, &keys).load()
+        }
+        #[cfg(not(target_os = "macos"))]
+        plain::load(&path)
+    })
+    .await
+    .map_err(|_| "History load worker failed".to_string())?
 }
 
-/// Atomically replace `history.json` with `contents`.
+/// macOS writes authenticated whole-document ciphertext, without a plaintext
+/// fallback. Frontend schema/retention policy and IPC names remain unchanged.
 #[tauri::command]
-pub fn history_save(app: AppHandle, contents: String) -> Result<(), String> {
-    let path = history_path(&app)?;
-    let tmp = path.with_extension("json.tmp");
-    fs::write(&tmp, contents.as_bytes()).map_err(|e| format!("write history.json.tmp: {e}"))?;
-    fs::rename(&tmp, &path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        format!("rename history.json.tmp: {e}")
-    })?;
-    Ok(())
+pub async fn history_save(app: AppHandle, contents: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = history_path(&app)?;
+        #[cfg(target_os = "macos")]
+        {
+            let keys = keychain::SystemKeys::new()?;
+            encrypted::Store::new(path.parent().ok_or("Invalid history directory")?, &keys)
+                .save(&contents)
+        }
+        #[cfg(not(target_os = "macos"))]
+        plain::save(&path, &contents)
+    })
+    .await
+    .map_err(|_| "History save worker failed".to_string())?
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    fn temp_dir() -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("voxloom-history-test-{nanos}"))
+#[cfg(target_os = "macos")]
+pub(crate) fn backup_history(dir: &std::path::Path) -> Result<Option<PathBuf>, String> {
+    if !dir.exists() {
+        return Ok(None);
     }
-
-    #[test]
-    fn atomic_save_round_trip() {
-        let dir = temp_dir();
-        let _ = fs::remove_dir_all(&dir);
-        fs::create_dir_all(&dir).unwrap();
-        let path = dir.join(HISTORY_FILE_NAME);
-        let tmp = path.with_extension("json.tmp");
-        let body = "{\"version\":1,\"records\":[]}\n";
-        fs::write(&tmp, body).unwrap();
-        fs::rename(&tmp, &path).unwrap();
-        assert_eq!(fs::read_to_string(&path).unwrap(), body);
-        let _ = fs::remove_dir_all(&dir);
-    }
+    let keys = keychain::SystemKeys::new()?;
+    encrypted::Store::new(dir, &keys).backup()
 }
