@@ -26,7 +26,7 @@ See [Privacy](PRIVACY.md) before working with real user data, and follow the
 The parent app requires macOS 13.1 or later. Its system WKWebView needs the
 WebKit features available with Safari 16.2, including `color-mix()`, `:has()`,
 `Array.prototype.at()` and `inert`. The minimum is declared in
-`src-tauri/tauri.conf.json`.
+`src-tauri/tauri.conf.json` → `bundle.macOS.minimumSystemVersion`.
 
 Install Rust, the macOS/Xcode build tools and CMake. To run the desktop shell
 without real Whisper linkage:
