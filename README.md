@@ -3,6 +3,10 @@
 Local dictation for macOS. Speak with a keyboard shortcut and put the text into
 the app you're using, without sending your audio to a cloud transcription service.
 
+![Voxloom guided setup showing Microphone and Accessibility access, shortcut selection, and first-dictation practice.](docs/images/voxloom-preview.png)
+
+*Guided setup in a production browser preview. Dictation requires the desktop app.*
+
 [Download for macOS](https://github.com/voxloom-app/voxloom/releases/latest)
 · [Release notes](https://github.com/voxloom-app/voxloom/releases)
 · [Privacy](PRIVACY.md)
@@ -76,6 +80,7 @@ and clipboard details.
 The app uses Tauri, React/TypeScript and Rust, with a Swift helper for Parakeet.
 
 - [Contributing](CONTRIBUTING.md): local setup, builds, checks and releases.
+- [Coding guidance](AGENTS.md): repository orientation and behavior contracts for coding assistants.
 - [Models and word dictionary](docs/models.md): model choices, downloads and recognition behavior.
 - [Dictation and insertion](docs/dictation.md): targeting, delivery and recovery.
 - [Architecture decisions](docs/decisions/): design rationale and historical implementation notes.
