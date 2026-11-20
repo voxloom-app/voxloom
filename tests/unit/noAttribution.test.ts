@@ -41,8 +41,8 @@ describe('no personal attribution (BUS-75 / BUS-80)', () => {
     expect(hits).toEqual([]);
   });
 
-  it('README sentences end with a period', () => {
-    const readme = readFileSync('README.md', 'utf8');
-    expect(readme).toContain('bundle.macOS.minimumSystemVersion`.');
+  it('contributor platform requirement ends with a period', () => {
+    const contributing = readFileSync('CONTRIBUTING.md', 'utf8');
+    expect(contributing).toContain('bundle.macOS.minimumSystemVersion`.');
   });
 });
