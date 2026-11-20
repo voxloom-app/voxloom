@@ -108,7 +108,7 @@ fn backup_store(app: &AppHandle, store: &str) -> Result<Option<String>, String> 
         .path()
         .app_data_dir()
         .map_err(|e| format!("app data dir: {e}"))?;
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     if store == "history" {
         return Ok(crate::history::backup_history(&dir)?.map(|p| p.to_string_lossy().into_owned()));
     }

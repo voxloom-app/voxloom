@@ -6,6 +6,12 @@ use std::{
 };
 
 const DOCUMENT: &str = r#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207","rawText":"RAW-CANARY-BUS207","metadata":"META-CANARY-BUS207"}]}"#;
+fn scratch() -> PathBuf {
+    std::env::var_os("TMPDIR")
+        .map(PathBuf::from)
+        .or_else(|| cfg!(target_os = "windows").then(std::env::temp_dir))
+        .expect("tests require an explicit synthetic scratch TMPDIR on macOS")
+}
 #[derive(Default)]
 struct FakeKeys(RefCell<Option<Vec<u8>>>);
 impl KeyOps for FakeKeys {
@@ -23,9 +29,7 @@ struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(0);
-        let base =
-            std::env::var_os("TMPDIR").expect("tests require an explicit synthetic scratch TMPDIR");
-        let dir = PathBuf::from(base).join(format!(
+        let dir = scratch().join(format!(
             "history-encryption-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
@@ -35,7 +39,14 @@ impl Fixture {
     }
     fn assert_no_canaries(&self) {
         for e in fs::read_dir(&self.0).unwrap() {
-            let data = fs::read(e.unwrap().path()).unwrap();
+            let path = e.unwrap().path();
+            if path.file_name().unwrap() == "history.lock" {
+                // Windows byte-range locks prohibit reading via another
+                // handle, even in the owning process. This file is empty.
+                assert_eq!(fs::metadata(&path).unwrap().len(), 0);
+                continue;
+            }
+            let data = fs::read(path).unwrap();
             for canary in [
                 "FINAL-CANARY-BUS207",
                 "RAW-CANARY-BUS207",
@@ -74,6 +85,150 @@ fn missing_key_never_reprovisions_for_encrypted_artifacts() {
         assert!(store.save(DOCUMENT).is_err(), "missing key must block save");
         assert!(keys.0.borrow().is_none(), "must not add a replacement key");
         assert_eq!(fs::read(f.0.join(name)).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn case_variant_ciphertext_inventory_never_reprovisions() {
+    for name in [
+        "HISTORY.JSON",
+        "HiStOrY.JsOn",
+        "HISTORY.JSON.TMP",
+        "HiStOrY.JsOn.TmP",
+        "HISTORY.JSON.UNREADABLE-1-2.BAK",
+        "HiStOrY.JsOn.UnReAdAbLe-1-2.BaK",
+        "HISTORY.JSON.ENCRYPTED-STALE.TMP",
+        "HiStOrY.JsOn.EnCrYpTeD-StAlE.TmP",
+    ] {
+        let f = Fixture::new();
+        let keys = FakeKeys::default();
+        let store = Store::new(&f.0, &keys);
+        store.save(DOCUMENT).unwrap();
+        fs::rename(f.0.join(PRIMARY), f.0.join(name)).unwrap();
+        assert!(fs::read_dir(&f.0)
+            .unwrap()
+            .any(|e| e.unwrap().file_name() == name));
+        let before = fs::read(f.0.join(name)).unwrap();
+        *keys.0.borrow_mut() = None;
+        for result in [store.load().map(|_| ()), store.save(DOCUMENT)] {
+            assert!(result.unwrap_err().contains("key missing"), "{name}");
+            assert!(keys.0.borrow().is_none(), "replacement key for {name}");
+            assert_eq!(fs::read(f.0.join(name)).unwrap(), before, "{name}");
+        }
+        f.assert_no_canaries();
+    }
+}
+
+#[test]
+fn case_variant_legacy_files_migrate_losslessly_without_plaintext() {
+    for [primary, tmp, archive] in [
+        [
+            "HISTORY.JSON",
+            "HISTORY.JSON.TMP",
+            "HISTORY.JSON.UNREADABLE-1-2.BAK",
+        ],
+        [
+            "HiStOrY.JsOn",
+            "HiStOrY.JsOn.TmP",
+            "HiStOrY.JsOn.UnReAdAbLe-1-2.BaK",
+        ],
+    ] {
+        let f = Fixture::new();
+        let keys = FakeKeys::default();
+        let store = Store::new(&f.0, &keys);
+        let raw = b"RAW-CANARY-BUS207\xff\0";
+        fs::write(f.0.join(primary), DOCUMENT).unwrap();
+        fs::write(f.0.join(tmp), DOCUMENT).unwrap();
+        fs::write(f.0.join(archive), raw).unwrap();
+        assert_eq!(store.load().unwrap().as_deref(), Some(DOCUMENT));
+        assert!(!f.0.join(tmp).exists(), "legacy tmp was not quarantined");
+        let migrated = fs::read(f.0.join(archive)).unwrap();
+        assert_eq!(
+            open(keys.0.borrow().as_ref().unwrap(), &migrated).unwrap(),
+            raw
+        );
+        let first_backup = store.backup().unwrap().unwrap();
+        let renamed = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9-2.BaK");
+        fs::rename(first_backup, &renamed).unwrap();
+        assert_eq!(store.backup().unwrap().unwrap(), renamed);
+        store.save(DOCUMENT).unwrap();
+        assert_eq!(fs::read(f.0.join(archive)).unwrap(), migrated);
+        assert!(fs::read_dir(&f.0)
+            .unwrap()
+            .any(|e| e.unwrap().file_name() == primary));
+        assert_eq!(store.load().unwrap().as_deref(), Some(DOCUMENT));
+        f.assert_no_canaries();
+    }
+}
+
+#[test]
+fn case_variant_staging_requires_ciphertext_before_any_migration() {
+    for name in [
+        "HISTORY.JSON.ENCRYPTED-STALE.TMP",
+        "HiStOrY.JsOn.EnCrYpTeD-StAlE.TmP",
+    ] {
+        for has_key in [false, true] {
+            let f = Fixture::new();
+            let keys = FakeKeys(RefCell::new(has_key.then(|| vec![7; 32])));
+            let store = Store::new(&f.0, &keys);
+            fs::write(f.0.join(name), DOCUMENT).unwrap();
+            assert!(store.load().is_err(), "{name}/{has_key}");
+            assert!(store.save(DOCUMENT).is_err(), "{name}/{has_key}");
+            assert_eq!(keys.0.borrow().is_some(), has_key);
+            assert_eq!(fs::read(f.0.join(name)).unwrap(), DOCUMENT.as_bytes());
+            assert!(!f.0.join(PRIMARY).exists());
+        }
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+        let store = Store::new(&f.0, &keys);
+        let ciphertext = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+        fs::write(f.0.join(name), &ciphertext).unwrap();
+        assert_eq!(store.load().unwrap(), None, "staging must not be restored");
+        store.save(DOCUMENT).unwrap();
+        assert_eq!(fs::read(f.0.join(name)).unwrap(), ciphertext);
+        f.assert_no_canaries();
+    }
+}
+
+#[test]
+fn case_variant_unknown_or_unsafe_artifacts_fail_closed() {
+    for name in [
+        "HISTORY.JSON",
+        "HiStOrY.JsOn",
+        "HISTORY.JSON.TMP",
+        "HiStOrY.JsOn.TmP",
+        "HISTORY.JSON.UNREADABLE-1-2.BAK",
+        "HiStOrY.JsOn.UnReAdAbLe-1-2.BaK",
+        "HISTORY.JSON.ENCRYPTED-STALE.TMP",
+        "HiStOrY.JsOn.EnCrYpTeD-StAlE.TmP",
+    ] {
+        for has_key in [false, true] {
+            let f = Fixture::new();
+            let keys = FakeKeys(RefCell::new(has_key.then(|| vec![7; 32])));
+            let store = Store::new(&f.0, &keys);
+            let raw = br#"{"format":"voxloom-history-encrypted","envelopeVersion":99}"#;
+            fs::write(f.0.join(name), raw).unwrap();
+            assert!(store.load().is_err(), "{name}/{has_key}");
+            assert!(store.save(DOCUMENT).is_err(), "{name}/{has_key}");
+            assert_eq!(keys.0.borrow().is_some(), has_key);
+            assert_eq!(fs::read(f.0.join(name)).unwrap(), raw);
+        }
+        for directory in [false, true] {
+            let f = Fixture::new();
+            let keys = FakeKeys::default();
+            let victim = f.0.join("unrelated.txt");
+            fs::write(&victim, DOCUMENT).unwrap();
+            if directory {
+                fs::create_dir(f.0.join(name)).unwrap();
+            } else {
+                fs::hard_link(&victim, f.0.join(name)).unwrap();
+            }
+            let store = Store::new(&f.0, &keys);
+            assert!(store.load().is_err(), "unsafe {name}");
+            assert!(store.save(DOCUMENT).is_err(), "unsafe {name}");
+            assert!(keys.0.borrow().is_none());
+            assert_eq!(fs::read(&victim).unwrap(), DOCUMENT.as_bytes());
+        }
     }
 }
 
@@ -514,6 +669,7 @@ fn unknown_archives_and_staging_block_load_and_save_without_mutation() {
 
 #[test]
 fn planted_nonregular_history_artifacts_are_never_followed_or_overwritten() {
+    #[cfg(unix)]
     for name in [
         PRIMARY,
         "history.json.tmp",
@@ -541,6 +697,58 @@ fn planted_nonregular_history_artifacts_are_never_followed_or_overwritten() {
     fs::hard_link(&victim, f.0.join(PRIMARY)).unwrap();
     assert!(Store::new(&f.0, &keys).load().is_err());
     assert_eq!(fs::read_to_string(victim).unwrap(), DOCUMENT);
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn planted_windows_junction_artifacts_are_rejected_without_touching_target() {
+    for name in [
+        PRIMARY,
+        "history.json.tmp",
+        "history.json.unreadable-1.bak",
+        "history.json.encrypted-stale.tmp",
+        "history.lock",
+    ] {
+        let f = Fixture::new();
+        let victim = f.0.join("unrelated-directory");
+        fs::create_dir(&victim).unwrap();
+        fs::write(victim.join("canary"), b"unrelated bytes").unwrap();
+        // Directory junctions do not require Developer Mode/symlink privilege.
+        // Fail the test if the synthetic reparse fixture cannot be created.
+        let status = std::process::Command::new("cmd")
+            .args(["/c", "mklink", "/J"])
+            .arg(f.0.join(name))
+            .arg(&victim)
+            .output()
+            .unwrap();
+        assert!(status.status.success(), "junction fixture: {:?}", status);
+        let keys = FakeKeys::default();
+        assert!(Store::new(&f.0, &keys).load().is_err());
+        assert!(Store::new(&f.0, &keys).save(DOCUMENT).is_err());
+        assert_eq!(fs::read(victim.join("canary")).unwrap(), b"unrelated bytes");
+        fs::remove_dir(f.0.join(name)).unwrap();
+    }
+}
+
+#[test]
+fn native_create_only_publication_preserves_collision_and_replacement_is_readable() {
+    let f = Fixture::new();
+    let from = f.0.join("new");
+    let to = f.0.join("existing");
+    fs::write(&from, b"new bytes").unwrap();
+    fs::write(&to, b"winner").unwrap();
+    assert!(native_fs::create_new(&to).is_err());
+    assert_eq!(
+        native_fs::publish(&from, &to, false).unwrap_err().kind(),
+        ErrorKind::AlreadyExists
+    );
+    assert_eq!(fs::read(&to).unwrap(), b"winner");
+    assert_eq!(fs::read(&from).unwrap(), b"new bytes");
+    native_fs::publish(&from, &to, true).unwrap();
+    native_fs::sync_publication(&f.0, &to).unwrap();
+    native_fs::open_regular(&to, false).unwrap();
+    assert_eq!(fs::read(&to).unwrap(), b"new bytes");
+    assert!(!from.exists());
 }
 
 #[test]
@@ -640,11 +848,12 @@ fn assert_deduplicated_archive_retry_fence(
     let archives: Vec<_> = fs::read_dir(&f.0)
         .unwrap()
         .map(|e| e.unwrap().path())
-        .filter(|p| backup_name(&p.file_name().unwrap().to_string_lossy()))
+        .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
         .collect();
     assert_eq!(archives.len(), 1);
-    let archive = &archives[0];
-    let before = fs::read(archive).unwrap();
+    let archive = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9-2.BaK");
+    fs::rename(&archives[0], &archive).unwrap();
+    let before = fs::read(&archive).unwrap();
     if encrypted_marker(original) {
         assert_eq!(before, original);
     } else {
@@ -671,7 +880,7 @@ fn assert_deduplicated_archive_retry_fence(
     let mut restarted = Store::new(&f.0, &keys);
     restarted.io_fault = Some(&retry_hook);
     let replacement = r#"{"version":2,"records":[]}"#;
-    let result = if source_name == PRIMARY {
+    let result = if source_name.eq_ignore_ascii_case(PRIMARY) {
         restarted.save(replacement)
     } else {
         restarted.load().map(|v| assert_eq!(v, None))
@@ -693,7 +902,7 @@ fn assert_deduplicated_archive_retry_fence(
     } else {
         result.unwrap();
         assert_eq!(&stages.borrow()[..2], ["sync", "directory-sync"]);
-        if source_name == PRIMARY {
+        if source_name.eq_ignore_ascii_case(PRIMARY) {
             assert_eq!(
                 document(&[7; 32], &fs::read(&source).unwrap()).unwrap(),
                 replacement.as_bytes()
@@ -704,14 +913,14 @@ fn assert_deduplicated_archive_retry_fence(
         }
     }
     assert_eq!(
-        fs::read(archive).unwrap(),
+        fs::read(&archive).unwrap(),
         before,
         "reuse must not rewrite the archive"
     );
     assert_eq!(
         fs::read_dir(&f.0)
             .unwrap()
-            .filter(|e| backup_name(&e.as_ref().unwrap().file_name().to_string_lossy()))
+            .filter(|e| artifact_kind(&e.as_ref().unwrap().path()) == Some(ArtifactKind::Backup))
             .count(),
         1
     );
@@ -743,6 +952,22 @@ fn deduplicated_archive_retry_fence_failures_leave_sources_intact() {
     ] {
         for stage in ["sync", "directory-sync"] {
             assert_deduplicated_archive_retry_fence(source, original, Some(stage));
+        }
+    }
+}
+
+#[test]
+fn case_variant_duplicate_archives_retain_retry_fences() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for (source, bytes) in [
+        ("HISTORY.JSON", DOCUMENT.as_bytes()),
+        ("HiStOrY.JsOn", DOCUMENT.as_bytes()),
+        ("HISTORY.JSON.TMP", DOCUMENT.as_bytes()),
+        ("HiStOrY.JsOn.TmP", DOCUMENT.as_bytes()),
+        ("HiStOrY.JsOn.TmP", encrypted.as_slice()),
+    ] {
+        for failure in [None, Some("sync"), Some("directory-sync")] {
+            assert_deduplicated_archive_retry_fence(source, bytes, failure);
         }
     }
 }
@@ -846,7 +1071,7 @@ fn lock_process_helper() {
         return;
     };
     let dir = PathBuf::from(dir);
-    let scratch = PathBuf::from(std::env::var_os("TMPDIR").expect("explicit synthetic scratch"));
+    let scratch = scratch();
     assert!(dir.starts_with(&scratch));
     let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
     fs::write(dir.join("child-ready"), b"ready").unwrap();
@@ -883,6 +1108,7 @@ fn binary_fields_are_strict_and_preservation_role_cannot_become_active() {
 }
 
 #[test]
+#[cfg(unix)]
 fn new_primary_archives_and_staging_have_private_modes() {
     use std::os::unix::fs::PermissionsExt;
     let f = Fixture::new();
@@ -957,11 +1183,14 @@ fn create_publication_never_leaves_a_double_link_crash_window() {
     let mut store = Store::new(&f.0, &keys);
     let check = |at: &str| {
         if at == "new-published" {
-            assert_eq!(
-                fs::metadata(f.0.join(PRIMARY)).unwrap().nlink(),
-                1,
-                "published history must not depend on unlinking a second name to become readable"
-            );
+            // The native regular-file adapter rejects multi-linked files on
+            // both platforms, including this immediate publication checkpoint.
+            native_fs::open_regular(&f.0.join(PRIMARY), false).unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                assert_eq!(fs::metadata(f.0.join(PRIMARY)).unwrap().nlink(), 1);
+            }
         }
         Ok(())
     };

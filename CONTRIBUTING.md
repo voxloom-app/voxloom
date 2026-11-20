@@ -172,10 +172,10 @@ encryption envelope. Any change to these stores must stay backwards compatible:
 Why: BUS-42. A history file saved in a newer sibling version by an unmerged branch was
 rejected as unreadable, and History came up empty.
 
-## macOS history encryption and recovery
+## History encryption and recovery
 
 `history_load`, `history_save` and `store_backup({ store: 'history' })` keep
-their IPC contract. The macOS native boundary encrypts the entire serialized
+their IPC contract. The shared macOS/Windows native boundary encrypts the entire serialized
 history document using ring AES-256-GCM. The outer JSON has `format` =
 `voxloom-history-encrypted`, `envelopeVersion` = 1, `algorithm` = `AES-256-GCM`,
 `role` (`history` or `preservation`), a base64 12-byte nonce, and base64
@@ -187,7 +187,7 @@ Inner history v1/v2, retention, settings hydration and error gates are unchanged
 
 Each seal uses a fresh OS-random 96-bit nonce under a random 256-bit key: a
 probabilistic bounded-volume policy, not a deterministic uniqueness guarantee.
-Key bytes are never stored beside history. The dedicated file-Keychain generic
+Raw key bytes are never stored beside history. On macOS, the dedicated file-Keychain generic
 password uses service `com.voxloom.prototype.history`, account `encryption-key`,
 and the default file Keychain resolved once for matching read/add operations.
 The adapter uses restricted lookup and **add-only** creation; do not substitute
@@ -195,13 +195,37 @@ The adapter uses restricted lookup and **add-only** creation; do not substitute
 Read back and validate the persisted key before encrypting. Missing keys with
 ciphertext/unknown encrypted artifacts must never trigger reprovisioning.
 
+Windows stores a per-directory key in `history.key.dpapi`, with a versioned
+outer header, bounded blob and unkeyed corruption checksum, and a current-user
+DPAPI-protected inner domain/key/SHA-256 payload. The checksum is not a same-user
+authentication boundary. `CryptProtectData`/`CryptUnprotectData` use UI-forbidden flags, never
+machine-wide scope. Validate the full decrypted payload, not a particular
+tamper error code. Clear and `LocalFree` native outputs on every exit. Publish
+the protected blob add-only, flush and read back the persistent winner before
+using it; never recreate a missing key when any encrypted artifact survives.
+This is user-account protection, not an app ACL or a same-user malware boundary.
+
 Native transactions use an OS-backed `history.lock`, revalidate the current
-source/schema and run filesystem/Keychain work on blocking workers, not the UI
-thread. New same-directory staging is exclusive, 0600 and ciphertext-only;
-verify, sync and publish atomically. A post-publication directory-sync failure
+source/schema and run filesystem/protected-key work on blocking workers, not the UI
+thread. New same-directory staging is exclusive and ciphertext-only (0600 on
+macOS; inherited user app-data ACLs on Windows). Reject nonregular files,
+reparse/symlink artifacts and hard links using opened-handle information.
+Verify, sync and publish atomically. A post-publication persistence failure
 means changed-but-durability-uncertain, not "nothing changed." The lock orders
 cooperating app processes; this is not protection from arbitrary same-user
 malware changing files concurrently.
+
+Keep native adapters separate from the shared codec/migration state machine.
+macOS retains exclusive `renamex_np` publication and directory `fsync`.
+Windows uses same-directory `MoveFileExW` (no copy fallback), with replacement
+only when intended, and reopens the published regular file for a writable
+`FlushFileBuffers` data/metadata fence. `MOVEFILE_WRITE_THROUGH` is not itself
+a general directory `fsync`; explicit flushes also run before deduplicated
+archive reuse and persisted-key use. Propagate unsupported/access/sharing/flush
+errors. Windows does not promise durable deletion of a legacy tmp directory
+entry or whole-volume power-loss recovery; a resurrected tmp must be migrated
+again, never restored as active history. See Microsoft's File Caching and
+CreateFileW/FlushFileBuffers/MoveFileExW API documentation for these boundaries.
 
 Before a supported plaintext primary is rewritten, preserve its original bytes
 in an encrypted archive. Migrate owned numeric `history.json.unreadable-*.bak`
@@ -209,18 +233,23 @@ names independently and restartably, including corrupt/non-UTF8 contents.
 Quarantine legacy `history.json.tmp` before removing it; never restore stale
 staging or archives. Normal retention/Off/delete does not prune archival copies
 or delete their key. Unknown ciphertext stays opaque; a backup is never permission
-to overwrite unreadable history. Recovery requires the original usable Keychain
+to overwrite unreadable history. Recovery requires the original usable protected
 key; do not advise key deletion, automatic reset or speculative restoration.
-See [Privacy](PRIVACY.md#transcript-encryption-on-macos) for limitations.
+See [Privacy](PRIVACY.md#transcript-encryption-on-macos-and-windows) for limitations.
 
-Windows/Linux explicitly retain existing plaintext storage; there is no macOS
-plaintext fallback. Dictionary/settings encryption is out of scope. Tests inject
-synthetic key operations while compiling the real adapter; never run them against
-personal data or the real Keychain. Use a disposable explicit `TMPDIR` for storage
-tests. The encrypted fixture uses a public synthetic `[7; 32]` key and decrypts to
+Linux explicitly retains existing plaintext storage; macOS and Windows have no
+plaintext fallback. Dictionary/settings encryption is out of scope. Shared tests
+inject synthetic key operations and execute on both native platforms. Windows
+also tests actual current-user DPAPI against owned synthetic directories,
+persisted-key restart/reuse, tamper/loss/access failure, migration and canaries.
+Never run tests against personal data or the real macOS Keychain. Use a disposable
+explicit `TMPDIR` on macOS; Windows tests create owned fixtures in its temp directory.
+The encrypted fixture uses a public synthetic `[7; 32]` key and decrypts to
 the existing v2 fixture. Signed-app Keychain approval and upgrade trust continuity
 need a separately authorized isolated native acceptance check; unit tests do not
 establish them.
+Native Windows CI compilation/tests are required separately from macOS checks;
+neither proves Windows GUI behavior or actual power-loss recovery.
 
 ## Releases
 

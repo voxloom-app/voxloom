@@ -1,4 +1,4 @@
-//! Existing Windows/Linux behavior, deliberately not a macOS fallback.
+//! Existing Linux/other-platform behavior, not a macOS/Windows fallback.
 use std::{fs, path::Path};
 
 pub(super) fn load(path: &Path) -> Result<Option<String>, String> {

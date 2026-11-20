@@ -8,19 +8,22 @@ or the optional local cleanup model (see
 immutable Hugging Face revision, and the app checks the file's exact size and
 SHA-256 before saving it; a mismatch saves nothing.
 
-## Transcript encryption on macOS
+## Transcript encryption on macOS and Windows
 
-The macOS desktop app encrypts the **whole durable history document** with
+The macOS and Windows desktop apps encrypt the **whole durable history document** with
 AES-256-GCM, including final and raw transcript text, cleanup provenance,
 status, duration, model, timestamps and delivery outcomes. Recorded audio is
 never saved. History, Home, Copy and retention still operate on decrypted data
 in the running app's memory.
 
-The app data folder contains:
+The app data folder contains the files below. On macOS it is
+`~/Library/Application Support/com.voxloom.prototype/`; on Windows, use the
+application's app-data directory under your user profile (not the install folder).
 
 ```text
 ~/Library/Application Support/com.voxloom.prototype/
-├── history.json      authenticated encrypted history envelope on macOS
+├── history.json      authenticated encrypted history envelope
+├── history.key.dpapi  Windows only: versioned current-user DPAPI-protected key
 ├── history.json.unreadable-*.bak  preserved history originals (see below)
 ├── history.json.encrypted-*.tmp   ciphertext-only staging, if interrupted
 ├── history.lock      transaction lock; no transcript/key content
@@ -31,15 +34,15 @@ The app data folder contains:
 └── cleanup-models/   downloaded local cleanup model; no user data
 ```
 
-**Windows and Linux retain their existing unencrypted JSON History storage.**
-This macOS encryption change does not protect their transcripts. Settings,
-dictionary words and their backups also remain plaintext on macOS. Other
+**Linux retains its existing unencrypted JSON History storage.** This change
+does not protect Linux transcripts. Settings, dictionary words and their
+backups remain plaintext on all platforms. Other
 processes running as your user, or tools copying your home folder, can read
 those unencrypted files.
 
 ### Key protection and limits
 
-The random history key is kept in a dedicated generic-password item in the
+On macOS, the random history key is kept in a dedicated generic-password item in the
 user's default **file-based macOS Keychain**, with the ordinary creating-app
 access policy. It is not synchronized by Voxloom. macOS may request approval
 when a different app build tries to access it. Voxloom never replaces an
@@ -53,13 +56,29 @@ all same-user malware. Decrypted transcripts remain in app memory; text you
 copy or insert into another app is outside this storage boundary. Signing and
 upgrade identity can affect Keychain approval behavior.
 
+On Windows, a separate random 256-bit key per app-data directory is stored
+only as a versioned **current-user DPAPI-protected blob** beside history. The
+raw key is never written to a file. Provisioning is add-only and the persisted
+winner is read back and validated before any history ciphertext is written.
+There are no prompts, machine-wide protection, plaintext fallback or automatic
+replacement of a lost/corrupt key while encrypted artifacts remain.
+
+DPAPI protects at rest under your Windows account, **not exclusively for this
+app**: another process already running as your user can unprotect the key.
+This is not protection from same-user malware, biometric protection, or a
+cross-machine/roaming recovery promise. Copying encrypted files to another
+machine/account is not an export/import feature. Keep the protected key blob
+with recoverable files; restoring it still requires a usable original DPAPI
+user environment. Neither platform offers a general encrypted-history export.
+
 A missing, inaccessible or invalid key, failed authentication, unsafe file,
 or unknown encrypted format blocks durable history loading/writing. Existing
 frontend settings/read-error gates remain in force, so dictations can remain
 memory-only while storage is unavailable. Files are preserved; there is no
 automatic reset or archive restoration. **Recovery needs the original usable
-Keychain key.** A file backup alone is not sufficient. Do not delete or replace
-the Keychain item as a troubleshooting step. Keep recoverable files and seek
+protected key** (the macOS Keychain item or Windows DPAPI blob and user
+environment). History-file backups alone are not sufficient. Do not delete or
+replace the key as a troubleshooting step. Keep recoverable files and seek
 help if access cannot be restored.
 
 ### Upgrade and archival backups
@@ -82,6 +101,14 @@ unreadable, unknown or unsafe artifact causes an error/incomplete protection;
 its original stays in place and may still be plaintext. No automatic process
 can retroactively encrypt external backups or old sync copies.
 
+Windows uses same-directory native rename plus explicit file-data/metadata
+flushes, including when reusing a previously published archive or key. Flush
+failures stop migration rather than authorizing source removal. This is not a
+portable directory-fsync or whole-volume power-loss guarantee: an interrupted
+legacy temporary-file deletion may reappear and require migration again.
+No storage backend can promise physical media persistence if the device or
+filesystem does not honor flushes; actual power-loss behavior is not tested.
+
 History archives can contain raw and final text, metadata, deleted rows and
 expired transcripts. **Retention and row deletion do not prune archives.**
 Settings/dictionary upgrade and unreadable-file backups are still byte-exact
@@ -92,7 +119,7 @@ plaintext copies, separate from these history rules.
 - **One transcript:** History → the row's **Delete transcript** (trash) button.
 - **All durable transcripts, and stop keeping new ones:** Settings → Privacy →
   **Transcript retention → Off** rewrites the active history with no records
-  (encrypted on macOS). Already-loaded transcripts remain visible in History
+  (encrypted on macOS and Windows). Already-loaded transcripts remain visible in History
   and Home, in memory only, until restart. Off does not delete the history key
   or archives. If settings/history cannot be read, the existing error gate
   prevents this rewrite; it must not erase unavailable history.
@@ -109,7 +136,7 @@ plaintext copies, separate from these history rules.
 File removal does not erase copies captured by Time Machine, other backup or
 sync tools, nor promise forensic erasure on SSDs. Encryption cannot retract
 transcripts already copied or inserted elsewhere. For the format and recovery
-invariants, see [Contributing](CONTRIBUTING.md#macos-history-encryption-and-recovery).
+invariants, see [Contributing](CONTRIBUTING.md#history-encryption-and-recovery).
 
 ## Accessibility
 
