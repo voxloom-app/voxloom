@@ -3,9 +3,9 @@
 Local dictation for macOS. Speak with a keyboard shortcut and put the text into
 the app you're using, without sending your audio to a cloud transcription service.
 
-![Voxloom guided setup showing Microphone and Accessibility access, shortcut selection, and first-dictation practice.](docs/images/voxloom-preview.png)
+![Voxloom guided setup showing Microphone and Accessibility access, shortcut selection, and first-dictation practice.](docs/images/voxloom-desktop.png)
 
-*Guided setup in a production browser preview. Dictation requires the desktop app.*
+*Voxloom v0.5.0 guided setup on macOS.*
 
 [Download for macOS](https://github.com/voxloom-app/voxloom/releases/latest)
 · [Release notes](https://github.com/voxloom-app/voxloom/releases)
