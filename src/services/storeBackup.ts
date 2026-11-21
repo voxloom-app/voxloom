@@ -3,12 +3,22 @@ import { invoke } from '@tauri-apps/api/core';
 /** Store files that can be preserved before an unreadable file is replaced. */
 export type BackupStore = 'dictionary' | 'history' | 'settings';
 
+/** Optional context for a backup attempt; omission keeps explicit-backup semantics. */
+export interface BackupOptions {
+  /** Read failed before frontend parsing; never authorizes replacing the source. */
+  automaticReadError?: boolean;
+}
+
 /**
  * Copy the on-disk store file aside (Tauri `store_backup`). Resolves to the
- * backup path, or `null` when no file existed. Never modifies the original.
+ * backup path, or `null` for no file / a skipped automatic encrypted backup.
+ * Never modifies the original; a skip never authorizes replacing it.
  */
-export function tauriBackup(store: BackupStore): () => Promise<string | null> {
-  return () => invoke<string | null>('store_backup', { store });
+export function tauriBackup(store: BackupStore): (options?: BackupOptions) => Promise<string | null> {
+  return (options) => invoke<string | null>('store_backup', {
+    store,
+    ...(options?.automaticReadError ? { automaticReadError: true } : {}),
+  });
 }
 
 export type BackupOutcome =
@@ -17,11 +27,12 @@ export type BackupOutcome =
 
 /** Run an optional IO backup hook, never throwing. */
 export async function runBackup(
-  backup: (() => Promise<string | null>) | undefined,
+  backup: ((options?: BackupOptions) => Promise<string | null>) | undefined,
+  options?: BackupOptions,
 ): Promise<BackupOutcome> {
   if (!backup) return { error: 'no backup support', ok: false };
   try {
-    const path = await backup();
+    const path = await (options ? backup(options) : backup());
     // No file copied (vanished, not a regular file, unreadable dir): that
     // is not a backup, so nothing may be overwritten on its strength.
     if (!path) return { error: 'no file was backed up', ok: false };
