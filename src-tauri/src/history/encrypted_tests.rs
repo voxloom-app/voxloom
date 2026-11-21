@@ -572,42 +572,52 @@ fn automatic_read_error_does_not_archive_current_ciphertext_on_key_access_failur
 }
 
 #[test]
-fn automatic_read_error_preserves_malformed_unknown_and_auth_failed_sources() {
+fn automatic_read_error_skips_but_explicit_backup_preserves_malformed_unknown_and_auth_failed_sources(
+) {
     let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
-    let mut opaque = vec![
-        original[..original.len() - 5].to_vec(),
-        br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"ciphertext":"opaque"}"#
-            .to_vec(),
+    let mut sources = vec![
+        (original[..original.len() - 5].to_vec(), true),
+        (
+            br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"ciphertext":"opaque"}"#
+                .to_vec(),
+            false,
+        ),
     ];
-    for (field, value) in [
-        ("envelopeVersion", serde_json::json!(99)),
-        ("format", serde_json::json!("other")),
-        ("algorithm", serde_json::json!("other")),
-        ("nonce", serde_json::json!("bad")),
-        ("ciphertext", serde_json::json!("AAAA")),
-        ("role", serde_json::json!(PRESERVATION)),
-        ("unknownField", serde_json::json!(true)),
+    for (field, value, opaque) in [
+        ("envelopeVersion", serde_json::json!(99), true),
+        ("format", serde_json::json!("other"), false),
+        ("algorithm", serde_json::json!("other"), false),
+        ("nonce", serde_json::json!("bad"), false),
+        ("ciphertext", serde_json::json!("AAAA"), false),
+        ("role", serde_json::json!(PRESERVATION), true),
+        ("unknownField", serde_json::json!(true), false),
     ] {
         let mut value_json: serde_json::Value = serde_json::from_slice(&original).unwrap();
         value_json[field] = value;
-        opaque.push(serde_json::to_vec(&value_json).unwrap());
+        sources.push((serde_json::to_vec(&value_json).unwrap(), opaque));
     }
-    // These are structurally current: only real authentication/schema checking
-    // can distinguish them from healthy history when a key is available.
-    opaque.push(seal(&[8; 32], DOCUMENT.as_bytes()).unwrap());
-    opaque.push(seal(&[7; 32], br#"{"version":99,"records":[]}"#).unwrap());
-    for raw in opaque {
+    // Encoding recognition is not authentication or active-schema validation.
+    sources.push((seal(&[8; 32], DOCUMENT.as_bytes()).unwrap(), true));
+    sources.push((
+        seal(&[7; 32], br#"{"version":99,"records":[]}"#).unwrap(),
+        true,
+    ));
+    for (raw, opaque) in sources {
         let f = Fixture::new();
         let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
         let store = Store::new(&f.0, &keys);
         fs::write(f.0.join(PRIMARY), &raw).unwrap();
         assert!(store.load().is_err());
-        let first = store
-            .backup(true)
-            .unwrap()
-            .expect("damaged/unknown sources must not be skipped");
-        assert_eq!(fs::read(&first).unwrap(), raw);
-        assert_eq!(store.backup(true).unwrap().unwrap(), first);
+        assert_eq!(store.backup(true).unwrap(), None);
+        let first = store.backup(false).unwrap().unwrap();
+        let preserved = fs::read(&first).unwrap();
+        if opaque {
+            assert_eq!(preserved, raw);
+        } else {
+            assert_eq!(envelope(&preserved).unwrap().role, PRESERVATION);
+            assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
+        }
+        assert_eq!(store.backup(false).unwrap().unwrap(), first);
         assert!(store.save(DOCUMENT).is_err());
         assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
     }
@@ -625,20 +635,35 @@ fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verd
         }
     }
     let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
-    for raw in [
-        original[..original.len() - 5].to_vec(),
-        br#"{"format":"voxloom-history-encrypted","envelopeVersion":99}"#.to_vec(),
-        {
-            let mut v: serde_json::Value = serde_json::from_slice(&original).unwrap();
-            v["ciphertext"] = serde_json::json!("AAAA");
-            serde_json::to_vec(&v).unwrap()
-        },
+    for (raw, opaque) in [
+        (original[..original.len() - 5].to_vec(), true),
+        (
+            br#"{"format":"voxloom-history-encrypted","envelopeVersion":99}"#.to_vec(),
+            false,
+        ),
+        (
+            {
+                let mut v: serde_json::Value = serde_json::from_slice(&original).unwrap();
+                v["ciphertext"] = serde_json::json!("AAAA");
+                serde_json::to_vec(&v).unwrap()
+            },
+            false,
+        ),
     ] {
         let f = Fixture::new();
         let store = Store::new(&f.0, &Denied);
         fs::write(f.0.join(PRIMARY), &raw).unwrap();
-        let preserved = store.backup(true).unwrap().unwrap();
-        assert_eq!(fs::read(preserved).unwrap(), raw);
+        assert_eq!(store.backup(true).unwrap(), None);
+        if opaque {
+            let preserved = store.backup(false).unwrap().unwrap();
+            assert_eq!(fs::read(preserved).unwrap(), raw);
+        } else {
+            assert!(
+                store.backup(false).is_err(),
+                "ambiguous bytes require a usable key"
+            );
+            assert_eq!(store.artifacts().unwrap().len(), 1);
+        }
         assert!(store.load().is_err());
         assert!(store.save(DOCUMENT).is_err());
         assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
@@ -655,15 +680,16 @@ fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verd
     assert!(store.load().is_err());
     assert!(store.save(DOCUMENT).is_err());
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), original);
-    // Once a real key can be read, a known tag failure must be archived, not
-    // classified as healthy merely because the outer envelope is current.
+    // Once a real key can be read, explicit backup still preserves a known
+    // tag failure; the automatic context never claims an authentication verdict.
     *keys.0.borrow_mut() = Some(vec![8; 32]);
-    let preserved = store.backup(true).unwrap().unwrap();
+    assert_eq!(store.backup(true).unwrap(), None);
+    let preserved = store.backup(false).unwrap().unwrap();
     assert_eq!(fs::read(preserved).unwrap(), original);
 }
 
 #[test]
-fn automatic_read_error_preserves_legacy_bytes_and_does_not_hide_staging_failure() {
+fn automatic_read_error_skips_legacy_bytes_while_explicit_preservation_and_staging_fences_remain() {
     for raw in [
         DOCUMENT.as_bytes(),
         br#"{"version":1,"records":[]}"#,
@@ -673,7 +699,12 @@ fn automatic_read_error_preserves_legacy_bytes_and_does_not_hide_staging_failure
         let keys = FakeKeys::default();
         let store = Store::new(&f.0, &keys);
         fs::write(f.0.join(PRIMARY), raw).unwrap();
-        let path = store.backup(true).unwrap().unwrap();
+        assert_eq!(store.backup(true).unwrap(), None);
+        assert!(
+            keys.0.borrow().is_none(),
+            "automatic skip must not provision"
+        );
+        let path = store.backup(false).unwrap().unwrap();
         assert_eq!(
             open(keys.0.borrow().as_ref().unwrap(), &fs::read(path).unwrap()).unwrap(),
             raw
@@ -736,9 +767,11 @@ fn unknown_ciphertext_backup_is_opaque_and_never_authorizes_save() {
     }
     let f = Fixture::new();
     let store = Store::new(&f.0, &NoAccess);
-    let raw =
-        br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"ciphertext":"opaque"}"#;
-    fs::write(f.0.join(PRIMARY), raw).unwrap();
+    let mut future: serde_json::Value =
+        serde_json::from_slice(&seal(&[7; 32], DOCUMENT.as_bytes()).unwrap()).unwrap();
+    future["envelopeVersion"] = 99.into();
+    let raw = serde_json::to_vec(&future).unwrap();
+    fs::write(f.0.join(PRIMARY), &raw).unwrap();
     let path = store.backup(false).unwrap().unwrap();
     assert_eq!(fs::read(&path).unwrap(), raw);
     assert_eq!(store.backup(false).unwrap().unwrap(), path);
@@ -1991,6 +2024,311 @@ fn create_publication_never_leaves_a_double_link_crash_window() {
     };
     store.io_fault = Some(&check);
     store.save(DOCUMENT).unwrap();
+}
+
+#[derive(Default)]
+struct CountingKeys {
+    value: RefCell<Option<Vec<u8>>>,
+    reads: std::cell::Cell<usize>,
+    adds: std::cell::Cell<usize>,
+    denied: bool,
+}
+impl KeyOps for CountingKeys {
+    fn read(&self) -> Result<Option<Vec<u8>>, String> {
+        self.reads.set(self.reads.get() + 1);
+        if self.denied {
+            Err("synthetic protected-key failure".into())
+        } else {
+            Ok(self.value.borrow().clone())
+        }
+    }
+    fn add(&self, _: &[u8]) -> Result<(), String> {
+        self.adds.set(self.adds.get() + 1);
+        Err("unexpected provisioning".into())
+    }
+}
+
+#[test]
+fn ambiguous_marker_backup_requires_existing_key_and_never_publishes_plaintext() {
+    for raw in [
+        br#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207 voxloom-history-encrypted"#
+            .as_slice(),
+        br#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207 "envelopeVersion""#,
+    ] {
+        for value in [Some(vec![7; 32]), None, Some(vec![7; 31])] {
+            for denied in [false, true] {
+                let f = Fixture::new();
+                let keys = CountingKeys {
+                    value: RefCell::new(value.clone()),
+                    denied,
+                    ..Default::default()
+                };
+                let store = Store::new(&f.0, &keys);
+                fs::write(f.0.join("HiStOrY.JsOn"), raw).unwrap();
+                assert!(store.load().is_err());
+                let backup = store.backup(false);
+                if !denied && value.as_ref().is_some_and(|v| v.len() == 32) {
+                    let path = backup.unwrap().unwrap();
+                    let preserved = fs::read(&path).unwrap();
+                    assert_ne!(
+                        preserved, raw,
+                        "marker suspicion is not raw-backup permission"
+                    );
+                    assert_eq!(envelope(&preserved).unwrap().role, PRESERVATION);
+                    assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
+                    assert!(!preserved
+                        .windows(b"FINAL-CANARY-BUS207".len())
+                        .any(|w| w == b"FINAL-CANARY-BUS207"));
+                    assert_eq!(
+                        Store::new(&f.0, &keys).backup(false).unwrap().unwrap(),
+                        path
+                    );
+                } else {
+                    assert!(
+                        backup.is_err(),
+                        "unavailable key must refuse, not publish raw legacy bytes"
+                    );
+                    assert_eq!(store.artifacts().unwrap().len(), 1);
+                }
+                assert!(store.save(DOCUMENT).is_err());
+                assert_eq!(keys.adds.get(), 0);
+                assert_eq!(fs::read(f.0.join("HiStOrY.JsOn")).unwrap(), raw);
+            }
+        }
+    }
+}
+
+#[test]
+fn wrapped_preservation_never_reuses_an_identical_unvalidated_outer_archive() {
+    for raw in [
+        br#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207 voxloom-history-encrypted"#
+            .to_vec(),
+        seal(&[8; 32], DOCUMENT.as_bytes()).unwrap(),
+    ] {
+        let f = Fixture::new();
+        let keys = CountingKeys {
+            value: RefCell::new(Some(vec![7; 32])),
+            ..Default::default()
+        };
+        let store = Store::new(&f.0, &keys);
+        let archive = f.0.join("HiStOrY.JsOn.UnReAdAbLe-1.BaK");
+        fs::write(&archive, &raw).unwrap();
+        assert!(
+            store.preserve_bytes(Some(&[7; 32]), &raw, true).is_err(),
+            "byte equality cannot stand in for authenticated wrapped preservation"
+        );
+        assert_eq!(fs::read(&archive).unwrap(), raw);
+        assert_eq!(store.artifacts().unwrap().len(), 1);
+        assert!(store.load().is_err());
+        assert!(store.save(DOCUMENT).is_err());
+        assert_eq!(keys.adds.get(), 0);
+    }
+}
+
+#[test]
+fn automatic_read_error_is_key_read_free_after_actual_load_for_every_key_outcome() {
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let mut future: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    future["envelopeVersion"] = 99.into();
+    for raw in [
+        original.clone(),
+        seal(&[8; 32], DOCUMENT.as_bytes()).unwrap(),
+        serde_json::to_vec(&future).unwrap(),
+        original[..50].to_vec(),
+        br#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207 voxloom-history-encrypted"#
+            .to_vec(),
+    ] {
+        for value in [None, Some(vec![7; 32]), Some(vec![7; 31])] {
+            for denied in [false, true] {
+                let f = Fixture::new();
+                let keys = CountingKeys {
+                    value: RefCell::new(value.clone()),
+                    denied,
+                    ..Default::default()
+                };
+                let store = Store::new(&f.0, &keys);
+                fs::write(f.0.join(PRIMARY), &raw).unwrap();
+                let _loaded = store.load();
+                let reads = keys.reads.get();
+                assert_eq!(reads, 1);
+                assert_eq!(store.backup(true).unwrap(), None);
+                assert_eq!(
+                    keys.reads.get(),
+                    reads,
+                    "automatic backup retried protected-key IO"
+                );
+                assert_eq!(keys.adds.get(), 0);
+                assert_eq!(store.artifacts().unwrap().len(), 1);
+                assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+            }
+        }
+    }
+}
+
+#[test]
+fn unsupported_envelope_header_strings_are_not_raw_backup_permission() {
+    for field in ["algorithm", "role"] {
+        for available in [true, false] {
+            let f = Fixture::new();
+            let keys = CountingKeys {
+                value: RefCell::new(available.then(|| vec![7; 32])),
+                ..Default::default()
+            };
+            let store = Store::new(&f.0, &keys);
+            let mut value: serde_json::Value =
+                serde_json::from_slice(&seal(&[7; 32], DOCUMENT.as_bytes()).unwrap()).unwrap();
+            value[field] = "FINAL-CANARY-BUS207 voxloom-history-encrypted".into();
+            let raw = serde_json::to_vec(&value).unwrap();
+            fs::write(f.0.join(PRIMARY), &raw).unwrap();
+            assert!(store.load().is_err());
+            if available {
+                let backup = store.backup(false).unwrap().unwrap();
+                let preserved = fs::read(backup).unwrap();
+                assert_ne!(preserved, raw);
+                assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
+                assert!(!preserved
+                    .windows(b"FINAL-CANARY-BUS207".len())
+                    .any(|w| w == b"FINAL-CANARY-BUS207"));
+            } else {
+                assert!(store.backup(false).is_err());
+                assert_eq!(store.artifacts().unwrap().len(), 1);
+            }
+            assert_eq!(keys.adds.get(), 0);
+            assert!(store.save(DOCUMENT).is_err());
+            assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+        }
+    }
+}
+
+#[test]
+fn recognized_reordered_current_and_future_backups_never_grant_active_write_authority() {
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+    // serde_json::Value serializes its map in a different order than the writer.
+    let reordered = serde_json::to_vec_pretty(&value).unwrap();
+    assert_ne!(reordered, original);
+    let mut future = value;
+    future["envelopeVersion"] = 99.into();
+    let future = serde_json::to_vec_pretty(&future).unwrap();
+    for (raw, current) in [(reordered, true), (future, false)] {
+        for value in [
+            None,
+            Some(vec![7; 32]),
+            Some(vec![8; 32]),
+            Some(vec![7; 31]),
+        ] {
+            let f = Fixture::new();
+            let keys = CountingKeys {
+                value: RefCell::new(value.clone()),
+                ..Default::default()
+            };
+            let store = Store::new(&f.0, &keys);
+            fs::write(f.0.join("HiStOrY.JsOn"), &raw).unwrap();
+            let readable = current && value == Some(vec![7; 32]);
+            assert_eq!(store.load().is_ok(), readable);
+            let reads = keys.reads.get();
+            let first = store.backup(false).unwrap().unwrap();
+            assert_eq!(keys.reads.get(), reads, "opaque copy should not read a key");
+            assert_eq!(fs::read(&first).unwrap(), raw);
+            assert_eq!(store.backup(false).unwrap().unwrap(), first);
+            // Even a byte-exact opaque archive is not an authentication verdict.
+            // Use a fresh store: future or wrong/missing key remains refused.
+            if !readable {
+                assert!(Store::new(&f.0, &keys).save(DOCUMENT).is_err());
+            }
+            assert_eq!(keys.adds.get(), 0);
+            assert_eq!(fs::read(f.0.join("HiStOrY.JsOn")).unwrap(), raw);
+        }
+    }
+}
+
+#[test]
+fn ambiguous_marker_backup_retry_renews_durability_fences_without_source_loss() {
+    let raw = br#"{"version":2,"records":[{"text":"FINAL-CANARY-BUS207 voxloom-history-encrypted"#;
+    for failed_fence in ["sync", "directory-sync"] {
+        let f = Fixture::new();
+        let keys = CountingKeys {
+            value: RefCell::new(Some(vec![7; 32])),
+            ..Default::default()
+        };
+        fs::write(f.0.join(PRIMARY), raw).unwrap();
+        let mut first = Store::new(&f.0, &keys);
+        let fail_publication = |at: &str| {
+            if at == "directory-sync" {
+                Err("synthetic publication fence failure".into())
+            } else {
+                Ok(())
+            }
+        };
+        first.io_fault = Some(&fail_publication);
+        assert!(first.backup(false).is_err());
+        let archives: Vec<_> = first
+            .artifacts()
+            .unwrap()
+            .into_iter()
+            .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+            .collect();
+        assert_eq!(archives.len(), 1);
+        let archive = &archives[0];
+        let renamed = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9.BaK");
+        fs::rename(archive, &renamed).unwrap();
+        let preserved = fs::read(&renamed).unwrap();
+        assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
+        assert!(!preserved
+            .windows(b"FINAL-CANARY-BUS207".len())
+            .any(|w| w == b"FINAL-CANARY-BUS207"));
+        let observed = RefCell::new(Vec::new());
+        let fail_retry = |at: &str| {
+            observed.borrow_mut().push(at.to_owned());
+            if at == failed_fence {
+                Err("synthetic retry fence failure".into())
+            } else {
+                Ok(())
+            }
+        };
+        let mut retry = Store::new(&f.0, &keys);
+        retry.io_fault = Some(&fail_retry);
+        assert!(retry.backup(false).is_err());
+        assert!(observed.borrow().iter().any(|s| s == failed_fence));
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+        assert_eq!(fs::read(&renamed).unwrap(), preserved);
+        assert_eq!(
+            Store::new(&f.0, &keys).backup(false).unwrap().unwrap(),
+            renamed
+        );
+        assert!(Store::new(&f.0, &keys).save(DOCUMENT).is_err());
+        assert_eq!(keys.adds.get(), 0);
+    }
+}
+
+#[test]
+fn automatic_skip_does_not_swallow_unsafe_inventory_or_read_errors() {
+    for name in [
+        PRIMARY,
+        "HiStOrY.JsOn.UnReAdAbLe-1.BaK",
+        "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+    ] {
+        let f = Fixture::new();
+        let keys = CountingKeys::default();
+        if name != PRIMARY {
+            fs::write(
+                f.0.join(PRIMARY),
+                seal(&[7; 32], DOCUMENT.as_bytes()).unwrap(),
+            )
+            .unwrap();
+        }
+        fs::create_dir(f.0.join(name)).unwrap();
+        let store = Store::new(&f.0, &keys);
+        let load_error = store.load().unwrap_err();
+        let automatic_error = store.backup(true).unwrap_err();
+        let explicit_error = store.backup(false).unwrap_err();
+        assert_eq!(load_error, automatic_error);
+        assert_eq!(load_error, explicit_error);
+        assert!(load_error.contains("Cannot read history artifact"));
+        assert_eq!(keys.reads.get(), 0);
+        assert_eq!(keys.adds.get(), 0);
+        assert!(f.0.join(name).is_dir());
+    }
 }
 
 #[test]

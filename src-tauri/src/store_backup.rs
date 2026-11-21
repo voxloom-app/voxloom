@@ -94,7 +94,9 @@ pub(crate) fn backup_file(path: &Path, now_ms: u128) -> Result<Option<PathBuf>, 
 }
 
 /// Back up an unreadable store file. Returns the backup path, or `null`
-/// when there was no file or an automatic read-error copy was redundant.
+/// when there was no file or legacy automatic read-error context requested
+/// a deliberate non-authorizing history skip (without protected-key access).
+/// New history loaders do not issue automatic read-error backup requests.
 /// Omitted/false context retains explicit original-byte backup semantics.
 #[tauri::command]
 pub async fn store_backup(

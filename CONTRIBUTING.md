@@ -175,9 +175,11 @@ rejected as unreadable, and History came up empty.
 ## History encryption and recovery
 
 `history_load`, `history_save` and `store_backup({ store: 'history' })` keep
-their existing call/result contract. `store_backup` also accepts optional
-`automaticReadError: true` for a failed history read; omitted/false retains
-explicit backup semantics. The shared macOS/Windows native boundary encrypts the entire serialized
+their existing call/result contract. The deprecated optional
+`store_backup({ store: 'history', automaticReadError: true })` context deliberately
+skips copying without protected-key access after safe inventory/read; new history
+loaders do not issue that request. Omitted/false retains explicit backup semantics.
+The shared macOS/Windows native boundary encrypts the entire serialized
 history document using ring AES-256-GCM. The outer JSON has `format` =
 `voxloom-history-encrypted`, `envelopeVersion` = 1, `algorithm` = `AES-256-GCM`,
 `role` (`history` or `preservation`), a base64 12-byte nonce, and base64
@@ -239,7 +241,7 @@ in an encrypted archive. Migrate owned numeric `history.json.unreadable-*.bak`
 names independently and restartably, including corrupt/non-UTF8 contents.
 Quarantine legacy `history.json.tmp` before removing it; never restore stale
 staging or archives. Normal retention/Off/delete does not prune archival copies
-or delete their key. Unknown ciphertext stays opaque; a backup is never permission
+or delete their key. Recognized ciphertext may be copied opaquely; a backup is never permission
 to overwrite unreadable history. Recovery requires the original usable protected
 key; do not advise key deletion, automatic reset or speculative restoration.
 See [Privacy](PRIVACY.md#transcript-encryption-on-macos-and-windows) for limitations.
@@ -265,12 +267,22 @@ folder and seeking recovery help without deleting files or resetting the key.
 Do not imply folder-wide rollback when an earlier per-file migration committed.
 Diagnostics must not change recovery, deletion, format or key-provisioning policy.
 
-Automatic history-read-error backup context is non-authorizing. Authenticate and
-validate current ciphertext when its key is available; known authentication,
-schema, malformed and unknown-format failures retain preservation. If key access
-fails, strict current outer encoding may skip a redundant archive while leaving
-the original untouched; encoding alone never establishes authenticity or permits
-a write/reset. Explicit/migration/prune backups keep their original behavior.
+Keep conservative encrypted-artifact suspicion separate from raw-copy permission.
+Complete strictly encoded recognized envelopes (including future versions) and
+identifiable current-writer payload truncations can be copied opaquely; neither
+is an authentication verdict. Ambiguous marker-bearing bytes require exact-byte
+preservation under an existing usable key, or refusal with the original untouched.
+Do not narrow the missing-key fence to a prefix-only test or provision a new key
+for suspected ciphertext. Wrapped preservation deduplication must authenticate
+the existing archive: raw byte equality with an ambiguous archive is insufficient.
+
+History read failures stay write-blocking and must not issue a second automatic
+backup/key access. Preserve the original read error and report a non-authorizing
+skip. Legacy automatic backup requests return null after safe inventory/read and
+do not catch inventory failures as key denial. Frontend backup outcomes distinguish
+an intentional legacy skip from real errors and explicit null; no truthy path
+sentinel may authorize replacement. Explicit/parse/migration/prune calls keep their
+own backup gates, with stricter refusal for ambiguous input when no usable key exists.
 
 Linux explicitly retains existing plaintext storage; macOS and Windows have no
 plaintext fallback. Dictionary/settings encryption is out of scope. Shared tests

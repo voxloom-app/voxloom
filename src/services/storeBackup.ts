@@ -5,7 +5,8 @@ export type BackupStore = 'dictionary' | 'history' | 'settings';
 
 /** Optional context for a backup attempt; omission keeps explicit-backup semantics. */
 export interface BackupOptions {
-  /** Read failed before frontend parsing; never authorizes replacing the source. */
+  /** @deprecated History read failures no longer request backups. Legacy true
+   * requests skip history copies without protected-key access; never authorizes writes. */
   automaticReadError?: boolean;
 }
 
@@ -23,6 +24,7 @@ export function tauriBackup(store: BackupStore): (options?: BackupOptions) => Pr
 
 export type BackupOutcome =
   | { ok: true; path: string }
+  | { ok: false; skipped: true }
   | { ok: false; error: string };
 
 /** Run an optional IO backup hook, never throwing. */
@@ -35,7 +37,10 @@ export async function runBackup(
     const path = await (options ? backup(options) : backup());
     // No file copied (vanished, not a regular file, unreadable dir): that
     // is not a backup, so nothing may be overwritten on its strength.
-    if (!path) return { error: 'no file was backed up', ok: false };
+    if (!path) {
+      if (options?.automaticReadError) return { ok: false, skipped: true };
+      return { error: 'no file was backed up', ok: false };
+    }
     return { ok: true, path };
   } catch (error: unknown) {
     return {
@@ -61,6 +66,7 @@ export function memoryBackups(read: () => string | null) {
 }
 
 export function describeBackup(outcome: BackupOutcome): string {
+  if ('skipped' in outcome) return ' (automatic backup skipped; file left untouched)';
   if (!outcome.ok) return ` (backup failed: ${outcome.error}; file left untouched)`;
   return ` (original kept at ${outcome.path})`;
 }

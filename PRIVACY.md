@@ -98,8 +98,13 @@ primary is missing. Empty or authenticated encrypted staging files are removed,
 never restored. Recognizable damaged current-format staging is preserved
 byte-for-byte inside an encrypted quarantine before removal; ambiguous short
 headers, plaintext staging and unknown/future formats still block storage and
-remain untouched. Known ciphertext backups remain opaque encrypted copies;
-unknown/damaged primary ciphertext is preserved without decrypting or wrapping it.
+remain untouched. Recognized encrypted envelopes and identifiable current-writer
+truncations can be preserved as opaque copies, without claiming authentication.
+Encryption-marker words alone do not prove a file is ciphertext. Ambiguous
+originals need an existing usable key for exact-byte encrypted preservation;
+otherwise backup is refused and the original stays in place. Suspected ciphertext
+never authorizes creating a replacement key. Existing ambiguous archives remain
+fail-closed rather than being accepted as encrypted duplicates.
 Migration is restartable per file, not atomic across the whole folder. An
 unreadable, unknown or unsafe artifact causes an error/incomplete protection;
 its original stays in place and may still be plaintext. No automatic process
@@ -122,10 +127,11 @@ filesystem does not honor flushes; actual power-loss behavior is not tested.
 
 History archives can contain raw and final text, metadata, deleted rows and
 expired transcripts. **Retention and row deletion do not prune archives.**
-An automatic read-error backup may skip a redundant copy of an encrypted
-primary, including when its key cannot be accessed. The original stays in place;
-this is not proof it is healthy and does not unblock history writes. Explicit
-backups and preservation before a supported migration retain their usual behavior.
+History read failures do not trigger another automatic backup or protected-key
+access attempt. The active file stays in place and history writes remain blocked;
+the error reports an intentional skip, not a failed backup or successful recovery.
+Frontend parse errors, explicit backups and preservation before a supported
+migration retain their own backup gates, subject to the ambiguity rules above.
 Settings/dictionary upgrade and unreadable-file backups are still byte-exact
 plaintext copies, separate from these history rules.
 

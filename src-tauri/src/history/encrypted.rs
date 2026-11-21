@@ -205,15 +205,21 @@ fn encrypted_marker(bytes: &[u8]) -> bool {
     text.trim_start().starts_with('{')
         && (text.contains(FORMAT) || text.contains("\"envelopeVersion\""))
 }
-// Strict outer encoding only; the tag and plaintext require the protected key.
-fn current_history_encoding(bytes: &[u8]) -> bool {
-    envelope(bytes).is_ok_and(|e| {
-        e.role == HISTORY
+// Conservative suspicion above fences key provisioning. Raw-copy permission
+// is narrower: a complete, strictly encoded envelope (including future versions)
+// or the current writer's complete header/payload prefix. Neither authenticates
+// the bytes or grants permission to replace active history.
+fn opaque_backup_encoding(bytes: &[u8]) -> bool {
+    serde_json::from_slice::<Envelope>(bytes).is_ok_and(|e| {
+        e.format == FORMAT
+            && e.algorithm == ALGORITHM
+            && matches!(e.role.as_str(), HISTORY | PRESERVATION)
             && STANDARD.decode(&e.nonce).is_ok_and(|v| v.len() == 12)
             && STANDARD
                 .decode(&e.ciphertext)
                 .is_ok_and(|v| v.len() >= aead::AES_256_GCM.tag_len())
-    })
+    }) || (serde_json::from_slice::<serde_json::Value>(bytes).is_err()
+        && current_staging_debris(bytes))
 }
 
 // Only the complete current header plus a strict writer-payload prefix can
@@ -462,7 +468,7 @@ impl<'a> Store<'a> {
                 // A plaintext duplicate is not durable encrypted protection
                 // (notably when legacy tmp sorts before archive migration).
                 if encrypted_marker(&old) {
-                    let duplicate = old == bytes
+                    let duplicate = (!wrap && opaque_backup_encoding(&old) && old == bytes)
                         || match key {
                             Some(key) => {
                                 open(key, &old).map_err(|e| sidefile_error(&path, &e))? == bytes
@@ -483,7 +489,7 @@ impl<'a> Store<'a> {
                 }
             }
         }
-        let encrypted = if encrypted_marker(bytes) && !wrap {
+        let encrypted = if opaque_backup_encoding(bytes) && !wrap {
             bytes.to_vec()
         } else {
             seal_as(
@@ -587,26 +593,16 @@ impl<'a> Store<'a> {
         let Some(bytes) = read_optional(&path)? else {
             return Ok(None);
         };
-        if automatic_read_error && current_history_encoding(&bytes) {
-            // A protected-key access failure gives us NO authentication verdict.
-            // Skip the redundant automatic copy, not validation or write fences:
-            // the original stays untouched and load/save still independently fail.
-            // With a usable key, actually authenticate and validate the document;
-            // auth failures/unknown schemas must retain their opaque backup path.
-            let skip = match self.key() {
-                Ok(key) => document(&key, &bytes).is_ok(),
-                Err(_) => true,
-            };
-            if skip {
-                if read_optional(&path)?.as_deref() != Some(bytes.as_slice()) {
-                    return Err("History changed during backup; files preserved".into());
-                }
-                return Ok(None);
-            }
+        if automatic_read_error {
+            // Deprecated compatibility context: new frontend loaders do not
+            // request a backup after read failure. Old callers get a deliberate
+            // non-authorizing skip after safe inventory/read, never another key
+            // access or an authentication verdict. Explicit backups are below.
+            return Ok(None);
         }
         // Unknown ciphertext must remain opaque, even when the original key is
         // unavailable. A successful backup never authorizes active replacement.
-        let backup = if encrypted_marker(&bytes) {
+        let backup = if opaque_backup_encoding(&bytes) {
             self.preserve_with_key(None, &bytes)?
         } else {
             let key = self.key()?;
