@@ -105,6 +105,13 @@ unreadable, unknown or unsafe artifact causes an error/incomplete protection;
 its original stays in place and may still be plaintext. No automatic process
 can retroactively encrypt external backups or old sync copies.
 
+If a side file stops history loading or saving, the error identifies its type
+and its generated filename when safe to display. Unrecognized names are redacted;
+file contents, keys and the full folder path are not included. Quit Voxloom,
+back up the history folder, and seek recovery help before changing anything.
+Do not delete suspect files or reset the protected key. An error does not mean
+the whole folder was rolled back: earlier per-file migrations may have completed.
+
 Windows uses same-directory native rename plus explicit file-data/metadata
 flushes, including when reusing a previously published archive or key. Flush
 failures stop migration rather than authorizing source removal. This is not a
@@ -125,7 +132,7 @@ plaintext copies, separate from these history rules.
 ## Deleting transcripts
 
 - **One transcript:** History → the row's **Delete transcript** (trash) button.
-- **All durable transcripts, and stop keeping new ones:** Settings → Privacy →
+- **Clear active history, and stop keeping new transcripts:** Settings → Privacy →
   **Transcript retention → Off** rewrites the active history with no records
   (encrypted on macOS and Windows). Already-loaded transcripts remain visible in History
   and Home, in memory only, until restart. Off does not delete the history key

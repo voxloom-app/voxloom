@@ -46,6 +46,57 @@ fn artifact_kind(path: &Path) -> Option<ArtifactKind> {
     }
 }
 
+// Only fixed internal format/read errors belong here, never OS error text or
+// file contents. Discovery is deliberately broader than safe diagnostic names.
+fn sidefile_error(path: &Path, reason: &str) -> String {
+    let category = match artifact_kind(path) {
+        Some(ArtifactKind::Backup) => "archive",
+        Some(ArtifactKind::Staging) => "staging file",
+        Some(ArtifactKind::LegacyTmp) => "legacy temporary file",
+        _ => return reason.to_owned(),
+    };
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let folded = name.to_ascii_lowercase();
+    let safe = match artifact_kind(path) {
+        Some(ArtifactKind::LegacyTmp) => true,
+        Some(ArtifactKind::Backup) => folded
+            .strip_prefix("history.json.unreadable-")
+            .and_then(|n| n.strip_suffix(".bak"))
+            .is_some_and(|n| {
+                let mut parts = n.split('-');
+                let timestamp = parts.next().unwrap_or("");
+                !timestamp.is_empty()
+                    && timestamp.len() <= 39
+                    && timestamp.bytes().all(|b| b.is_ascii_digit())
+                    && parts.next().is_none_or(|suffix| {
+                        !suffix.is_empty()
+                            && suffix.len() <= 3
+                            && suffix.bytes().all(|b| b.is_ascii_digit())
+                            && suffix.parse::<u8>().is_ok_and(|n| (1..=100).contains(&n))
+                    })
+                    && parts.next().is_none()
+            }),
+        Some(ArtifactKind::Staging) => folded
+            .strip_prefix("history.json.encrypted-")
+            .and_then(|n| n.strip_suffix(".tmp"))
+            .is_some_and(|n| {
+                n.len() == 22
+                    && n.bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+            }),
+        _ => false,
+    };
+    let label = if safe {
+        name
+    } else {
+        "[redacted history artifact]"
+    };
+    // Earlier independent per-file migrations may already have committed;
+    // this is a refusal, not a promise that every folder entry is unchanged.
+    let reason = reason.replace("; files preserved", "");
+    format!("History {category} '{label}': {reason}. History loading and saving are blocked. Quit Voxloom, back up the history folder, and seek recovery help. Do not delete suspect files or reset the protected key.")
+}
+
 pub(super) trait KeyOps {
     fn read(&self) -> Result<Option<Vec<u8>>, String>;
     /// Add only. A duplicate leaves the winner unchanged; read it back.
@@ -193,10 +244,10 @@ fn current_staging_debris(bytes: &[u8]) -> bool {
 
 fn read_regular(path: &Path) -> Result<Vec<u8>, String> {
     let mut file = native_fs::open_regular(path, false)
-        .map_err(|_| "Cannot read history artifact; files preserved")?;
+        .map_err(|_| sidefile_error(path, "Cannot read history artifact; files preserved"))?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)
-        .map_err(|_| "Cannot read history artifact")?;
+        .map_err(|_| sidefile_error(path, "Cannot read history artifact"))?;
     Ok(bytes)
 }
 fn read_optional(path: &Path) -> Result<Option<Vec<u8>>, String> {
@@ -413,7 +464,9 @@ impl<'a> Store<'a> {
                 if encrypted_marker(&old) {
                     let duplicate = old == bytes
                         || match key {
-                            Some(key) => open(key, &old)? == bytes,
+                            Some(key) => {
+                                open(key, &old).map_err(|e| sidefile_error(&path, &e))? == bytes
+                            }
                             None => false,
                         };
                     if duplicate {
@@ -478,10 +531,10 @@ impl<'a> Store<'a> {
                     && open(key, &bytes).is_err()
                     && !current_staging_debris(&bytes)
                 {
-                    return Err("Unsupported history staging format; files preserved".into());
+                    return Err(sidefile_error(&path, "Unsupported history staging format"));
                 }
             } else if encrypted_marker(&bytes) {
-                open(key, &bytes)?;
+                open(key, &bytes).map_err(|e| sidefile_error(path, &e))?;
             }
         }
         for path in artifacts {
@@ -493,7 +546,7 @@ impl<'a> Store<'a> {
             if kind == Some(ArtifactKind::Staging) {
                 let authenticated = open(key, &bytes).is_ok();
                 if !bytes.is_empty() && !authenticated && !current_staging_debris(&bytes) {
-                    return Err("Unsupported history staging format; files preserved".into());
+                    return Err(sidefile_error(&path, "Unsupported history staging format"));
                 }
                 // Never store damaged ciphertext as an outer archive: wrap the
                 // exact bytes so a later inventory can authenticate quarantine.

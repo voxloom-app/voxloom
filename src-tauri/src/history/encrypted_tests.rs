@@ -892,6 +892,370 @@ fn entropy_failure_blocks_key_creation_and_existing_key_writes() {
     f.assert_no_canaries();
 }
 
+fn assert_sidefile_recovery(error: &str, label: &str, category: &str, reason: &str, dir: &Path) {
+    for expected in [
+        label,
+        category,
+        reason,
+        "History loading and saving are blocked",
+        "Quit Voxloom",
+        "back up the history folder",
+        "seek recovery help",
+        "Do not delete suspect files or reset the protected key",
+    ] {
+        assert!(error.contains(expected), "missing {expected:?}: {error}");
+    }
+    for private in [
+        dir.to_str().unwrap(),
+        "FINAL-CANARY-BUS207",
+        "RAW-CANARY-BUS207",
+        "META-CANARY-BUS207",
+        "CONTENT-CANARY",
+        "KEY-CANARY",
+    ] {
+        assert!(!error.contains(private), "private diagnostic: {error}");
+    }
+    assert!(error.len() <= 512, "diagnostic must stay bounded");
+    assert!(
+        !error.contains("files preserved"),
+        "do not promise a folder-wide rollback: {error}"
+    );
+}
+
+#[test]
+fn sidefile_archive_diagnostics_block_load_and_save_with_exact_bytes_and_key() {
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let mut cases = vec![
+        (
+            br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"content":"CONTENT-CANARY KEY-CANARY"}"#.to_vec(),
+            "Unsupported encrypted history format",
+        ),
+        (original[..original.len() - 5].to_vec(), "Unsupported encrypted history format"),
+        (seal(&[8; 32], DOCUMENT.as_bytes()).unwrap(), "History authentication failed"),
+    ];
+    for (field, reason) in [
+        ("nonce", "Invalid encrypted history nonce"),
+        ("ciphertext", "Invalid encrypted history encoding"),
+    ] {
+        let mut value: serde_json::Value = serde_json::from_slice(&original).unwrap();
+        value[field] = serde_json::json!("CONTENT-CANARY KEY-CANARY");
+        cases.push((serde_json::to_vec(&value).unwrap(), reason));
+    }
+    for name in [
+        "history.json.unreadable-1795260000000-2.bak",
+        "HiStOrY.JsOn.UnReAdAbLe-1795260000000-2.BaK",
+        "history.json.tmp",
+        "HiStOrY.JsOn.TmP",
+    ] {
+        for (source, reason) in &cases {
+            let category = if name.to_ascii_lowercase().ends_with(".bak") {
+                "archive"
+            } else {
+                "legacy temporary file"
+            };
+            assert_store_sidefile_refusal(name, source, name, category, reason);
+        }
+    }
+}
+
+fn assert_store_sidefile_refusal(
+    name: &str,
+    source: &[u8],
+    label: &str,
+    category: &str,
+    reason: &str,
+) {
+    let f = Fixture::new();
+    let dir = f.0.join("PARENT-CANARY");
+    fs::create_dir(&dir).unwrap();
+    let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+    let store = Store::new(&dir, &keys);
+    store.save(DOCUMENT).unwrap();
+    let primary = fs::read(dir.join(PRIMARY)).unwrap();
+    fs::write(dir.join(name), source).unwrap();
+    for save in [false, true] {
+        let error = if save {
+            store.save(r#"{"version":2,"records":[]}"#)
+        } else {
+            store.load().map(|_| ())
+        }
+        .unwrap_err();
+        assert_eq!(fs::read(dir.join(name)).unwrap(), source);
+        assert_eq!(fs::read(dir.join(PRIMARY)).unwrap(), primary);
+        assert_eq!(*keys.0.borrow(), Some(vec![7; 32]));
+        assert_sidefile_recovery(&error, label, category, reason, &dir);
+        assert!(!error.contains("PARENT-CANARY"));
+        assert!(!error.contains(&STANDARD.encode([7; 32])));
+        if label == "[redacted history artifact]" {
+            assert!(!error.contains(name), "untrusted name leaked: {error}");
+            assert!(!error.contains("FILENAME-CANARY"));
+            assert!(!error.chars().any(|c| c.is_control() || c == '\u{202e}'));
+        }
+    }
+}
+
+#[test]
+fn sidefile_staging_diagnostics_name_generated_case_variants_and_preserve_ambiguous_bytes() {
+    let generated = format!(
+        "history.json.encrypted-{}.tmp",
+        URL_SAFE_NO_PAD.encode([11; 16])
+    );
+    for name in [
+        generated.clone(),
+        generated.to_uppercase(),
+        generated.replacen("history.json.encrypted-", "HiStOrY.JsOn.EnCrYpTeD-", 1),
+    ] {
+        for source in [
+            b"{".as_slice(),
+            br#"{"format":"voxloom-history-encrypted","envelopeVersion":1"#,
+            DOCUMENT.as_bytes(),
+            br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"content":"CONTENT-CANARY KEY-CANARY"}"#,
+        ] {
+            assert_store_sidefile_refusal(&name, source, &name, "staging file", "Unsupported history staging format");
+        }
+    }
+}
+
+#[test]
+fn sidefile_diagnostics_redact_untrusted_owned_names_without_disclosing_path_or_content() {
+    let names = vec![
+        format!("history.json.encrypted-{}.tmp", "9".repeat(180)),
+        format!("history.json.unreadable-{}.bak", "9".repeat(180)),
+        "history.json.encrypted-FILENAME-CANARY\u{202e}.tmp".into(),
+        "history.json.encrypted-FILENAME-CANARY.tmp".into(),
+    ];
+    #[cfg(unix)]
+    let names = {
+        let mut names = names;
+        names.extend([
+            "history.json.encrypted-FILENAME-CANARY\nFORGED.tmp".into(),
+            "history.json.encrypted-FILENAME-CANARY\\escape.tmp".into(),
+            "history.json.encrypted-FILENAME-CANARY\".tmp".into(),
+        ]);
+        names
+    };
+    let source = br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"content":"CONTENT-CANARY KEY-CANARY"}"#;
+    for name in names {
+        let archive = name.ends_with(".bak");
+        assert_store_sidefile_refusal(
+            &name,
+            source,
+            "[redacted history artifact]",
+            if archive { "archive" } else { "staging file" },
+            if archive {
+                "Unsupported encrypted history format"
+            } else {
+                "Unsupported history staging format"
+            },
+        );
+    }
+}
+
+#[test]
+fn sidefile_inventory_diagnostics_identify_unsafe_files_before_key_provisioning() {
+    for name in [
+        "history.json.unreadable-1795260000000-2.bak",
+        "HiStOrY.JsOn.TmP",
+        "HISTORY.JSON.ENCRYPTED-CWSLCWSLCWSLCWSLCWSLCW.TMP",
+    ] {
+        for directory in [false, true] {
+            let f = Fixture::new();
+            let keys = FakeKeys::default();
+            let victim = f.0.join("PARENT-CANARY-CONTENT-CANARY");
+            fs::write(&victim, DOCUMENT).unwrap();
+            if directory {
+                fs::create_dir(f.0.join(name)).unwrap();
+            } else {
+                fs::hard_link(&victim, f.0.join(name)).unwrap();
+            }
+            let store = Store::new(&f.0, &keys);
+            for save in [false, true] {
+                let error = if save {
+                    store.save(DOCUMENT)
+                } else {
+                    store.load().map(|_| ())
+                }
+                .unwrap_err();
+                assert!(keys.0.borrow().is_none());
+                assert!(!f.0.join(PRIMARY).exists());
+                assert_eq!(fs::read(&victim).unwrap(), DOCUMENT.as_bytes());
+                let category = match artifact_kind(Path::new(name)).unwrap() {
+                    ArtifactKind::Backup => "archive",
+                    ArtifactKind::LegacyTmp => "legacy temporary file",
+                    _ => "staging file",
+                };
+                assert_sidefile_recovery(
+                    &error,
+                    name,
+                    category,
+                    "Cannot read history artifact",
+                    &f.0,
+                );
+                assert!(!error.contains("PARENT-CANARY"));
+                assert_eq!(
+                    fs::symlink_metadata(f.0.join(name)).unwrap().is_dir(),
+                    directory
+                );
+            }
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn sidefile_inventory_diagnostics_preserve_symlinks_and_unreadable_files() {
+    use std::os::unix::fs::PermissionsExt;
+    for symlink in [false, true] {
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+        let store = Store::new(&f.0, &keys);
+        store.save(DOCUMENT).unwrap();
+        let primary = fs::read(f.0.join(PRIMARY)).unwrap();
+        let name = "history.json.unreadable-1795260000000.bak";
+        let path = f.0.join(name);
+        let victim = f.0.join("PARENT-CANARY-CONTENT-CANARY");
+        fs::write(&victim, DOCUMENT).unwrap();
+        if symlink {
+            std::os::unix::fs::symlink(&victim, &path).unwrap();
+        } else {
+            fs::write(&path, DOCUMENT).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0)).unwrap();
+            assert!(fs::read(&path).is_err(), "fixture must actually deny reads");
+        }
+        for save in [false, true] {
+            let error = if save {
+                store.save(DOCUMENT)
+            } else {
+                store.load().map(|_| ())
+            }
+            .unwrap_err();
+            assert_sidefile_recovery(
+                &error,
+                name,
+                "archive",
+                "Cannot read history artifact",
+                &f.0,
+            );
+            assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), primary);
+            assert_eq!(fs::read(&victim).unwrap(), DOCUMENT.as_bytes());
+            assert_eq!(*keys.0.borrow(), Some(vec![7; 32]));
+        }
+        if symlink {
+            assert_eq!(fs::read_link(&path).unwrap(), victim);
+        } else {
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            assert_eq!(fs::read(&path).unwrap(), DOCUMENT.as_bytes());
+        }
+    }
+}
+
+#[test]
+fn sidefile_second_pass_read_diagnostic_does_not_claim_prior_migrations_rolled_back() {
+    for save in [false, true] {
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+        let mut store = Store::new(&f.0, &keys);
+        store.save(DOCUMENT).unwrap();
+        let primary = fs::read(f.0.join(PRIMARY)).unwrap();
+        let one = f.0.join("history.json.unreadable-1.bak");
+        let two_name = "history.json.unreadable-2.bak";
+        let two = f.0.join(two_name);
+        let victim = f.0.join("PARENT-CANARY-CONTENT-CANARY");
+        fs::write(&one, b"first exact bytes\xff").unwrap();
+        fs::write(&two, b"second exact bytes\xfe").unwrap();
+        fs::write(&victim, b"second exact bytes\xfe").unwrap();
+        let changed = std::cell::Cell::new(false);
+        let fault = |at: &str| {
+            if at == "publish" && !changed.replace(true) {
+                fs::remove_file(&two).unwrap();
+                fs::hard_link(&victim, &two).unwrap();
+            }
+            Ok(())
+        };
+        store.io_fault = Some(&fault);
+        let error = if save {
+            store.save(DOCUMENT)
+        } else {
+            store.load().map(|_| ())
+        }
+        .unwrap_err();
+        assert!(changed.get());
+        assert_eq!(
+            open(&[7; 32], &fs::read(&one).unwrap()).unwrap(),
+            b"first exact bytes\xff"
+        );
+        assert_eq!(fs::read(&two).unwrap(), b"second exact bytes\xfe");
+        assert_eq!(fs::read(&victim).unwrap(), b"second exact bytes\xfe");
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), primary);
+        assert_sidefile_recovery(
+            &error,
+            two_name,
+            "archive",
+            "Cannot read history artifact",
+            &f.0,
+        );
+        assert!(
+            !error.contains("unreadable-1.bak"),
+            "wrong failing artifact: {error}"
+        );
+    }
+}
+
+#[test]
+fn sidefile_preservation_diagnostic_identifies_failing_archive_not_legacy_source() {
+    for save in [false, true] {
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+        let mut store = Store::new(&f.0, &keys);
+        store.save(DOCUMENT).unwrap();
+        let primary = fs::read(f.0.join(PRIMARY)).unwrap();
+        let archive_name = "history.json.unreadable-1795260000000.bak";
+        let archive = f.0.join(archive_name);
+        let original = seal(&[7; 32], b"old archive").unwrap();
+        let corrupt = seal(&[8; 32], b"CONTENT-CANARY KEY-CANARY").unwrap();
+        fs::write(&archive, original).unwrap();
+        fs::write(f.0.join("history.json.tmp"), DOCUMENT).unwrap();
+        let staging =
+            f.0.join("history.json.encrypted-CwsLCwsLCwsLCwsLCwsLCw.tmp");
+        fs::write(&staging, b"").unwrap();
+        let mutate = |at: &str| {
+            if at == "remove-staging" {
+                fs::write(&archive, &corrupt).unwrap();
+            }
+            Ok(())
+        };
+        store.io_fault = Some(&mutate);
+        let error = if save {
+            store.save(DOCUMENT)
+        } else {
+            store.load().map(|_| ())
+        }
+        .unwrap_err();
+        assert_sidefile_recovery(
+            &error,
+            archive_name,
+            "archive",
+            "History authentication failed",
+            &f.0,
+        );
+        assert!(
+            !error.contains("'history.json.tmp'"),
+            "wrong source blamed: {error}"
+        );
+        assert_eq!(fs::read(&archive).unwrap(), corrupt);
+        assert_eq!(
+            fs::read(f.0.join("history.json.tmp")).unwrap(),
+            DOCUMENT.as_bytes()
+        );
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), primary);
+        assert!(
+            !staging.exists(),
+            "earlier independent cleanup is not rolled back"
+        );
+        assert_eq!(*keys.0.borrow(), Some(vec![7; 32]));
+    }
+}
+
 #[test]
 fn unknown_archives_and_staging_block_load_and_save_without_mutation() {
     for name in [

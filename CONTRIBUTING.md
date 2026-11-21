@@ -255,6 +255,16 @@ never bypass the missing-key/nonreplacement fence. Quarantine is the deliberate
 exception to opaque ciphertext copying because damaged bytes cannot serve as an
 outer authenticated archive.
 
+Attach side-file read/format/authentication error context at the failing
+operation, including inventory and archive deduplication, not a top-level catch
+that could name the wrong source. Display only bounded recognized generated
+basenames (retaining case), otherwise a fixed redacted label; never interpolate
+parent paths, file contents, protected keys or arbitrary OS error text. Explain
+that loading/writing is blocked and advise quitting, backing up the history
+folder and seeking recovery help without deleting files or resetting the key.
+Do not imply folder-wide rollback when an earlier per-file migration committed.
+Diagnostics must not change recovery, deletion, format or key-provisioning policy.
+
 Automatic history-read-error backup context is non-authorizing. Authenticate and
 validate current ciphertext when its key is available; known authentication,
 schema, malformed and unknown-format failures retain preservation. If key access
