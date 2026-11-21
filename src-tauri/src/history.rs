@@ -75,10 +75,13 @@ pub async fn history_save(app: AppHandle, contents: String) -> Result<(), String
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-pub(crate) fn backup_history(dir: &std::path::Path) -> Result<Option<PathBuf>, String> {
+pub(crate) fn backup_history(
+    dir: &std::path::Path,
+    automatic_read_error: bool,
+) -> Result<Option<PathBuf>, String> {
     if !dir.exists() {
         return Ok(None);
     }
     let keys = system_keys(dir)?;
-    encrypted::Store::new(dir, &keys).backup()
+    encrypted::Store::new(dir, &keys).backup(automatic_read_error)
 }

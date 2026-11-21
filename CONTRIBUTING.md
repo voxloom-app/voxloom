@@ -175,7 +175,9 @@ rejected as unreadable, and History came up empty.
 ## History encryption and recovery
 
 `history_load`, `history_save` and `store_backup({ store: 'history' })` keep
-their IPC contract. The shared macOS/Windows native boundary encrypts the entire serialized
+their existing call/result contract. `store_backup` also accepts optional
+`automaticReadError: true` for a failed history read; omitted/false retains
+explicit backup semantics. The shared macOS/Windows native boundary encrypts the entire serialized
 history document using ring AES-256-GCM. The outer JSON has `format` =
 `voxloom-history-encrypted`, `envelopeVersion` = 1, `algorithm` = `AES-256-GCM`,
 `role` (`history` or `preservation`), a base64 12-byte nonce, and base64
@@ -211,9 +213,14 @@ thread. New same-directory staging is exclusive and ciphertext-only (0600 on
 macOS; inherited user app-data ACLs on Windows). Reject nonregular files,
 reparse/symlink artifacts and hard links using opened-handle information.
 Verify, sync and publish atomically. A post-publication persistence failure
-means changed-but-durability-uncertain, not "nothing changed." The lock orders
-cooperating app processes; this is not protection from arbitrary same-user
-malware changing files concurrently.
+means changed-but-durability-uncertain, not "nothing changed." The lock excludes
+concurrent transactions but does not order incoming snapshots. The app provider
+allows one history save in flight and retains only the newest pending snapshot,
+so rapid deletes or retention changes cannot be overtaken by an older save.
+Failures do not poison later requested saves. Unsent work is retired on provider
+replacement/disable/unmount; there is no shutdown-flush guarantee. This is not
+protection from independent writers or arbitrary same-user malware changing files
+concurrently.
 
 Keep native adapters separate from the shared codec/migration state machine.
 macOS retains exclusive `renamex_np` publication and directory `fsync`.
@@ -236,6 +243,24 @@ or delete their key. Unknown ciphertext stays opaque; a backup is never permissi
 to overwrite unreadable history. Recovery requires the original usable protected
 key; do not advise key deletion, automatic reset or speculative restoration.
 See [Privacy](PRIVACY.md#transcript-encryption-on-macos-and-windows) for limitations.
+
+After key acquisition and primary validation, dispose empty or authenticated
+encrypted staging under the transaction lock, never restoring its rows.
+Recognizable current-format staging debris is encrypted as exact raw bytes
+inside a preservation envelope before removal. Renew file/publication fences on
+dedup reuse and recheck the source before removing it. Incomplete ambiguous
+headers, plaintext, future formats and unsafe paths remain fail-closed. Inventory
+all staging before key creation, even empty staging with no primary: cleanup must
+never bypass the missing-key/nonreplacement fence. Quarantine is the deliberate
+exception to opaque ciphertext copying because damaged bytes cannot serve as an
+outer authenticated archive.
+
+Automatic history-read-error backup context is non-authorizing. Authenticate and
+validate current ciphertext when its key is available; known authentication,
+schema, malformed and unknown-format failures retain preservation. If key access
+fails, strict current outer encoding may skip a redundant archive while leaving
+the original untouched; encoding alone never establishes authenticity or permits
+a write/reset. Explicit/migration/prune backups keep their original behavior.
 
 Linux explicitly retains existing plaintext storage; macOS and Windows have no
 plaintext fallback. Dictionary/settings encryption is out of scope. Shared tests

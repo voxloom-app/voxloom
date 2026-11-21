@@ -148,6 +148,9 @@ export function AppProvider({
   /** False after a corrupt-load so we never overwrite the broken file. */
   const allowHistoryPersistRef = useRef(!historyPers.enabled);
   const historyPersistGenRef = useRef(0);
+  /** One active write plus the newest not-yet-started snapshot. */
+  const historySaveRef = useRef<Promise<void> | null>(null);
+  const pendingHistorySaveRef = useRef<(() => Promise<void>) | null>(null);
 
   const dictionaryHydratedRef = useRef(!dictionaryPers.enabled);
   const allowDictionaryPersistRef = useRef(!dictionaryPers.enabled);
@@ -166,6 +169,13 @@ export function AppProvider({
   // settles so gated screens never flash fixture defaults / empty lists.
   useEffect(() => {
     let cancelled = false;
+    // A changed persistence identity starts a new hydration owner. Never hand
+    // the replacement store pre-hydration state or leave old pending writes.
+    historyPersistGenRef.current += 1;
+    historyHydratedRef.current = false;
+    allowHistoryPersistRef.current = false;
+    pendingHistorySaveRef.current = null;
+    setBootReady(!needsBootHydrate);
 
     // BUS-42: a migrated (older-version) or backed-up corrupt settings.json
     // is rewritten as the current version during boot, so every later reader
@@ -282,6 +292,11 @@ export function AppProvider({
         return;
       }
 
+      // A prior owner may already have issued a native write. Wait for it,
+      // even when replacing the store: loading first could read stale bytes
+      // and later save them over that write. Do not retry or cancel it.
+      if (historySaveRef.current) await historySaveRef.current;
+      if (cancelled) return;
       const historyResult = await historyPers.store.load(retention, clock());
       if (cancelled) return;
       let historyBackupFailed = false;
@@ -326,8 +341,13 @@ export function AppProvider({
 
     return () => {
       cancelled = true;
+      historyPersistGenRef.current += 1;
+      historyHydratedRef.current = false;
+      allowHistoryPersistRef.current = false;
+      pendingHistorySaveRef.current = null;
     };
-    // Intentional once-on-mount boot load (persistence identity is stable).
+    // Production persistence identity is stable; replacement rehydrates only
+    // after any already-issued history write settles.
   }, [clock, dictionaryPers, historyPers, settingsPers]);
 
   useSettingsSync({
@@ -389,8 +409,9 @@ export function AppProvider({
     })();
   }, [dictionaryPers, state.words]);
 
-  // Persist history after a successful hydrate whenever records or retention
-  // change.
+  // Serialize at the provider boundary, including injected stores. Keep only
+  // the newest pending snapshot; a native write already sent cannot be cancelled
+  // or safely raced by a retry.
   useEffect(() => {
     if (
       !historyPers.enabled
@@ -400,24 +421,39 @@ export function AppProvider({
       return;
     }
     const gen = historyPersistGenRef.current;
-    void (async () => {
+    pendingHistorySaveRef.current = async () => {
+      if (gen !== historyPersistGenRef.current) return;
       try {
         await historyPers.store.save(
           state.records,
           state.settings.transcriptRetention,
           clock(),
         );
-        if (gen !== historyPersistGenRef.current) return;
+        if (gen !== historyPersistGenRef.current || pendingHistorySaveRef.current) return;
         dispatch({ message: null, type: 'set-history-error' });
       } catch (error: unknown) {
-        if (gen !== historyPersistGenRef.current) return;
+        if (gen !== historyPersistGenRef.current || pendingHistorySaveRef.current) return;
         const message = error instanceof Error ? error.message : String(error);
         dispatch({
           message: `Failed to save history: ${message}`,
           type: 'set-history-error',
         });
       }
-    })();
+    };
+    if (historySaveRef.current) return;
+    // Start in a microtask so even a synchronously throwing custom save cannot
+    // finish the drain before its ownership promise has been assigned.
+    historySaveRef.current = Promise.resolve().then(async () => {
+      try {
+        while (pendingHistorySaveRef.current) {
+          const save = pendingHistorySaveRef.current;
+          pendingHistorySaveRef.current = null;
+          await save();
+        }
+      } finally {
+        historySaveRef.current = null;
+      }
+    });
   }, [
     clock,
     historyPers,

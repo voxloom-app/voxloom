@@ -94,8 +94,12 @@ Owned old `history.json.unreadable-<timestamp>[-N].bak` files are encrypted in
 place, preserving even corrupt or non-UTF8 bytes. Legacy `history.json.tmp`
 is preserved in an encrypted quarantine backup and removed only after that
 backup is durable. It is **never restored as active history**, even if the
-primary is missing. Known ciphertext backups remain opaque encrypted copies;
-unknown/damaged ciphertext is preserved, not decrypted or wrapped again.
+primary is missing. Empty or authenticated encrypted staging files are removed,
+never restored. Recognizable damaged current-format staging is preserved
+byte-for-byte inside an encrypted quarantine before removal; ambiguous short
+headers, plaintext staging and unknown/future formats still block storage and
+remain untouched. Known ciphertext backups remain opaque encrypted copies;
+unknown/damaged primary ciphertext is preserved without decrypting or wrapping it.
 Migration is restartable per file, not atomic across the whole folder. An
 unreadable, unknown or unsafe artifact causes an error/incomplete protection;
 its original stays in place and may still be plaintext. No automatic process
@@ -111,6 +115,10 @@ filesystem does not honor flushes; actual power-loss behavior is not tested.
 
 History archives can contain raw and final text, metadata, deleted rows and
 expired transcripts. **Retention and row deletion do not prune archives.**
+An automatic read-error backup may skip a redundant copy of an encrypted
+primary, including when its key cannot be accessed. The original stays in place;
+this is not proof it is healthy and does not unblock history writes. Explicit
+backups and preservation before a supported migration retain their usual behavior.
 Settings/dictionary upgrade and unreadable-file backups are still byte-exact
 plaintext copies, separate from these history rules.
 

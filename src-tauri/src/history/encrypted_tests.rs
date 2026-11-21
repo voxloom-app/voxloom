@@ -67,6 +67,84 @@ impl Drop for Fixture {
 }
 
 #[test]
+fn empty_crash_staging_does_not_block_healthy_primary_or_restore_rows() {
+    for name in [
+        "history.json.encrypted-crash.tmp",
+        "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+    ] {
+        let f = Fixture::new();
+        let keys = FakeKeys::default();
+        let store = Store::new(&f.0, &keys);
+        store.save(DOCUMENT).unwrap();
+        let before = fs::read(f.0.join(PRIMARY)).unwrap();
+        fs::write(f.0.join(name), b"").unwrap();
+        assert_eq!(store.load().unwrap().as_deref(), Some(DOCUMENT));
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), before);
+        assert!(!f.0.join(name).exists());
+        let empty = r#"{"version":2,"records":[]}"#;
+        store.save(empty).unwrap();
+        assert_eq!(
+            Store::new(&f.0, &keys).load().unwrap().as_deref(),
+            Some(empty)
+        );
+    }
+}
+
+#[test]
+fn current_partial_crash_staging_is_quarantined_losslessly_and_restartable() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let text = std::str::from_utf8(&encrypted).unwrap();
+    let payload = text.find("\"ciphertext\":\"").unwrap() + "\"ciphertext\":\"".len();
+    for name in [
+        "history.json.encrypted-crash.tmp",
+        "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+    ] {
+        for end in [
+            payload,
+            payload + 5,
+            encrypted.len() - 2,
+            encrypted.len() - 1,
+        ] {
+            let f = Fixture::new();
+            let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+            let store = Store::new(&f.0, &keys);
+            store.save(DOCUMENT).unwrap();
+            let before = fs::read(f.0.join(PRIMARY)).unwrap();
+            let partial = &encrypted[..end];
+            fs::write(f.0.join(name), partial).unwrap();
+            assert_eq!(store.load().unwrap().as_deref(), Some(DOCUMENT));
+            assert!(!f.0.join(name).exists());
+            let backups: Vec<_> = store
+                .artifacts()
+                .unwrap()
+                .into_iter()
+                .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+                .collect();
+            assert_eq!(backups.len(), 1);
+            let quarantined = fs::read(&backups[0]).unwrap();
+            assert_eq!(open(&[7; 32], &quarantined).unwrap(), partial);
+            assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), before);
+            assert_eq!(
+                Store::new(&f.0, &keys).load().unwrap().as_deref(),
+                Some(DOCUMENT)
+            );
+            assert_eq!(
+                store
+                    .artifacts()
+                    .unwrap()
+                    .into_iter()
+                    .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+                    .count(),
+                1
+            );
+            store.save(r#"{"version":2,"records":[]}"#).unwrap();
+            assert_eq!(fs::read(&backups[0]).unwrap(), quarantined);
+            f.assert_no_canaries();
+        }
+    }
+}
+
+#[test]
 fn missing_key_never_reprovisions_for_encrypted_artifacts() {
     for name in [
         "history.json",
@@ -147,10 +225,10 @@ fn case_variant_legacy_files_migrate_losslessly_without_plaintext() {
             open(keys.0.borrow().as_ref().unwrap(), &migrated).unwrap(),
             raw
         );
-        let first_backup = store.backup().unwrap().unwrap();
+        let first_backup = store.backup(false).unwrap().unwrap();
         let renamed = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9-2.BaK");
         fs::rename(first_backup, &renamed).unwrap();
-        assert_eq!(store.backup().unwrap().unwrap(), renamed);
+        assert_eq!(store.backup(false).unwrap().unwrap(), renamed);
         store.save(DOCUMENT).unwrap();
         assert_eq!(fs::read(f.0.join(archive)).unwrap(), migrated);
         assert!(fs::read_dir(&f.0)
@@ -185,7 +263,10 @@ fn case_variant_staging_requires_ciphertext_before_any_migration() {
         fs::write(f.0.join(name), &ciphertext).unwrap();
         assert_eq!(store.load().unwrap(), None, "staging must not be restored");
         store.save(DOCUMENT).unwrap();
-        assert_eq!(fs::read(f.0.join(name)).unwrap(), ciphertext);
+        assert!(
+            !f.0.join(name).exists(),
+            "authenticated staging must be disposed, never restored"
+        );
         f.assert_no_canaries();
     }
 }
@@ -457,14 +538,181 @@ fn legacy_empty_file_keeps_existing_empty_history_semantics() {
 }
 
 #[test]
+fn automatic_read_error_does_not_archive_current_ciphertext_on_key_access_failure() {
+    struct Denied;
+    impl KeyOps for Denied {
+        fn read(&self) -> Result<Option<Vec<u8>>, String> {
+            Err("synthetic key denied".into())
+        }
+        fn add(&self, _: &[u8]) -> Result<(), String> {
+            panic!("must not provision")
+        }
+    }
+    let f = Fixture::new();
+    let store = Store::new(&f.0, &Denied);
+    let raw = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    fs::write(f.0.join(PRIMARY), &raw).unwrap();
+    for _ in 0..2 {
+        assert!(store.load().is_err());
+        assert_eq!(
+            store.backup(true).unwrap(),
+            None,
+            "automatic access failure must not add a snapshot"
+        );
+        assert!(store.save(DOCUMENT).is_err());
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+        assert_eq!(store.artifacts().unwrap().len(), 1);
+    }
+    let explicit = store.backup(false).unwrap().unwrap();
+    assert_eq!(
+        fs::read(&explicit).unwrap(),
+        raw,
+        "explicit backup still preserves original bytes without key access"
+    );
+}
+
+#[test]
+fn automatic_read_error_preserves_malformed_unknown_and_auth_failed_sources() {
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let mut opaque = vec![
+        original[..original.len() - 5].to_vec(),
+        br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"ciphertext":"opaque"}"#
+            .to_vec(),
+    ];
+    for (field, value) in [
+        ("envelopeVersion", serde_json::json!(99)),
+        ("format", serde_json::json!("other")),
+        ("algorithm", serde_json::json!("other")),
+        ("nonce", serde_json::json!("bad")),
+        ("ciphertext", serde_json::json!("AAAA")),
+        ("role", serde_json::json!(PRESERVATION)),
+        ("unknownField", serde_json::json!(true)),
+    ] {
+        let mut value_json: serde_json::Value = serde_json::from_slice(&original).unwrap();
+        value_json[field] = value;
+        opaque.push(serde_json::to_vec(&value_json).unwrap());
+    }
+    // These are structurally current: only real authentication/schema checking
+    // can distinguish them from healthy history when a key is available.
+    opaque.push(seal(&[8; 32], DOCUMENT.as_bytes()).unwrap());
+    opaque.push(seal(&[7; 32], br#"{"version":99,"records":[]}"#).unwrap());
+    for raw in opaque {
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+        let store = Store::new(&f.0, &keys);
+        fs::write(f.0.join(PRIMARY), &raw).unwrap();
+        assert!(store.load().is_err());
+        let first = store
+            .backup(true)
+            .unwrap()
+            .expect("damaged/unknown sources must not be skipped");
+        assert_eq!(fs::read(&first).unwrap(), raw);
+        assert_eq!(store.backup(true).unwrap().unwrap(), first);
+        assert!(store.save(DOCUMENT).is_err());
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+    }
+}
+
+#[test]
+fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verdict() {
+    struct Denied;
+    impl KeyOps for Denied {
+        fn read(&self) -> Result<Option<Vec<u8>>, String> {
+            Err("synthetic key denied".into())
+        }
+        fn add(&self, _: &[u8]) -> Result<(), String> {
+            panic!("no provisioning")
+        }
+    }
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for raw in [
+        original[..original.len() - 5].to_vec(),
+        br#"{"format":"voxloom-history-encrypted","envelopeVersion":99}"#.to_vec(),
+        {
+            let mut v: serde_json::Value = serde_json::from_slice(&original).unwrap();
+            v["ciphertext"] = serde_json::json!("AAAA");
+            serde_json::to_vec(&v).unwrap()
+        },
+    ] {
+        let f = Fixture::new();
+        let store = Store::new(&f.0, &Denied);
+        fs::write(f.0.join(PRIMARY), &raw).unwrap();
+        let preserved = store.backup(true).unwrap().unwrap();
+        assert_eq!(fs::read(preserved).unwrap(), raw);
+        assert!(store.load().is_err());
+        assert!(store.save(DOCUMENT).is_err());
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+    }
+    let f = Fixture::new();
+    let keys = FakeKeys::default();
+    let store = Store::new(&f.0, &keys);
+    fs::write(f.0.join(PRIMARY), &original).unwrap();
+    assert_eq!(store.backup(true).unwrap(), None);
+    assert!(
+        keys.0.borrow().is_none(),
+        "automatic backup must not rekey ciphertext"
+    );
+    assert!(store.load().is_err());
+    assert!(store.save(DOCUMENT).is_err());
+    assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), original);
+    // Once a real key can be read, a known tag failure must be archived, not
+    // classified as healthy merely because the outer envelope is current.
+    *keys.0.borrow_mut() = Some(vec![8; 32]);
+    let preserved = store.backup(true).unwrap().unwrap();
+    assert_eq!(fs::read(preserved).unwrap(), original);
+}
+
+#[test]
+fn automatic_read_error_preserves_legacy_bytes_and_does_not_hide_staging_failure() {
+    for raw in [
+        DOCUMENT.as_bytes(),
+        br#"{"version":1,"records":[]}"#,
+        b"malformed plaintext\xff",
+    ] {
+        let f = Fixture::new();
+        let keys = FakeKeys::default();
+        let store = Store::new(&f.0, &keys);
+        fs::write(f.0.join(PRIMARY), raw).unwrap();
+        let path = store.backup(true).unwrap().unwrap();
+        assert_eq!(
+            open(keys.0.borrow().as_ref().unwrap(), &fs::read(path).unwrap()).unwrap(),
+            raw
+        );
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+    }
+    let f = Fixture::new();
+    let keys = FakeKeys::default();
+    let store = Store::new(&f.0, &keys);
+    store.save(DOCUMENT).unwrap();
+    let raw = fs::read(f.0.join(PRIMARY)).unwrap();
+    let unknown = f.0.join("HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP");
+    fs::write(&unknown, b"unexpected plaintext").unwrap();
+    assert!(store.load().is_err());
+    assert_eq!(
+        store.backup(true).unwrap(),
+        None,
+        "healthy source needs no automatic archive"
+    );
+    assert!(
+        store.save(DOCUMENT).is_err(),
+        "skip cannot authorize writes through a staging error"
+    );
+    assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
+    assert_eq!(fs::read(&unknown).unwrap(), b"unexpected plaintext");
+    assert_eq!(store.artifacts().unwrap().len(), 2);
+    let explicit = store.backup(false).unwrap().unwrap();
+    assert_eq!(fs::read(explicit).unwrap(), raw);
+}
+
+#[test]
 fn backup_preserves_corrupt_non_utf8_bytes_encrypted_and_deduplicated() {
     let f = Fixture::new();
     let keys = FakeKeys::default();
     let store = Store::new(&f.0, &keys);
     let raw = b"RAW-CANARY-BUS207\xff\xfe\0corrupt";
     fs::write(f.0.join(PRIMARY), raw).unwrap();
-    let first = store.backup().unwrap().unwrap();
-    let second = store.backup().unwrap().unwrap();
+    let first = store.backup(false).unwrap().unwrap();
+    let second = store.backup(false).unwrap().unwrap();
     assert_eq!(first, second);
     assert_eq!(
         open(keys.0.borrow().as_ref().unwrap(), &fs::read(first).unwrap()).unwrap(),
@@ -491,9 +739,9 @@ fn unknown_ciphertext_backup_is_opaque_and_never_authorizes_save() {
     let raw =
         br#"{"format":"voxloom-history-encrypted","envelopeVersion":99,"ciphertext":"opaque"}"#;
     fs::write(f.0.join(PRIMARY), raw).unwrap();
-    let path = store.backup().unwrap().unwrap();
+    let path = store.backup(false).unwrap().unwrap();
     assert_eq!(fs::read(&path).unwrap(), raw);
-    assert_eq!(store.backup().unwrap().unwrap(), path);
+    assert_eq!(store.backup(false).unwrap().unwrap(), path);
     assert!(store.load().is_err());
     assert!(store.save(DOCUMENT).is_err());
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
@@ -542,7 +790,7 @@ fn denied_invalid_and_unpersisted_keys_never_fall_back_to_plaintext() {
         assert!(!f.0.join(PRIMARY).exists());
         fs::write(f.0.join(PRIMARY), DOCUMENT).unwrap();
         assert!(store.load().is_err());
-        assert!(store.backup().is_err());
+        assert!(store.backup(false).is_err());
         assert_eq!(fs::read_to_string(f.0.join(PRIMARY)).unwrap(), DOCUMENT);
         assert_eq!(fs::read_dir(&f.0).unwrap().count(), 2); // source plus lock
     }
@@ -854,7 +1102,7 @@ fn assert_deduplicated_archive_retry_fence(
     let archive = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9-2.BaK");
     fs::rename(&archives[0], &archive).unwrap();
     let before = fs::read(&archive).unwrap();
-    if encrypted_marker(original) {
+    if encrypted_marker(original) && artifact_kind(&source) != Some(ArtifactKind::Staging) {
         assert_eq!(before, original);
     } else {
         assert_eq!(open(&[7; 32], &before).unwrap(), original);
@@ -863,7 +1111,7 @@ fn assert_deduplicated_archive_retry_fence(
     let stages = RefCell::new(Vec::new());
     let retry_hook = |at: &str| {
         stages.borrow_mut().push(at.to_string());
-        if matches!(at, "remove-legacy" | "publish") {
+        if matches!(at, "remove-legacy" | "remove-staging" | "publish") {
             assert_eq!(
                 &stages.borrow()[..2.min(stages.borrow().len())],
                 ["sync", "directory-sync"],
@@ -970,6 +1218,189 @@ fn case_variant_duplicate_archives_retain_retry_fences() {
             assert_deduplicated_archive_retry_fence(source, bytes, failure);
         }
     }
+}
+
+#[test]
+fn partial_staging_quarantine_retries_refence_case_variant_archive_before_removal() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let partial = &encrypted[..encrypted.len() - 5];
+    for source in [
+        "history.json.encrypted-crash.tmp",
+        "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+    ] {
+        for failure in [None, Some("sync"), Some("directory-sync")] {
+            assert_deduplicated_archive_retry_fence(source, partial, failure);
+        }
+    }
+}
+
+#[test]
+fn staging_cleanup_and_quarantine_failures_keep_exact_source_until_retry() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for source in [
+        b"".as_slice(),
+        encrypted.as_slice(),
+        &encrypted[..encrypted.len() - 5],
+    ] {
+        let stages: &[&str] = if source.is_empty() || source == encrypted {
+            &["remove-staging"]
+        } else {
+            &[
+                "write",
+                "sync",
+                "verify",
+                "publish",
+                "new-published",
+                "directory-sync",
+                "remove-staging",
+            ]
+        };
+        for stage in stages {
+            let f = Fixture::new();
+            let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+            let mut store = Store::new(&f.0, &keys);
+            store.save(DOCUMENT).unwrap();
+            let primary = fs::read(f.0.join(PRIMARY)).unwrap();
+            let path = f.0.join("HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP");
+            fs::write(&path, source).unwrap();
+            let fault = |at: &str| {
+                if &at == stage {
+                    Err("synthetic quarantine/cleanup refusal".into())
+                } else {
+                    Ok(())
+                }
+            };
+            store.io_fault = Some(&fault);
+            assert!(store.load().is_err(), "missing fault {stage}");
+            assert_eq!(
+                fs::read(&path).unwrap(),
+                source,
+                "source removed on {stage}"
+            );
+            assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), primary);
+            let restarted = Store::new(&f.0, &keys);
+            assert_eq!(restarted.load().unwrap().as_deref(), Some(DOCUMENT));
+            assert!(!path.exists());
+            if !source.is_empty() && source != encrypted {
+                let backups: Vec<_> = restarted
+                    .artifacts()
+                    .unwrap()
+                    .into_iter()
+                    .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+                    .collect();
+                assert_eq!(backups.len(), 1);
+                assert_eq!(
+                    open(&[7; 32], &fs::read(&backups[0]).unwrap()).unwrap(),
+                    source
+                );
+            }
+            f.assert_no_canaries();
+        }
+    }
+}
+
+#[test]
+fn staging_only_missing_key_fences_empty_and_current_partial_bytes() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for source in [
+        b"".as_slice(),
+        &encrypted[..encrypted.len() - 5],
+        encrypted.as_slice(),
+    ] {
+        for name in [
+            "history.json.encrypted-crash.tmp",
+            "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+        ] {
+            let f = Fixture::new();
+            let keys = FakeKeys::default();
+            let store = Store::new(&f.0, &keys);
+            fs::write(f.0.join(name), source).unwrap();
+            assert!(store.load().unwrap_err().contains("key missing"));
+            assert!(store.save(DOCUMENT).unwrap_err().contains("key missing"));
+            assert!(keys.0.borrow().is_none());
+            assert_eq!(fs::read(f.0.join(name)).unwrap(), source);
+            assert!(!f.0.join(PRIMARY).exists());
+        }
+    }
+}
+
+#[test]
+fn ambiguous_staging_and_partial_primary_or_archive_are_not_quarantined() {
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for name in [
+        PRIMARY,
+        "history.json.unreadable-1.bak",
+        "HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP",
+    ] {
+        let sources = if artifact_kind(Path::new(name)) == Some(ArtifactKind::Staging) {
+            vec![
+                b"{".as_slice(),
+                br#"{"format":"voxloom-history-encrypted","envelopeVersion":1"#.as_slice(),
+                DOCUMENT.as_bytes(),
+                b"not ciphertext",
+            ]
+        } else {
+            vec![&encrypted[..encrypted.len() - 5]]
+        };
+        for source in sources {
+            let f = Fixture::new();
+            let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+            let store = Store::new(&f.0, &keys);
+            store.save(DOCUMENT).unwrap();
+            fs::write(f.0.join(name), source).unwrap();
+            assert!(store.load().is_err(), "{name}");
+            assert!(store.save(DOCUMENT).is_err(), "{name}");
+            assert_eq!(fs::read(f.0.join(name)).unwrap(), source);
+            assert_eq!(
+                store
+                    .artifacts()
+                    .unwrap()
+                    .iter()
+                    .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+                    .count(),
+                usize::from(name.ends_with(".bak"))
+            );
+        }
+    }
+}
+
+#[test]
+fn staging_cleanup_refuses_a_source_changed_after_quarantine() {
+    let f = Fixture::new();
+    let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+    let mut store = Store::new(&f.0, &keys);
+    store.save(DOCUMENT).unwrap();
+    let primary = fs::read(f.0.join(PRIMARY)).unwrap();
+    let encrypted = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    let partial = &encrypted[..encrypted.len() - 5];
+    let path = f.0.join("history.json.encrypted-crash.tmp");
+    fs::write(&path, partial).unwrap();
+    let future = br#"{"format":"voxloom-history-encrypted","envelopeVersion":99}"#;
+    let mutate = |at: &str| {
+        if at == "remove-staging" {
+            fs::write(&path, future).unwrap();
+        }
+        Ok(())
+    };
+    store.io_fault = Some(&mutate);
+    assert!(store.load().unwrap_err().contains("staging changed"));
+    assert_eq!(fs::read(&path).unwrap(), future);
+    assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), primary);
+    let backups: Vec<_> = store
+        .artifacts()
+        .unwrap()
+        .into_iter()
+        .filter(|p| artifact_kind(p) == Some(ArtifactKind::Backup))
+        .collect();
+    assert_eq!(backups.len(), 1);
+    assert_eq!(
+        open(&[7; 32], &fs::read(&backups[0]).unwrap()).unwrap(),
+        partial
+    );
+    let restarted = Store::new(&f.0, &keys);
+    assert!(restarted.load().is_err());
+    assert!(restarted.save(DOCUMENT).is_err());
+    assert_eq!(fs::read(&path).unwrap(), future);
 }
 
 #[test]
@@ -1125,7 +1556,7 @@ fn new_primary_archives_and_staging_have_private_modes() {
     };
     store.io_fault = Some(&check);
     store.save(DOCUMENT).unwrap();
-    store.backup().unwrap();
+    store.backup(false).unwrap();
     f.assert_no_canaries();
 }
 
@@ -1170,7 +1601,7 @@ fn backup_reports_a_source_change_instead_of_authorizing_a_reset() {
     };
     store.io_fault = Some(&mutate);
     assert!(
-        store.backup().is_err(),
+        store.backup(false).is_err(),
         "source changed while backup was being published"
     );
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), changed);

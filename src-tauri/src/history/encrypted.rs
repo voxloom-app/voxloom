@@ -154,6 +154,43 @@ fn encrypted_marker(bytes: &[u8]) -> bool {
     text.trim_start().starts_with('{')
         && (text.contains(FORMAT) || text.contains("\"envelopeVersion\""))
 }
+// Strict outer encoding only; the tag and plaintext require the protected key.
+fn current_history_encoding(bytes: &[u8]) -> bool {
+    envelope(bytes).is_ok_and(|e| {
+        e.role == HISTORY
+            && STANDARD.decode(&e.nonce).is_ok_and(|v| v.len() == 12)
+            && STANDARD
+                .decode(&e.ciphertext)
+                .is_ok_and(|v| v.len() >= aead::AES_256_GCM.tag_len())
+    })
+}
+
+// Only the complete current header plus a strict writer-payload prefix can
+// identify truncated ciphertext. Short/ambiguous headers, plaintext and future
+// envelopes stay fenced. This is format recognition, NEVER authentication.
+fn current_staging_debris(bytes: &[u8]) -> bool {
+    if envelope(bytes).is_ok() {
+        return true;
+    }
+    let Ok(text) = std::str::from_utf8(bytes) else {
+        return false;
+    };
+    [HISTORY, PRESERVATION].iter().any(|role| {
+        let prefix = format!(
+            "{{\"format\":\"{FORMAT}\",\"envelopeVersion\":1,\"algorithm\":\"{ALGORITHM}\",\"role\":\"{role}\",\"nonce\":\""
+        );
+        let Some(rest) = text.strip_prefix(&prefix) else { return false };
+        let Some((nonce, payload)) = rest.split_once("\",\"ciphertext\":\"") else { return false };
+        if !STANDARD.decode(nonce).is_ok_and(|v| v.len() == 12) {
+            return false;
+        }
+        let payload = payload.strip_suffix('"').unwrap_or(payload);
+        let unpadded = payload.trim_end_matches('=');
+        payload.len() - unpadded.len() <= 2
+            && unpadded.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/'))
+    })
+}
+
 fn read_regular(path: &Path) -> Result<Vec<u8>, String> {
     let mut file = native_fs::open_regular(path, false)
         .map_err(|_| "Cannot read history artifact; files preserved")?;
@@ -360,6 +397,14 @@ impl<'a> Store<'a> {
         self.preserve_with_key(Some(key), bytes)
     }
     fn preserve_with_key(&self, key: Option<&[u8]>, bytes: &[u8]) -> Result<PathBuf, String> {
+        self.preserve_bytes(key, bytes, false)
+    }
+    fn preserve_bytes(
+        &self,
+        key: Option<&[u8]>,
+        bytes: &[u8],
+        wrap: bool,
+    ) -> Result<PathBuf, String> {
         for path in self.artifacts()? {
             if artifact_kind(&path) == Some(ArtifactKind::Backup) {
                 let old = read_regular(&path)?;
@@ -385,7 +430,7 @@ impl<'a> Store<'a> {
                 }
             }
         }
-        let encrypted = if encrypted_marker(bytes) {
+        let encrypted = if encrypted_marker(bytes) && !wrap {
             bytes.to_vec()
         } else {
             seal_as(
@@ -417,8 +462,9 @@ impl<'a> Store<'a> {
         }
         Err("Too many history backup name collisions".into())
     }
-    /// Archive conversions are independently atomic and restartable. Stale
-    /// staging files are verified, never restored or merged into active rows.
+    /// Archive conversions are independently atomic and restartable. Staging
+    /// is disposed only when empty/authenticated, or after exact current-format
+    /// debris is durably wrapped in quarantine. Never restore or merge rows.
     fn migrate_archives(&self, key: &[u8]) -> Result<(), String> {
         let artifacts = self.artifacts()?;
         for path in &artifacts {
@@ -427,7 +473,14 @@ impl<'a> Store<'a> {
             }
             let bytes = read_regular(path)?;
             let staging = artifact_kind(path) == Some(ArtifactKind::Staging);
-            if encrypted_marker(&bytes) || staging {
+            if staging {
+                if !bytes.is_empty()
+                    && open(key, &bytes).is_err()
+                    && !current_staging_debris(&bytes)
+                {
+                    return Err("Unsupported history staging format; files preserved".into());
+                }
+            } else if encrypted_marker(&bytes) {
                 open(key, &bytes)?;
             }
         }
@@ -437,7 +490,26 @@ impl<'a> Store<'a> {
                 continue;
             }
             let bytes = read_regular(&path)?;
-            if kind == Some(ArtifactKind::LegacyTmp) {
+            if kind == Some(ArtifactKind::Staging) {
+                let authenticated = open(key, &bytes).is_ok();
+                if !bytes.is_empty() && !authenticated && !current_staging_debris(&bytes) {
+                    return Err("Unsupported history staging format; files preserved".into());
+                }
+                // Never store damaged ciphertext as an outer archive: wrap the
+                // exact bytes so a later inventory can authenticate quarantine.
+                let preserved = if bytes.is_empty() || authenticated {
+                    self.dir.join("history.lock")
+                } else {
+                    self.preserve_bytes(Some(key), &bytes, true)?
+                };
+                self.checkpoint("remove-staging")?;
+                if read_regular(&path)? != bytes {
+                    return Err("History staging changed; files preserved".into());
+                }
+                fs::remove_file(&path)
+                    .map_err(|_| "Cannot remove history staging; files preserved")?;
+                self.sync_dir(&preserved)?;
+            } else if kind == Some(ArtifactKind::LegacyTmp) {
                 let preserved = self.preserve(key, &bytes)?;
                 self.checkpoint("remove-legacy")?;
                 if read_regular(&path)? != bytes {
@@ -456,12 +528,29 @@ impl<'a> Store<'a> {
         }
         Ok(())
     }
-    pub fn backup(&self) -> Result<Option<PathBuf>, String> {
+    pub fn backup(&self, automatic_read_error: bool) -> Result<Option<PathBuf>, String> {
         let _lock = self.lock()?;
         let path = self.primary_path()?;
         let Some(bytes) = read_optional(&path)? else {
             return Ok(None);
         };
+        if automatic_read_error && current_history_encoding(&bytes) {
+            // A protected-key access failure gives us NO authentication verdict.
+            // Skip the redundant automatic copy, not validation or write fences:
+            // the original stays untouched and load/save still independently fail.
+            // With a usable key, actually authenticate and validate the document;
+            // auth failures/unknown schemas must retain their opaque backup path.
+            let skip = match self.key() {
+                Ok(key) => document(&key, &bytes).is_ok(),
+                Err(_) => true,
+            };
+            if skip {
+                if read_optional(&path)?.as_deref() != Some(bytes.as_slice()) {
+                    return Err("History changed during backup; files preserved".into());
+                }
+                return Ok(None);
+            }
+        }
         // Unknown ciphertext must remain opaque, even when the original key is
         // unavailable. A successful backup never authorizes active replacement.
         let backup = if encrypted_marker(&bytes) {
