@@ -55,11 +55,11 @@ export function createHistoryStore(io: HistoryFileIo): HistoryStore {
         raw = await io.read();
       } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
-        // Same as settings/dictionary: try to keep the raw bytes. History
-        // stays write-blocked either way (the caller never writes on error).
-        const backup = await runBackup(io.backup);
+        // Read failures are always write-blocking. Do not retry filesystem or
+        // protected-key access just to make a redundant automatic copy. Parse,
+        // migration and explicit/prune backups below retain their own gates.
         return {
-          error: `Failed to read history store: ${message}${describeBackup(backup)}`,
+          error: `Failed to read history store: ${message} (automatic backup skipped; file left untouched)`,
           ok: false,
         };
       }

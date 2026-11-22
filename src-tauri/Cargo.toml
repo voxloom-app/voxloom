@@ -38,7 +38,18 @@ ureq = { version = "2.12.1", default-features = false, features = ["tls"] }
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 whisper-rs = { version = "=0.13.2", optional = true }
 
+[target.'cfg(any(target_os = "macos", target_os = "windows"))'.dependencies]
+# Identical authenticated history format and migration engine on both platforms.
+ring = "=0.17.14"
+base64 = "0.22"
+zeroize = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_Storage_FileSystem"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
+security-framework = "=3.7.0"
+core-foundation = "0.10"
 whisper-rs = { version = "=0.13.2", optional = true, features = ["metal"] }
 block2 = "0.6"
 objc2 = "0.6"

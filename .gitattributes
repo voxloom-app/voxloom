@@ -1,0 +1,2 @@
+# This plaintext is compared byte-for-byte with an authenticated ciphertext fixture.
+tests/fixtures/history-v2.json text eol=lf

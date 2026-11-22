@@ -183,7 +183,7 @@ describe('store read errors (BUS-42)', () => {
     'stat history.json: Permission denied (os error 13)',
     'stat history.json: No such file or directory (broken symlink)',
   ]) {
-    it(`history "${msg}": backup attempted, message matches, notice stays, no writes`, async () => {
+    it(`history "${msg}": backup skipped, message matches, notice stays, no writes`, async () => {
       const writes: string[] = [];
       let backups = 0;
       const io = {
@@ -199,9 +199,9 @@ describe('store read errors (BUS-42)', () => {
       );
       await waitFor(() => expect(api?.bootReady).toBe(true));
       await settle();
-      const expected = `Failed to read history store: ${msg} (backup failed: no file was backed up; file left untouched)`;
+      const expected = `Failed to read history store: ${msg} (automatic backup skipped; file left untouched)`;
       expect(api!.state.historyError).toBe(expected);
-      expect(backups).toBe(1);
+      expect(backups).toBe(0);
       act(() => api!.dispatch({
         record: { createdAt: NOW, durationSeconds: 1, id: 'n', model: null, recoveryExpiresAt: null, status: 'copied', style: 'formal', text: 'x' },
         type: 'append-record',

@@ -8,69 +8,124 @@ or the optional local cleanup model (see
 immutable Hugging Face revision, and the app checks the file's exact size and
 SHA-256 before saving it; a mismatch saves nothing.
 
-## Transcripts are stored as plain text
+## Transcript encryption on macOS and Windows
 
-The desktop app keeps its data as **unencrypted JSON** in its app data folder:
+The macOS and Windows apps encrypt the **whole saved history** with
+AES-256-GCM: final and raw transcript text, cleanup details, status, duration,
+model, timestamps and delivery outcomes. Recorded audio is never saved. While
+the app runs, History, Home, Copy and retention work on decrypted data in
+memory.
+
+The app data folder is `~/Library/Application Support/com.voxloom.prototype/`
+on macOS. On Windows it is the app's data folder under your user profile, not
+the install folder. It contains:
 
 ```text
-~/Library/Application Support/com.voxloom.prototype/
-├── history.json      final transcript text, raw transcript, cleanup metadata,
-│                     status, duration, model, timestamp, delivery outcome
-├── *.json.unreadable-*.bak  backups of a store file before an upgrade, or one
-│                     Voxloom couldn't read (see below)
-├── dictionary.json   your custom words (also given to the on-device cleanup
-│                     model in its prompt; nothing is sent over the network)
-├── settings.json     preferences
-├── models/           downloaded Whisper model files (*.bin), and *.bin.verified
-                      markers (pinned SHA-256, size, modified time; no user data)
-└── cleanup-models/   the local cleanup model (qwen3-0.6b-q4-k-m.gguf), downloaded
-                      (or imported by an earlier version); no user data
+history.json                   encrypted history
+history.key.dpapi              Windows only: the protected history key
+history.json.unreadable-*.bak  encrypted backups of earlier history files
+history.json.encrypted-*.tmp   encrypted leftovers of an interrupted save
+history.lock                   transaction lock; no transcripts or keys
+dictionary.json                custom words, not encrypted
+settings.json                  preferences, not encrypted
+*.json.unreadable-*.bak        settings/dictionary backups, not encrypted
+models/                        downloaded Whisper models
+cleanup-models/                downloaded cleanup model; no user data
 ```
 
-`history.json` is not encrypted. Any process running as your macOS user, and
-anything that copies your home folder (Time Machine, other backup or sync
-tools), can read your transcripts. FileVault protects it only while the Mac is
-shut down; once you've logged in, a locked screen doesn't keep it from other
-processes running as you. Recorded audio is never saved.
+**Linux history is not encrypted.** Settings, dictionary words and their
+backups stay plaintext on every platform. Other processes running as your
+user, or tools copying your home folder, can read those files.
 
-Each history row stores the **raw transcript** as well as the final text, even
-when they are identical, plus **cleanup metadata**: whether optional local
-cleanup ran (cleaned, fallback, skipped or unavailable), the cleanup model's
-ID and digest, the prompt version, and a digest of your dictionary words.
-The raw transcript is covered by the same retention and delete controls as
-the final text.
+### Key protection and limits
+
+On macOS, the random history key is kept in a dedicated item in your default
+file-based Keychain. Voxloom doesn't sync it. macOS may ask for approval when a
+different build of the app tries to read it, depending on how it is signed. On
+Windows, each app data folder gets its own random key, stored only as a
+current-user DPAPI-protected file beside history; Windows doesn't prompt.
+
+Both protect history at rest under your user account. They are not biometric
+or hardware-bound protection, and they don't protect against a compromised app
+or other software running as you; on Windows, any process running as you can
+unprotect the key. Text you copy or insert into another app is outside this
+protection. Encrypted history can't be exported, and copying it to another
+machine or account doesn't make it readable there.
+
+Voxloom never replaces an existing key, deletes it for retention, or falls back
+to writing plaintext when the key can't be used. If the key is missing while
+encrypted history exists, the key is inaccessible or invalid, a file fails
+authentication, or a file is unsafe or in an unknown format, History stops
+loading and saving and the files are left as they are. Dictation can continue, but new transcripts stay in memory only.
+History backups alone can't restore history: they need the original key (the
+macOS Keychain item, or on Windows the key file and the same Windows account).
+Don't delete or replace the key to troubleshoot.
+
+### If the history key is lost
+
+If History reports that the original protected key is required and you can't
+restore it, that history can't be decrypted. To start a new, empty history
+without deleting anything:
+
+1. Quit Voxloom.
+2. Create a folder outside the app data folder, such as `voxloom-old-history`
+   in your Documents folder.
+3. Move every file whose name starts with `history` into it. On Windows this
+   includes `history.key.dpapi`.
+4. Start Voxloom. It saves new transcripts to a new, empty history.
+
+Keep the moved files together. They become readable again only if the
+original key is restored.
+
+### Upgrade and archival backups
+
+Earlier unencrypted history (versions 1 and 2) still loads. Before rewriting
+it, Voxloom saves the original bytes in an encrypted backup, then encrypts the
+active file on the next successful save. Older Voxloom versions can't read
+encrypted history and should refuse it rather than overwrite it.
+
+Existing `history.json.unreadable-*.bak` backups and any leftover
+`history.json.tmp` are encrypted during the upgrade; a leftover file is never
+restored as active history. The upgrade works one file at a time and resumes
+after an interruption. A file that can't be read or has an unknown format
+stays where it is, may still be unencrypted, and blocks History until it's
+resolved. Encryption can't reach copies in external backups or sync folders.
+
+If a side file blocks History, the error names its type and, when safe, its
+filename, but never its contents, keys or the full folder path. Quit Voxloom,
+back up the history folder and get recovery help before changing anything. An
+error doesn't mean earlier per-file upgrades were undone.
+
+History backups can contain raw and final text, metadata, deleted rows and
+expired transcripts. **Retention and row deletion don't remove backups.** A
+history read error doesn't create another backup; the file stays in place and
+saving stays blocked. Settings and dictionary backups are plain copies,
+separate from these rules.
+
+For the storage format and recovery rules, see
+[Contributing](CONTRIBUTING.md#history-encryption-and-recovery).
 
 ## Deleting transcripts
 
 - **One transcript:** History → the row's **Delete transcript** (trash) button.
-- **All transcripts, and stop keeping them:** Settings → Privacy →
-  **Transcript retention → Off**. `history.json` is rewritten with no records
-  right away, and new dictations are not stored. Transcripts already loaded
-  stay visible in History and Home (in memory only) until you restart Voxloom.
-  If Voxloom couldn't load `history.json` (it shows an error banner), Off
-  can't rewrite it; quit Voxloom and delete the files manually as below.
-- **Keep only recent ones:** **30 days** drops older records on every save
-  and on launch. **Forever** keeps everything until you delete it.
-- **Everything, manually:** quit Voxloom and delete the folder above, or at
-  least these files in it:
-  - `history.json`
-  - `*.unreadable-*.bak` (upgrade and unreadable-file backups, see below)
-  - `history.json.tmp`, a temporary file a crash during save can leave behind.
-    Nothing cleans it up automatically, and it may hold transcripts.
+- **Clear active history, and stop keeping new transcripts:** Settings → Privacy →
+  **Transcript retention → Off** rewrites the active history with no records
+  (encrypted on macOS and Windows). Already-loaded transcripts remain visible in History
+  and Home, in memory only, until restart. Off does not delete the history key
+  or backups. If settings or history can't be read, Voxloom doesn't do this
+  rewrite, so unavailable history is never erased.
+- **Keep only recent ones:** **30 days** drops older active records on every
+  save and launch. **Forever** keeps active records until you delete them.
+- **Remove local history files manually:** quit Voxloom first, then remove
+  `history.json`, its `history.json.unreadable-*.bak` backups and any
+  `history.json.tmp` or `history.json.encrypted-*.tmp` files from the folder
+  above. A missing `history.json` starts an empty history; Voxloom never
+  restores it from a backup. Keep any files you might want back. Deleting the
+  entire folder also removes settings, dictionary words and downloaded models.
 
-  A missing `history.json` is treated as empty history on next launch.
-- **Upgrade and unreadable-file backups:** before Voxloom rewrites
-  `history.json` or `settings.json` in a newer format, it copies the original
-  to `<file>.unreadable-<timestamp>.bak` in the same folder. The first launch
-  of a build with optional cleanup makes this **one-time upgrade backup** of
-  both files. The same copy is made when a store file can't be read (corrupt,
-  or from a different version), and that also applies to `dictionary.json`.
-  These copies may hold old transcripts in plain text, and **retention never
-  deletes them**. To remove them, quit Voxloom and delete them by hand, for
-  example:
-  `rm ~/Library/Application\ Support/com.voxloom.prototype/*.unreadable-*.bak`
-
-Deleting a file does not remove copies already captured by backups.
+File removal does not erase copies captured by Time Machine, other backup or
+sync tools, nor promise forensic erasure on SSDs. Encryption cannot retract
+transcripts already copied or inserted elsewhere.
 
 ## Accessibility
 

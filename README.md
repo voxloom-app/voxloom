@@ -70,7 +70,8 @@ Speech recognition and optional cleanup run locally. Recorded audio is not
 saved. Model downloads need an internet connection; dictation uses the installed
 models on your Mac.
 
-Saved transcripts are plain text, not encrypted by Voxloom. Clipboard managers
+History is encrypted at rest on macOS and Windows. Linux history remains
+plaintext. Settings and dictionary files remain unencrypted. Clipboard managers
 may also see text during insertion. Use Settings → Privacy to control transcript
 retention, and read [Privacy and local data](PRIVACY.md) for deletion, backup
 and clipboard details.

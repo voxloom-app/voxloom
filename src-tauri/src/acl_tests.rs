@@ -53,6 +53,28 @@ fn store_backup(store: String) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+fn history_load() {}
+#[tauri::command]
+fn history_save() {}
+
+#[test]
+fn history_storage_commands_remain_main_only() {
+    for command in ["history_load", "history_save"] {
+        let app = mock_builder()
+            .invoke_handler(tauri::generate_handler![history_load, history_save])
+            .build(crate::app_context())
+            .unwrap();
+        assert_eq!(invoke_command(&app, "main", "index.html", command), Ok(()));
+        assert!(invoke_command(&app, "settings", "settings.html", command)
+            .unwrap_err()
+            .contains("not allowed"));
+        assert!(invoke_command(&app, OVERLAY, "overlay.html", command)
+            .unwrap_err()
+            .contains("not allowed"));
+    }
+}
+
+#[tauri::command]
 fn cleanup_run() {}
 
 #[tauri::command]

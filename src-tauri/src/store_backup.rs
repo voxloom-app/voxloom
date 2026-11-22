@@ -94,14 +94,24 @@ pub(crate) fn backup_file(path: &Path, now_ms: u128) -> Result<Option<PathBuf>, 
 }
 
 /// Back up an unreadable store file. Returns the backup path, or `null`
-/// when there was no file.
+/// when there was no file. macOS/Windows history keeps backups encrypted.
 #[tauri::command]
-pub fn store_backup(app: AppHandle, store: String) -> Result<Option<String>, String> {
-    let file = file_name_for(&store)?;
+pub async fn store_backup(app: AppHandle, store: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || backup_store(&app, &store))
+        .await
+        .map_err(|_| "Store backup worker failed".to_string())?
+}
+
+fn backup_store(app: &AppHandle, store: &str) -> Result<Option<String>, String> {
+    let file = file_name_for(store)?;
     let dir = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("app data dir: {e}"))?;
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    if store == "history" {
+        return Ok(crate::history::backup_history(&dir)?.map(|p| p.to_string_lossy().into_owned()));
+    }
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
