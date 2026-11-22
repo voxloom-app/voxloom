@@ -94,28 +94,15 @@ pub(crate) fn backup_file(path: &Path, now_ms: u128) -> Result<Option<PathBuf>, 
 }
 
 /// Back up an unreadable store file. Returns the backup path, or `null`
-/// when there was no file or legacy automatic read-error context requested
-/// a deliberate non-authorizing history skip (without protected-key access).
-/// New history loaders do not issue automatic read-error backup requests.
-/// Omitted/false context retains explicit original-byte backup semantics.
+/// when there was no file. macOS/Windows history keeps backups encrypted.
 #[tauri::command]
-pub async fn store_backup(
-    app: AppHandle,
-    store: String,
-    automatic_read_error: Option<bool>,
-) -> Result<Option<String>, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        backup_store(&app, &store, automatic_read_error.unwrap_or(false))
-    })
-    .await
-    .map_err(|_| "Store backup worker failed".to_string())?
+pub async fn store_backup(app: AppHandle, store: String) -> Result<Option<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || backup_store(&app, &store))
+        .await
+        .map_err(|_| "Store backup worker failed".to_string())?
 }
 
-fn backup_store(
-    app: &AppHandle,
-    store: &str,
-    _automatic_read_error: bool,
-) -> Result<Option<String>, String> {
+fn backup_store(app: &AppHandle, store: &str) -> Result<Option<String>, String> {
     let file = file_name_for(store)?;
     let dir = app
         .path()
@@ -123,8 +110,7 @@ fn backup_store(
         .map_err(|e| format!("app data dir: {e}"))?;
     #[cfg(any(target_os = "macos", target_os = "windows"))]
     if store == "history" {
-        return Ok(crate::history::backup_history(&dir, _automatic_read_error)?
-            .map(|p| p.to_string_lossy().into_owned()));
+        return Ok(crate::history::backup_history(&dir)?.map(|p| p.to_string_lossy().into_owned()));
     }
     let now_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -225,10 +225,10 @@ fn case_variant_legacy_files_migrate_losslessly_without_plaintext() {
             open(keys.0.borrow().as_ref().unwrap(), &migrated).unwrap(),
             raw
         );
-        let first_backup = store.backup(false).unwrap().unwrap();
+        let first_backup = store.backup().unwrap().unwrap();
         let renamed = f.0.join("HiStOrY.JsOn.UnReAdAbLe-9-2.BaK");
         fs::rename(first_backup, &renamed).unwrap();
-        assert_eq!(store.backup(false).unwrap().unwrap(), renamed);
+        assert_eq!(store.backup().unwrap().unwrap(), renamed);
         store.save(DOCUMENT).unwrap();
         assert_eq!(fs::read(f.0.join(archive)).unwrap(), migrated);
         assert!(fs::read_dir(&f.0)
@@ -538,7 +538,7 @@ fn legacy_empty_file_keeps_existing_empty_history_semantics() {
 }
 
 #[test]
-fn automatic_read_error_does_not_archive_current_ciphertext_on_key_access_failure() {
+fn key_access_failure_writes_nothing_until_explicit_backup_preserves_ciphertext() {
     struct Denied;
     impl KeyOps for Denied {
         fn read(&self) -> Result<Option<Vec<u8>>, String> {
@@ -554,16 +554,11 @@ fn automatic_read_error_does_not_archive_current_ciphertext_on_key_access_failur
     fs::write(f.0.join(PRIMARY), &raw).unwrap();
     for _ in 0..2 {
         assert!(store.load().is_err());
-        assert_eq!(
-            store.backup(true).unwrap(),
-            None,
-            "automatic access failure must not add a snapshot"
-        );
         assert!(store.save(DOCUMENT).is_err());
         assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
         assert_eq!(store.artifacts().unwrap().len(), 1);
     }
-    let explicit = store.backup(false).unwrap().unwrap();
+    let explicit = store.backup().unwrap().unwrap();
     assert_eq!(
         fs::read(&explicit).unwrap(),
         raw,
@@ -572,8 +567,7 @@ fn automatic_read_error_does_not_archive_current_ciphertext_on_key_access_failur
 }
 
 #[test]
-fn automatic_read_error_skips_but_explicit_backup_preserves_malformed_unknown_and_auth_failed_sources(
-) {
+fn explicit_backup_preserves_malformed_unknown_and_auth_failed_sources() {
     let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
     let mut sources = vec![
         (original[..original.len() - 5].to_vec(), true),
@@ -608,8 +602,7 @@ fn automatic_read_error_skips_but_explicit_backup_preserves_malformed_unknown_an
         let store = Store::new(&f.0, &keys);
         fs::write(f.0.join(PRIMARY), &raw).unwrap();
         assert!(store.load().is_err());
-        assert_eq!(store.backup(true).unwrap(), None);
-        let first = store.backup(false).unwrap().unwrap();
+        let first = store.backup().unwrap().unwrap();
         let preserved = fs::read(&first).unwrap();
         if opaque {
             assert_eq!(preserved, raw);
@@ -617,14 +610,14 @@ fn automatic_read_error_skips_but_explicit_backup_preserves_malformed_unknown_an
             assert_eq!(envelope(&preserved).unwrap().role, PRESERVATION);
             assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
         }
-        assert_eq!(store.backup(false).unwrap().unwrap(), first);
+        assert_eq!(store.backup().unwrap().unwrap(), first);
         assert!(store.save(DOCUMENT).is_err());
         assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
     }
 }
 
 #[test]
-fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verdict() {
+fn unavailable_key_is_not_an_authentication_verdict() {
     struct Denied;
     impl KeyOps for Denied {
         fn read(&self) -> Result<Option<Vec<u8>>, String> {
@@ -653,13 +646,12 @@ fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verd
         let f = Fixture::new();
         let store = Store::new(&f.0, &Denied);
         fs::write(f.0.join(PRIMARY), &raw).unwrap();
-        assert_eq!(store.backup(true).unwrap(), None);
         if opaque {
-            let preserved = store.backup(false).unwrap().unwrap();
+            let preserved = store.backup().unwrap().unwrap();
             assert_eq!(fs::read(preserved).unwrap(), raw);
         } else {
             assert!(
-                store.backup(false).is_err(),
+                store.backup().is_err(),
                 "ambiguous bytes require a usable key"
             );
             assert_eq!(store.artifacts().unwrap().len(), 1);
@@ -672,24 +664,51 @@ fn automatic_read_error_does_not_treat_unavailable_key_as_an_authentication_verd
     let keys = FakeKeys::default();
     let store = Store::new(&f.0, &keys);
     fs::write(f.0.join(PRIMARY), &original).unwrap();
-    assert_eq!(store.backup(true).unwrap(), None);
-    assert!(
-        keys.0.borrow().is_none(),
-        "automatic backup must not rekey ciphertext"
-    );
     assert!(store.load().is_err());
     assert!(store.save(DOCUMENT).is_err());
+    assert!(
+        keys.0.borrow().is_none(),
+        "a missing key must not rekey ciphertext"
+    );
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), original);
     // Once a real key can be read, explicit backup still preserves a known
-    // tag failure; the automatic context never claims an authentication verdict.
+    // tag failure.
     *keys.0.borrow_mut() = Some(vec![8; 32]);
-    assert_eq!(store.backup(true).unwrap(), None);
-    let preserved = store.backup(false).unwrap().unwrap();
+    let preserved = store.backup().unwrap().unwrap();
     assert_eq!(fs::read(preserved).unwrap(), original);
 }
 
 #[test]
-fn automatic_read_error_skips_legacy_bytes_while_explicit_preservation_and_staging_fences_remain() {
+fn missing_or_wrong_key_for_active_history_explains_the_start_over_path() {
+    let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
+    for key in [None, Some(vec![8; 32])] {
+        let f = Fixture::new();
+        let keys = FakeKeys(RefCell::new(key.clone()));
+        let store = Store::new(&f.0, &keys);
+        fs::write(f.0.join(PRIMARY), &original).unwrap();
+        for error in [store.load().unwrap_err(), store.save(DOCUMENT).unwrap_err()] {
+            assert!(error.contains("original protected key required"), "{error}");
+            assert!(error.contains(KEY_LOSS_HELP), "{error}");
+        }
+        assert_eq!(*keys.0.borrow(), key, "the key is never replaced in place");
+        assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), original);
+    }
+    // Side files keep their bounded recovery diagnostics, and moving files
+    // aside does not repair an unusable key item.
+    let f = Fixture::new();
+    let keys = FakeKeys(RefCell::new(Some(vec![7; 32])));
+    let store = Store::new(&f.0, &keys);
+    store.save(DOCUMENT).unwrap();
+    let archive = f.0.join("history.json.unreadable-1795260000000-2.bak");
+    fs::write(&archive, seal(&[8; 32], DOCUMENT.as_bytes()).unwrap()).unwrap();
+    assert!(!store.load().unwrap_err().contains(KEY_LOSS_HELP));
+    fs::remove_file(archive).unwrap();
+    *keys.0.borrow_mut() = Some(vec![7; 31]);
+    assert!(!store.load().unwrap_err().contains(KEY_LOSS_HELP));
+}
+
+#[test]
+fn explicit_backup_preserves_legacy_bytes_while_staging_fences_remain() {
     for raw in [
         DOCUMENT.as_bytes(),
         br#"{"version":1,"records":[]}"#,
@@ -699,12 +718,7 @@ fn automatic_read_error_skips_legacy_bytes_while_explicit_preservation_and_stagi
         let keys = FakeKeys::default();
         let store = Store::new(&f.0, &keys);
         fs::write(f.0.join(PRIMARY), raw).unwrap();
-        assert_eq!(store.backup(true).unwrap(), None);
-        assert!(
-            keys.0.borrow().is_none(),
-            "automatic skip must not provision"
-        );
-        let path = store.backup(false).unwrap().unwrap();
+        let path = store.backup().unwrap().unwrap();
         assert_eq!(
             open(keys.0.borrow().as_ref().unwrap(), &fs::read(path).unwrap()).unwrap(),
             raw
@@ -719,19 +733,14 @@ fn automatic_read_error_skips_legacy_bytes_while_explicit_preservation_and_stagi
     let unknown = f.0.join("HiStOrY.JsOn.EnCrYpTeD-CrAsH.TmP");
     fs::write(&unknown, b"unexpected plaintext").unwrap();
     assert!(store.load().is_err());
-    assert_eq!(
-        store.backup(true).unwrap(),
-        None,
-        "healthy source needs no automatic archive"
-    );
     assert!(
         store.save(DOCUMENT).is_err(),
-        "skip cannot authorize writes through a staging error"
+        "writes stay blocked by a staging error"
     );
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
     assert_eq!(fs::read(&unknown).unwrap(), b"unexpected plaintext");
     assert_eq!(store.artifacts().unwrap().len(), 2);
-    let explicit = store.backup(false).unwrap().unwrap();
+    let explicit = store.backup().unwrap().unwrap();
     assert_eq!(fs::read(explicit).unwrap(), raw);
 }
 
@@ -742,8 +751,8 @@ fn backup_preserves_corrupt_non_utf8_bytes_encrypted_and_deduplicated() {
     let store = Store::new(&f.0, &keys);
     let raw = b"RAW-CANARY-BUS207\xff\xfe\0corrupt";
     fs::write(f.0.join(PRIMARY), raw).unwrap();
-    let first = store.backup(false).unwrap().unwrap();
-    let second = store.backup(false).unwrap().unwrap();
+    let first = store.backup().unwrap().unwrap();
+    let second = store.backup().unwrap().unwrap();
     assert_eq!(first, second);
     assert_eq!(
         open(keys.0.borrow().as_ref().unwrap(), &fs::read(first).unwrap()).unwrap(),
@@ -772,9 +781,9 @@ fn unknown_ciphertext_backup_is_opaque_and_never_authorizes_save() {
     future["envelopeVersion"] = 99.into();
     let raw = serde_json::to_vec(&future).unwrap();
     fs::write(f.0.join(PRIMARY), &raw).unwrap();
-    let path = store.backup(false).unwrap().unwrap();
+    let path = store.backup().unwrap().unwrap();
     assert_eq!(fs::read(&path).unwrap(), raw);
-    assert_eq!(store.backup(false).unwrap().unwrap(), path);
+    assert_eq!(store.backup().unwrap().unwrap(), path);
     assert!(store.load().is_err());
     assert!(store.save(DOCUMENT).is_err());
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
@@ -823,7 +832,7 @@ fn denied_invalid_and_unpersisted_keys_never_fall_back_to_plaintext() {
         assert!(!f.0.join(PRIMARY).exists());
         fs::write(f.0.join(PRIMARY), DOCUMENT).unwrap();
         assert!(store.load().is_err());
-        assert!(store.backup(false).is_err());
+        assert!(store.backup().is_err());
         assert_eq!(fs::read_to_string(f.0.join(PRIMARY)).unwrap(), DOCUMENT);
         assert_eq!(fs::read_dir(&f.0).unwrap().count(), 2); // source plus lock
     }
@@ -1953,7 +1962,7 @@ fn new_primary_archives_and_staging_have_private_modes() {
     };
     store.io_fault = Some(&check);
     store.save(DOCUMENT).unwrap();
-    store.backup(false).unwrap();
+    store.backup().unwrap();
     f.assert_no_canaries();
 }
 
@@ -1998,7 +2007,7 @@ fn backup_reports_a_source_change_instead_of_authorizing_a_reset() {
     };
     store.io_fault = Some(&mutate);
     assert!(
-        store.backup(false).is_err(),
+        store.backup().is_err(),
         "source changed while backup was being published"
     );
     assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), changed);
@@ -2066,7 +2075,7 @@ fn ambiguous_marker_backup_requires_existing_key_and_never_publishes_plaintext()
                 let store = Store::new(&f.0, &keys);
                 fs::write(f.0.join("HiStOrY.JsOn"), raw).unwrap();
                 assert!(store.load().is_err());
-                let backup = store.backup(false);
+                let backup = store.backup();
                 if !denied && value.as_ref().is_some_and(|v| v.len() == 32) {
                     let path = backup.unwrap().unwrap();
                     let preserved = fs::read(&path).unwrap();
@@ -2079,10 +2088,7 @@ fn ambiguous_marker_backup_requires_existing_key_and_never_publishes_plaintext()
                     assert!(!preserved
                         .windows(b"FINAL-CANARY-BUS207".len())
                         .any(|w| w == b"FINAL-CANARY-BUS207"));
-                    assert_eq!(
-                        Store::new(&f.0, &keys).backup(false).unwrap().unwrap(),
-                        path
-                    );
+                    assert_eq!(Store::new(&f.0, &keys).backup().unwrap().unwrap(), path);
                 } else {
                     assert!(
                         backup.is_err(),
@@ -2126,7 +2132,7 @@ fn wrapped_preservation_never_reuses_an_identical_unvalidated_outer_archive() {
 }
 
 #[test]
-fn automatic_read_error_is_key_read_free_after_actual_load_for_every_key_outcome() {
+fn load_reads_the_protected_key_once_for_every_key_outcome() {
     let original = seal(&[7; 32], DOCUMENT.as_bytes()).unwrap();
     let mut future: serde_json::Value = serde_json::from_slice(&original).unwrap();
     future["envelopeVersion"] = 99.into();
@@ -2149,14 +2155,7 @@ fn automatic_read_error_is_key_read_free_after_actual_load_for_every_key_outcome
                 let store = Store::new(&f.0, &keys);
                 fs::write(f.0.join(PRIMARY), &raw).unwrap();
                 let _loaded = store.load();
-                let reads = keys.reads.get();
-                assert_eq!(reads, 1);
-                assert_eq!(store.backup(true).unwrap(), None);
-                assert_eq!(
-                    keys.reads.get(),
-                    reads,
-                    "automatic backup retried protected-key IO"
-                );
+                assert_eq!(keys.reads.get(), 1);
                 assert_eq!(keys.adds.get(), 0);
                 assert_eq!(store.artifacts().unwrap().len(), 1);
                 assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
@@ -2182,7 +2181,7 @@ fn unsupported_envelope_header_strings_are_not_raw_backup_permission() {
             fs::write(f.0.join(PRIMARY), &raw).unwrap();
             assert!(store.load().is_err());
             if available {
-                let backup = store.backup(false).unwrap().unwrap();
+                let backup = store.backup().unwrap().unwrap();
                 let preserved = fs::read(backup).unwrap();
                 assert_ne!(preserved, raw);
                 assert_eq!(open(&[7; 32], &preserved).unwrap(), raw);
@@ -2190,7 +2189,7 @@ fn unsupported_envelope_header_strings_are_not_raw_backup_permission() {
                     .windows(b"FINAL-CANARY-BUS207".len())
                     .any(|w| w == b"FINAL-CANARY-BUS207"));
             } else {
-                assert!(store.backup(false).is_err());
+                assert!(store.backup().is_err());
                 assert_eq!(store.artifacts().unwrap().len(), 1);
             }
             assert_eq!(keys.adds.get(), 0);
@@ -2227,10 +2226,10 @@ fn recognized_reordered_current_and_future_backups_never_grant_active_write_auth
             let readable = current && value == Some(vec![7; 32]);
             assert_eq!(store.load().is_ok(), readable);
             let reads = keys.reads.get();
-            let first = store.backup(false).unwrap().unwrap();
+            let first = store.backup().unwrap().unwrap();
             assert_eq!(keys.reads.get(), reads, "opaque copy should not read a key");
             assert_eq!(fs::read(&first).unwrap(), raw);
-            assert_eq!(store.backup(false).unwrap().unwrap(), first);
+            assert_eq!(store.backup().unwrap().unwrap(), first);
             // Even a byte-exact opaque archive is not an authentication verdict.
             // Use a fresh store: future or wrong/missing key remains refused.
             if !readable {
@@ -2261,7 +2260,7 @@ fn ambiguous_marker_backup_retry_renews_durability_fences_without_source_loss() 
             }
         };
         first.io_fault = Some(&fail_publication);
-        assert!(first.backup(false).is_err());
+        assert!(first.backup().is_err());
         let archives: Vec<_> = first
             .artifacts()
             .unwrap()
@@ -2288,21 +2287,18 @@ fn ambiguous_marker_backup_retry_renews_durability_fences_without_source_loss() 
         };
         let mut retry = Store::new(&f.0, &keys);
         retry.io_fault = Some(&fail_retry);
-        assert!(retry.backup(false).is_err());
+        assert!(retry.backup().is_err());
         assert!(observed.borrow().iter().any(|s| s == failed_fence));
         assert_eq!(fs::read(f.0.join(PRIMARY)).unwrap(), raw);
         assert_eq!(fs::read(&renamed).unwrap(), preserved);
-        assert_eq!(
-            Store::new(&f.0, &keys).backup(false).unwrap().unwrap(),
-            renamed
-        );
+        assert_eq!(Store::new(&f.0, &keys).backup().unwrap().unwrap(), renamed);
         assert!(Store::new(&f.0, &keys).save(DOCUMENT).is_err());
         assert_eq!(keys.adds.get(), 0);
     }
 }
 
 #[test]
-fn automatic_skip_does_not_swallow_unsafe_inventory_or_read_errors() {
+fn backup_reports_the_same_unsafe_inventory_error_as_load_without_key_access() {
     for name in [
         PRIMARY,
         "HiStOrY.JsOn.UnReAdAbLe-1.BaK",
@@ -2320,10 +2316,8 @@ fn automatic_skip_does_not_swallow_unsafe_inventory_or_read_errors() {
         fs::create_dir(f.0.join(name)).unwrap();
         let store = Store::new(&f.0, &keys);
         let load_error = store.load().unwrap_err();
-        let automatic_error = store.backup(true).unwrap_err();
-        let explicit_error = store.backup(false).unwrap_err();
-        assert_eq!(load_error, automatic_error);
-        assert_eq!(load_error, explicit_error);
+        let backup_error = store.backup().unwrap_err();
+        assert_eq!(load_error, backup_error);
         assert!(load_error.contains("Cannot read history artifact"));
         assert_eq!(keys.reads.get(), 0);
         assert_eq!(keys.adds.get(), 0);

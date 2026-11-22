@@ -1,4 +1,4 @@
-import { memoryBackups, type BackupOptions } from '../storeBackup';
+import { memoryBackups } from '../storeBackup';
 
 /** Injectable byte store for history.json (Tauri app-data or tests). */
 export interface HistoryFileIo {
@@ -8,11 +8,10 @@ export interface HistoryFileIo {
   write(contents: string): Promise<void>;
   /**
    * Copy the current on-disk file aside before an unreadable / migrated file
-   * may be replaced. Resolves to the backup location or `null` (no file or
-   * redundant automatic encrypted backup skipped). A skip grants no write
-   * permission. Optional: without it, unreadable files are never overwritten.
+   * may be replaced. Resolves to the backup location or `null` (no file).
+   * Optional: without it, unreadable files are never overwritten.
    */
-  backup?(options?: BackupOptions): Promise<string | null>;
+  backup?(): Promise<string | null>;
 }
 
 /** In-memory IO for unit tests and non-Tauri shells. */

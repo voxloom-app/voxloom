@@ -1,24 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHistoryStore } from '../../src/services/history/store';
 import { createTauriHistoryIo } from '../../src/services/history/tauriIo';
-import { describeBackup, runBackup, tauriBackup } from '../../src/services/storeBackup';
+import { tauriBackup } from '../../src/services/storeBackup';
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke, isTauri: () => true }));
 
 beforeEach(() => { invoke.mockReset(); });
 
-describe('history automatic read-error backup bridge', () => {
+describe('history read-error backup bridge', () => {
   it.each([
     'synthetic protected-key access failure',
     'History protected key is invalid; files preserved',
     'Cannot inventory history artifacts',
     'Cannot read history artifact; files preserved',
     'History authentication failed; files preserved; original protected key required',
-  ])('does not retry protected IO or report a false backup failure after %s', async (message) => {
+  ])('does not request a backup or retry protected IO after %s', async (message) => {
     invoke.mockImplementation(async (command: string) => {
       if (command === 'history_load') throw new Error(message);
-      if (command === 'store_backup') return null;
       throw new Error(`unexpected command: ${command}`);
     });
     const store = createHistoryStore(createTauriHistoryIo());
@@ -41,22 +40,7 @@ describe('history automatic read-error backup bridge', () => {
     },
   );
 
-  it('keeps the legacy automatic null result distinct from backup success and real failures', async () => {
-    invoke.mockResolvedValue(null);
-    const skipped = await runBackup(tauriBackup('history'), { automaticReadError: true });
-    expect(skipped).toEqual({ ok: false, skipped: true });
-    expect(describeBackup(skipped)).toBe(' (automatic backup skipped; file left untouched)');
-    expect(invoke).toHaveBeenCalledWith('store_backup', { store: 'history', automaticReadError: true });
-    const explicit = await runBackup(tauriBackup('history'));
-    expect(explicit).toEqual({ ok: false, error: 'no file was backed up' });
-    expect(describeBackup(explicit)).toContain('backup failed');
-    invoke.mockRejectedValue(new Error('Cannot inventory history artifacts'));
-    const failed = await runBackup(tauriBackup('history'), { automaticReadError: true });
-    expect(failed).toEqual({ ok: false, error: 'Cannot inventory history artifacts' });
-    expect(describeBackup(failed)).toContain('backup failed');
-  });
-
-  it('retains omitted-context semantics for explicit/prune and other store backups', async () => {
+  it('sends only the store name for explicit/prune and other store backups', async () => {
     invoke.mockResolvedValue('synthetic-backup');
     expect(await createHistoryStore(createTauriHistoryIo()).backup?.()).toBe('saved');
     await tauriBackup('settings')();

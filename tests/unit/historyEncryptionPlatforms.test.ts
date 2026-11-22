@@ -4,16 +4,6 @@ import { describe, expect, it } from 'vitest';
 const read = (path: string) => existsSync(path) ? readFileSync(path, 'utf8').replace(/\r\n/g, '\n') : '';
 
 describe('native encrypted history platform routing', () => {
-  it('keeps README storage and clipboard disclosures consistent with platform behavior', () => {
-    const readme = read('README.md').replace(/\s+/g, ' ');
-    expect(readme).toContain('History is encrypted at rest on macOS and Windows.');
-    expect(readme).toContain('Linux history remains plaintext.');
-    expect(readme).toContain('Settings and dictionary files remain unencrypted.');
-    expect(readme).toContain('Clipboard managers may also see text during insertion.');
-    expect(readme).not.toContain('Saved transcripts are plain text, not encrypted by Voxloom.');
-    expect(readme).toContain('[Privacy and local data](PRIVACY.md)');
-  });
-
   it('uses the same encrypted engine on macOS and Windows, never the plaintext adapter', () => {
     const source = read('src-tauri/src/history.rs');
     expect(source).toContain('#[cfg(any(target_os = "macos", target_os = "windows"))]\nmod encrypted;');

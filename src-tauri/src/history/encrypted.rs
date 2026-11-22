@@ -22,6 +22,14 @@ const ALGORITHM: &str = "AES-256-GCM";
 const HISTORY: &str = "history";
 const PRESERVATION: &str = "preservation";
 const PRIMARY: &str = "history.json";
+const AUTH_FAILED: &str =
+    "History authentication failed; files preserved; original protected key required";
+/// Lost keys cannot be recovered. Moving every history file aside (on Windows
+/// that includes the key blob) starts over without deleting anything.
+pub(super) const KEY_LOSS_HELP: &str = "If the original key can't be restored, quit Voxloom and move every file named history* out of its data folder to start a new history";
+pub(super) fn key_loss(reason: &str) -> String {
+    format!("{reason}. {KEY_LOSS_HELP}")
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ArtifactKind {
@@ -182,9 +190,7 @@ pub(super) fn open(key: &[u8], bytes: &[u8]) -> Result<Vec<u8>, String> {
             &mut data,
         )
         .map(|v| v.to_vec())
-        .map_err(|_| {
-            "History authentication failed; files preserved; original protected key required".into()
-        })
+        .map_err(|_| AUTH_FAILED.into())
 }
 fn encrypted_marker(bytes: &[u8]) -> bool {
     if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes) {
@@ -248,11 +254,14 @@ fn current_staging_debris(bytes: &[u8]) -> bool {
     })
 }
 
+fn open_artifact(path: &Path) -> Result<File, String> {
+    native_fs::open_regular(path, false)
+        .map_err(|_| sidefile_error(path, "Cannot read history artifact; files preserved"))
+}
 fn read_regular(path: &Path) -> Result<Vec<u8>, String> {
-    let mut file = native_fs::open_regular(path, false)
-        .map_err(|_| sidefile_error(path, "Cannot read history artifact; files preserved"))?;
     let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)
+    open_artifact(path)?
+        .read_to_end(&mut bytes)
         .map_err(|_| sidefile_error(path, "Cannot read history artifact"))?;
     Ok(bytes)
 }
@@ -278,7 +287,9 @@ fn document(key: &[u8], bytes: &[u8]) -> Result<Vec<u8>, String> {
         if envelope(bytes)?.role != HISTORY {
             return Err("History preservation archive is not active history".into());
         }
-        open(key, bytes)?
+        // Side files keep their own diagnostics; only the active document
+        // gets key-loss guidance.
+        open(key, bytes).map_err(|e| if e == AUTH_FAILED { key_loss(&e) } else { e })?
     } else {
         // The existing frontend treats an empty/whitespace legacy file as an
         // empty store. Preserve its original bytes before the next rewrite.
@@ -319,31 +330,33 @@ impl<'a> Store<'a> {
         native_fs::lock(&self.dir.join("history.lock"))
             .map_err(|_| "Cannot safely lock history transaction; files preserved".into())
     }
+    /// Taken once per transaction, before any key access. Each artifact is
+    /// opened and checked as a regular file; contents are read where used.
     fn artifacts(&self) -> Result<Vec<PathBuf>, String> {
         let mut paths = Vec::new();
         for entry in fs::read_dir(self.dir).map_err(|_| "Cannot inventory history artifacts")? {
             let entry = entry.map_err(|_| "Cannot inventory history artifacts")?;
             if artifact_kind(&entry.path()).is_some() {
-                read_regular(&entry.path())?;
+                open_artifact(&entry.path())?;
                 paths.push(entry.path());
             }
         }
         paths.sort();
         Ok(paths)
     }
-    fn primary_path(&self) -> Result<PathBuf, String> {
+    fn primary_path(&self, artifacts: &[PathBuf]) -> Result<PathBuf, String> {
         let mut primary = None;
-        for path in self.artifacts()? {
-            if artifact_kind(&path) == Some(ArtifactKind::Primary)
-                && primary.replace(path).is_some()
+        for path in artifacts {
+            if artifact_kind(path) == Some(ArtifactKind::Primary) && primary.replace(path).is_some()
             {
                 return Err("Ambiguous history primary names; files preserved".into());
             }
         }
-        Ok(primary.unwrap_or_else(|| self.dir.join(PRIMARY)))
+        Ok(primary.cloned().unwrap_or_else(|| self.dir.join(PRIMARY)))
     }
-    fn key(&self) -> Result<Zeroizing<Vec<u8>>, String> {
-        let artifacts = self.artifacts()?;
+    fn key(&self, artifacts: &[PathBuf]) -> Result<Zeroizing<Vec<u8>>, String> {
+        let missing =
+            || key_loss("History key missing; files preserved; original protected key required");
         let validate = |key: Vec<u8>| {
             let key = Zeroizing::new(key);
             if key.len() != 32 {
@@ -360,16 +373,12 @@ impl<'a> Store<'a> {
             .as_deref()
             .is_some_and(encrypted_marker)
         {
-            return Err(
-                "History key missing; files preserved; original protected key required".into(),
-            );
+            return Err(missing());
         }
         for path in artifacts {
-            let bytes = read_regular(&path)?;
-            if encrypted_marker(&bytes) || artifact_kind(&path) == Some(ArtifactKind::Staging) {
-                return Err(
-                    "History key missing; files preserved; original protected key required".into(),
-                );
+            let bytes = read_regular(path)?;
+            if encrypted_marker(&bytes) || artifact_kind(path) == Some(ArtifactKind::Staging) {
+                return Err(missing());
             }
         }
         let mut key = Zeroizing::new(vec![0; 32]);
@@ -417,12 +426,9 @@ impl<'a> Store<'a> {
             file.sync_all()
                 .map_err(|_| "Cannot sync encrypted history staging file")?;
             self.checkpoint("verify")?;
-            let staged = read_regular(&tmp)?;
-            if staged != bytes {
+            // Identical to the bytes authenticated above; no second decrypt.
+            if read_regular(&tmp)? != bytes {
                 return Err("Encrypted history staging verification failed".into());
-            }
-            if let Some(key) = key {
-                open(key, &staged)?;
             }
             self.checkpoint("publish")?;
             if read_optional(path)?.as_deref() != old {
@@ -524,35 +530,37 @@ impl<'a> Store<'a> {
     /// Archive conversions are independently atomic and restartable. Staging
     /// is disposed only when empty/authenticated, or after exact current-format
     /// debris is durably wrapped in quarantine. Never restore or merge rows.
-    fn migrate_archives(&self, key: &[u8]) -> Result<(), String> {
-        let artifacts = self.artifacts()?;
-        for path in &artifacts {
-            if artifact_kind(path) == Some(ArtifactKind::Primary) {
+    fn migrate_archives(&self, key: &[u8], artifacts: &[PathBuf]) -> Result<(), String> {
+        // Validate every side file before changing any. Encrypted archives
+        // still authenticate on every transaction but need no further work.
+        let mut pending = Vec::new();
+        for path in artifacts {
+            let kind = artifact_kind(path);
+            if kind == Some(ArtifactKind::Primary) {
                 continue;
             }
             let bytes = read_regular(path)?;
-            let staging = artifact_kind(path) == Some(ArtifactKind::Staging);
-            if staging {
+            if kind == Some(ArtifactKind::Staging) {
                 if !bytes.is_empty()
                     && open(key, &bytes).is_err()
                     && !current_staging_debris(&bytes)
                 {
-                    return Err(sidefile_error(&path, "Unsupported history staging format"));
+                    return Err(sidefile_error(path, "Unsupported history staging format"));
                 }
             } else if encrypted_marker(&bytes) {
                 open(key, &bytes).map_err(|e| sidefile_error(path, &e))?;
+                if kind == Some(ArtifactKind::Backup) {
+                    continue;
+                }
             }
+            pending.push((path, kind));
         }
-        for path in artifacts {
-            let kind = artifact_kind(&path);
-            if kind == Some(ArtifactKind::Primary) {
-                continue;
-            }
-            let bytes = read_regular(&path)?;
+        for (path, kind) in pending {
+            let bytes = read_regular(path)?;
             if kind == Some(ArtifactKind::Staging) {
                 let authenticated = open(key, &bytes).is_ok();
                 if !bytes.is_empty() && !authenticated && !current_staging_debris(&bytes) {
-                    return Err(sidefile_error(&path, "Unsupported history staging format"));
+                    return Err(sidefile_error(path, "Unsupported history staging format"));
                 }
                 // Never store damaged ciphertext as an outer archive: wrap the
                 // exact bytes so a later inventory can authenticate quarantine.
@@ -562,51 +570,45 @@ impl<'a> Store<'a> {
                     self.preserve_bytes(Some(key), &bytes, true)?
                 };
                 self.checkpoint("remove-staging")?;
-                if read_regular(&path)? != bytes {
+                if read_regular(path)? != bytes {
                     return Err("History staging changed; files preserved".into());
                 }
-                fs::remove_file(&path)
+                fs::remove_file(path)
                     .map_err(|_| "Cannot remove history staging; files preserved")?;
                 self.sync_dir(&preserved)?;
             } else if kind == Some(ArtifactKind::LegacyTmp) {
                 let preserved = self.preserve(key, &bytes)?;
                 self.checkpoint("remove-legacy")?;
-                if read_regular(&path)? != bytes {
+                if read_regular(path)? != bytes {
                     return Err(
                         "Legacy history temporary file changed; migration incomplete".into(),
                     );
                 }
-                fs::remove_file(&path).map_err(|_| {
+                fs::remove_file(path).map_err(|_| {
                     "Cannot remove preserved legacy history temporary file; migration incomplete"
                 })?;
                 self.sync_dir(&preserved)?;
             } else if kind == Some(ArtifactKind::Backup) && !encrypted_marker(&bytes) {
                 let encrypted = seal_as(key, &bytes, PRESERVATION, self.entropy)?;
-                self.write_encrypted(&path, &encrypted, Some(&bytes), Some(key))?;
+                self.write_encrypted(path, &encrypted, Some(&bytes), Some(key))?;
             }
         }
         Ok(())
     }
-    pub fn backup(&self, automatic_read_error: bool) -> Result<Option<PathBuf>, String> {
+    pub fn backup(&self) -> Result<Option<PathBuf>, String> {
         let _lock = self.lock()?;
-        let path = self.primary_path()?;
+        let artifacts = self.artifacts()?;
+        let path = self.primary_path(&artifacts)?;
         let Some(bytes) = read_optional(&path)? else {
             return Ok(None);
         };
-        if automatic_read_error {
-            // Deprecated compatibility context: new frontend loaders do not
-            // request a backup after read failure. Old callers get a deliberate
-            // non-authorizing skip after safe inventory/read, never another key
-            // access or an authentication verdict. Explicit backups are below.
-            return Ok(None);
-        }
         // Unknown ciphertext must remain opaque, even when the original key is
         // unavailable. A successful backup never authorizes active replacement.
         let backup = if opaque_backup_encoding(&bytes) {
             self.preserve_with_key(None, &bytes)?
         } else {
-            let key = self.key()?;
-            self.migrate_archives(&key)?;
+            let key = self.key(&artifacts)?;
+            self.migrate_archives(&key, &artifacts)?;
             self.preserve(&key, &bytes)?
         };
         if read_optional(&path)?.as_deref() != Some(bytes.as_slice()) {
@@ -617,13 +619,14 @@ impl<'a> Store<'a> {
     pub fn save(&self, contents: &str) -> Result<(), String> {
         let _lock = self.lock()?;
         supported_document(contents.as_bytes())?;
-        let key = self.key()?;
-        let path = self.primary_path()?;
+        let artifacts = self.artifacts()?;
+        let key = self.key(&artifacts)?;
+        let path = self.primary_path(&artifacts)?;
         let old = read_optional(&path)?;
         if let Some(old) = &old {
             document(&key, old)?;
         }
-        self.migrate_archives(&key)?;
+        self.migrate_archives(&key, &artifacts)?;
         if let Some(old) = &old {
             if !encrypted_marker(old) {
                 self.preserve(&key, old)?;
@@ -637,10 +640,11 @@ impl<'a> Store<'a> {
     }
     pub fn load(&self) -> Result<Option<String>, String> {
         let _lock = self.lock()?;
-        let key = self.key()?;
-        let bytes = read_optional(&self.primary_path()?)?;
+        let artifacts = self.artifacts()?;
+        let key = self.key(&artifacts)?;
+        let bytes = read_optional(&self.primary_path(&artifacts)?)?;
         let plain = bytes.as_deref().map(|b| document(&key, b)).transpose()?;
-        self.migrate_archives(&key)?;
+        self.migrate_archives(&key, &artifacts)?;
         let Some(bytes) = bytes else { return Ok(None) };
         if !encrypted_marker(&bytes) {
             self.preserve(&key, &bytes)?;

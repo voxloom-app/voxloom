@@ -149,8 +149,9 @@ For documentation-only changes, check links, commands, Markdown rendering and
 ## Store backwards-compatibility rule
 
 Voxloom keeps user data in stores (`settings.json`, `history.json`,
-`dictionary.json`). History's inner JSON schema is independent of its macOS
-encryption envelope. Any change to these stores must stay backwards compatible:
+`dictionary.json`). History's inner JSON schema is independent of its
+macOS/Windows encryption envelope. Any change to these stores must stay
+backwards compatible:
 
 1. **Every new setting or store field has a default.** A file written before
    the field existed must load with that default filled in.
@@ -175,12 +176,9 @@ rejected as unreadable, and History came up empty.
 ## History encryption and recovery
 
 `history_load`, `history_save` and `store_backup({ store: 'history' })` keep
-their existing call/result contract. The deprecated optional
-`store_backup({ store: 'history', automaticReadError: true })` context deliberately
-skips copying without protected-key access after safe inventory/read; new history
-loaders do not issue that request. Omitted/false retains explicit backup semantics.
-The shared macOS/Windows native boundary encrypts the entire serialized
-history document using ring AES-256-GCM. The outer JSON has `format` =
+their existing call/result contract. The shared macOS/Windows native boundary
+encrypts the entire serialized history document using ring AES-256-GCM. The
+outer JSON has `format` =
 `voxloom-history-encrypted`, `envelopeVersion` = 1, `algorithm` = `AES-256-GCM`,
 `role` (`history` or `preservation`), a base64 12-byte nonce, and base64
 ciphertext including the 16-byte tag. The fixed format/version/algorithm/role
@@ -244,6 +242,11 @@ staging or archives. Normal retention/Off/delete does not prune archival copies
 or delete their key. Recognized ciphertext may be copied opaquely; a backup is never permission
 to overwrite unreadable history. Recovery requires the original usable protected
 key; do not advise key deletion, automatic reset or speculative restoration.
+The only fresh start is the manual move-aside in
+[Privacy](PRIVACY.md#if-the-history-key-is-lost). Missing-key, active-document
+authentication and Windows key-read errors append that guidance (`KEY_LOSS_HELP`).
+Side-file diagnostics keep their bounded recovery advice, and invalid-key or
+macOS Keychain access errors omit it because moving files aside cannot fix them.
 See [Privacy](PRIVACY.md#transcript-encryption-on-macos-and-windows) for limitations.
 
 After key acquisition and primary validation, dispose empty or authenticated
@@ -255,7 +258,10 @@ headers, plaintext, future formats and unsafe paths remain fail-closed. Inventor
 all staging before key creation, even empty staging with no primary: cleanup must
 never bypass the missing-key/nonreplacement fence. Quarantine is the deliberate
 exception to opaque ciphertext copying because damaged bytes cannot serve as an
-outer authenticated archive.
+outer authenticated archive. Each transaction takes one artifact inventory
+before key access and reuses it for the missing-key fence, primary lookup and
+archive migration; every encrypted archive is still authenticated on every
+transaction, and only unmigrated side files are revisited.
 
 Attach side-file read/format/authentication error context at the failing
 operation, including inventory and archive deduplication, not a top-level catch
@@ -277,12 +283,10 @@ for suspected ciphertext. Wrapped preservation deduplication must authenticate
 the existing archive: raw byte equality with an ambiguous archive is insufficient.
 
 History read failures stay write-blocking and must not issue a second automatic
-backup/key access. Preserve the original read error and report a non-authorizing
-skip. Legacy automatic backup requests return null after safe inventory/read and
-do not catch inventory failures as key denial. Frontend backup outcomes distinguish
-an intentional legacy skip from real errors and explicit null; no truthy path
-sentinel may authorize replacement. Explicit/parse/migration/prune calls keep their
-own backup gates, with stricter refusal for ambiguous input when no usable key exists.
+backup/key access; preserve the original read error. A null `store_backup` result
+is never a backup and never authorizes replacement. Explicit/parse/migration/prune
+calls keep their own backup gates, with stricter refusal for ambiguous input when
+no usable key exists.
 
 Linux explicitly retains existing plaintext storage; macOS and Windows have no
 plaintext fallback. Dictionary/settings encryption is out of scope. Shared tests

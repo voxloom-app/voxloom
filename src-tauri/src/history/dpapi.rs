@@ -117,9 +117,7 @@ impl SystemKeys {
             dir: dir.to_owned(),
         })
     }
-}
-impl KeyOps for SystemKeys {
-    fn read(&self) -> Result<Option<Vec<u8>>, String> {
+    fn read_stored(&self) -> Result<Option<Vec<u8>>, String> {
         let path = self.dir.join(KEY_FILE);
         match fs::symlink_metadata(&path) {
             Err(e) if e.kind() == ErrorKind::NotFound => return Ok(None),
@@ -138,6 +136,13 @@ impl KeyOps for SystemKeys {
         file.sync_all().map_err(|_| ERROR)?;
         native_fs::sync_publication(&self.dir, &path).map_err(|_| ERROR)?;
         Ok(Some(key.to_vec()))
+    }
+}
+impl KeyOps for SystemKeys {
+    /// A blob from another Windows account or machine never unprotects here.
+    fn read(&self) -> Result<Option<Vec<u8>>, String> {
+        self.read_stored()
+            .map_err(|e| super::encrypted::key_loss(&e))
     }
     fn add(&self, key: &[u8]) -> Result<(), String> {
         let bytes = protect(key)?;

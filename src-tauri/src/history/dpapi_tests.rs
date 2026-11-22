@@ -210,7 +210,7 @@ fn unavailable_native_key_preserves_plaintext_migration_sources() {
         .unwrap();
     assert!(Store::new(&f.0, &f.keys()).load().is_err());
     assert!(Store::new(&f.0, &f.keys()).save(DOCUMENT).is_err());
-    assert!(Store::new(&f.0, &f.keys()).backup(false).is_err());
+    assert!(Store::new(&f.0, &f.keys()).backup().is_err());
     for name in sources {
         assert_eq!(fs::read_to_string(f.0.join(name)).unwrap(), DOCUMENT);
     }

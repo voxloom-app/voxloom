@@ -10,130 +10,100 @@ SHA-256 before saving it; a mismatch saves nothing.
 
 ## Transcript encryption on macOS and Windows
 
-The macOS and Windows desktop apps encrypt the **whole durable history document** with
-AES-256-GCM, including final and raw transcript text, cleanup provenance,
-status, duration, model, timestamps and delivery outcomes. Recorded audio is
-never saved. History, Home, Copy and retention still operate on decrypted data
-in the running app's memory.
+The macOS and Windows apps encrypt the **whole saved history** with
+AES-256-GCM: final and raw transcript text, cleanup details, status, duration,
+model, timestamps and delivery outcomes. Recorded audio is never saved. While
+the app runs, History, Home, Copy and retention work on decrypted data in
+memory.
 
-The app data folder contains the files below. On macOS it is
-`~/Library/Application Support/com.voxloom.prototype/`; on Windows, use the
-application's app-data directory under your user profile (not the install folder).
+The app data folder is `~/Library/Application Support/com.voxloom.prototype/`
+on macOS. On Windows it is the app's data folder under your user profile, not
+the install folder. It contains:
 
 ```text
-~/Library/Application Support/com.voxloom.prototype/
-├── history.json      authenticated encrypted history envelope
-├── history.key.dpapi  Windows only: versioned current-user DPAPI-protected key
-├── history.json.unreadable-*.bak  preserved history originals (see below)
-├── history.json.encrypted-*.tmp   ciphertext-only staging, if interrupted
-├── history.lock      transaction lock; no transcript/key content
-├── dictionary.json   unencrypted custom words (also used by local cleanup)
-├── settings.json     unencrypted preferences
-├── *.json.unreadable-*.bak  settings/dictionary backups remain unencrypted
-├── models/           downloaded Whisper files and verification markers
-└── cleanup-models/   downloaded local cleanup model; no user data
+history.json                   encrypted history
+history.key.dpapi              Windows only: the protected history key
+history.json.unreadable-*.bak  encrypted backups of earlier history files
+history.json.encrypted-*.tmp   encrypted leftovers of an interrupted save
+history.lock                   transaction lock; no transcripts or keys
+dictionary.json                custom words, not encrypted
+settings.json                  preferences, not encrypted
+*.json.unreadable-*.bak        settings/dictionary backups, not encrypted
+models/                        downloaded Whisper models
+cleanup-models/                downloaded cleanup model; no user data
 ```
 
-**Linux retains its existing unencrypted JSON History storage.** This change
-does not protect Linux transcripts. Settings, dictionary words and their
-backups remain plaintext on all platforms. Other
-processes running as your user, or tools copying your home folder, can read
-those unencrypted files.
+**Linux history is not encrypted.** Settings, dictionary words and their
+backups stay plaintext on every platform. Other processes running as your
+user, or tools copying your home folder, can read those files.
 
 ### Key protection and limits
 
-On macOS, the random history key is kept in a dedicated generic-password item in the
-user's default **file-based macOS Keychain**, with the ordinary creating-app
-access policy. It is not synchronized by Voxloom. macOS may request approval
-when a different app build tries to access it. Voxloom never replaces an
-existing key on a duplicate-create race, deletes it for retention, or falls
-back to writing plaintext when key access fails.
+On macOS, the random history key is kept in a dedicated item in your default
+file-based Keychain. Voxloom doesn't sync it. macOS may ask for approval when a
+different build of the app tries to read it, depending on how it is signed. On
+Windows, each app data folder gets its own random key, stored only as a
+current-user DPAPI-protected file beside history; Windows doesn't prompt.
 
-This is Keychain-protected storage at rest, **not** biometric protection, a
-Secure Enclave/nonexportable key, or a guarantee of confidentiality while the
-screen is locked. It does not protect against a compromised running app or
-all same-user malware. Decrypted transcripts remain in app memory; text you
-copy or insert into another app is outside this storage boundary. Signing and
-upgrade identity can affect Keychain approval behavior.
+Both protect history at rest under your user account. They are not biometric
+or hardware-bound protection, and they don't protect against a compromised app
+or other software running as you; on Windows, any process running as you can
+unprotect the key. Text you copy or insert into another app is outside this
+protection. Encrypted history can't be exported, and copying it to another
+machine or account doesn't make it readable there.
 
-On Windows, a separate random 256-bit key per app-data directory is stored
-only as a versioned **current-user DPAPI-protected blob** beside history. The
-raw key is never written to a file. Provisioning is add-only and the persisted
-winner is read back and validated before any history ciphertext is written.
-There are no prompts, machine-wide protection, plaintext fallback or automatic
-replacement of a lost/corrupt key while encrypted artifacts remain.
+Voxloom never replaces an existing key, deletes it for retention, or falls back
+to writing plaintext when the key can't be used. If the key is missing while
+encrypted history exists, the key is inaccessible or invalid, a file fails
+authentication, or a file is unsafe or in an unknown format, History stops
+loading and saving and the files are left as they are. Dictation can continue, but new transcripts stay in memory only.
+History backups alone can't restore history: they need the original key (the
+macOS Keychain item, or on Windows the key file and the same Windows account).
+Don't delete or replace the key to troubleshoot.
 
-DPAPI protects at rest under your Windows account, **not exclusively for this
-app**: another process already running as your user can unprotect the key.
-This is not protection from same-user malware, biometric protection, or a
-cross-machine/roaming recovery promise. Copying encrypted files to another
-machine/account is not an export/import feature. Keep the protected key blob
-with recoverable files; restoring it still requires a usable original DPAPI
-user environment. Neither platform offers a general encrypted-history export.
+### If the history key is lost
 
-A missing, inaccessible or invalid key, failed authentication, unsafe file,
-or unknown encrypted format blocks durable history loading/writing. Existing
-frontend settings/read-error gates remain in force, so dictations can remain
-memory-only while storage is unavailable. Files are preserved; there is no
-automatic reset or archive restoration. **Recovery needs the original usable
-protected key** (the macOS Keychain item or Windows DPAPI blob and user
-environment). History-file backups alone are not sufficient. Do not delete or
-replace the key as a troubleshooting step. Keep recoverable files and seek
-help if access cannot be restored.
+If History reports that the original protected key is required and you can't
+restore it, that history can't be decrypted. To start a new, empty history
+without deleting anything:
+
+1. Quit Voxloom.
+2. Create a folder outside the app data folder, such as `voxloom-old-history`
+   in your Documents folder.
+3. Move every file whose name starts with `history` into it. On Windows this
+   includes `history.key.dpapi`.
+4. Start Voxloom. It saves new transcripts to a new, empty history.
+
+Keep the moved files together. They become readable again only if the
+original key is restored.
 
 ### Upgrade and archival backups
 
-Supported old plaintext history (versions 1 and 2) remains readable. Before
-rewriting it, Voxloom preserves its **original bytes** in an encrypted backup,
-including fields that a later schema migration might discard. The active
-file becomes encrypted on the normal safe save; settings/history errors that
-block saving also defer that active conversion. Older app versions cannot
-read the encrypted format and should refuse it rather than overwrite it.
+Earlier unencrypted history (versions 1 and 2) still loads. Before rewriting
+it, Voxloom saves the original bytes in an encrypted backup, then encrypts the
+active file on the next successful save. Older Voxloom versions can't read
+encrypted history and should refuse it rather than overwrite it.
 
-Owned old `history.json.unreadable-<timestamp>[-N].bak` files are encrypted in
-place, preserving even corrupt or non-UTF8 bytes. Legacy `history.json.tmp`
-is preserved in an encrypted quarantine backup and removed only after that
-backup is durable. It is **never restored as active history**, even if the
-primary is missing. Empty or authenticated encrypted staging files are removed,
-never restored. Recognizable damaged current-format staging is preserved
-byte-for-byte inside an encrypted quarantine before removal; ambiguous short
-headers, plaintext staging and unknown/future formats still block storage and
-remain untouched. Recognized encrypted envelopes and identifiable current-writer
-truncations can be preserved as opaque copies, without claiming authentication.
-Encryption-marker words alone do not prove a file is ciphertext. Ambiguous
-originals need an existing usable key for exact-byte encrypted preservation;
-otherwise backup is refused and the original stays in place. Suspected ciphertext
-never authorizes creating a replacement key. Existing ambiguous archives remain
-fail-closed rather than being accepted as encrypted duplicates.
-Migration is restartable per file, not atomic across the whole folder. An
-unreadable, unknown or unsafe artifact causes an error/incomplete protection;
-its original stays in place and may still be plaintext. No automatic process
-can retroactively encrypt external backups or old sync copies.
+Existing `history.json.unreadable-*.bak` backups and any leftover
+`history.json.tmp` are encrypted during the upgrade; a leftover file is never
+restored as active history. The upgrade works one file at a time and resumes
+after an interruption. A file that can't be read or has an unknown format
+stays where it is, may still be unencrypted, and blocks History until it's
+resolved. Encryption can't reach copies in external backups or sync folders.
 
-If a side file stops history loading or saving, the error identifies its type
-and its generated filename when safe to display. Unrecognized names are redacted;
-file contents, keys and the full folder path are not included. Quit Voxloom,
-back up the history folder, and seek recovery help before changing anything.
-Do not delete suspect files or reset the protected key. An error does not mean
-the whole folder was rolled back: earlier per-file migrations may have completed.
+If a side file blocks History, the error names its type and, when safe, its
+filename, but never its contents, keys or the full folder path. Quit Voxloom,
+back up the history folder and get recovery help before changing anything. An
+error doesn't mean earlier per-file upgrades were undone.
 
-Windows uses same-directory native rename plus explicit file-data/metadata
-flushes, including when reusing a previously published archive or key. Flush
-failures stop migration rather than authorizing source removal. This is not a
-portable directory-fsync or whole-volume power-loss guarantee: an interrupted
-legacy temporary-file deletion may reappear and require migration again.
-No storage backend can promise physical media persistence if the device or
-filesystem does not honor flushes; actual power-loss behavior is not tested.
+History backups can contain raw and final text, metadata, deleted rows and
+expired transcripts. **Retention and row deletion don't remove backups.** A
+history read error doesn't create another backup; the file stays in place and
+saving stays blocked. Settings and dictionary backups are plain copies,
+separate from these rules.
 
-History archives can contain raw and final text, metadata, deleted rows and
-expired transcripts. **Retention and row deletion do not prune archives.**
-History read failures do not trigger another automatic backup or protected-key
-access attempt. The active file stays in place and history writes remain blocked;
-the error reports an intentional skip, not a failed backup or successful recovery.
-Frontend parse errors, explicit backups and preservation before a supported
-migration retain their own backup gates, subject to the ambiguity rules above.
-Settings/dictionary upgrade and unreadable-file backups are still byte-exact
-plaintext copies, separate from these history rules.
+For the storage format and recovery rules, see
+[Contributing](CONTRIBUTING.md#history-encryption-and-recovery).
 
 ## Deleting transcripts
 
@@ -142,22 +112,20 @@ plaintext copies, separate from these history rules.
   **Transcript retention → Off** rewrites the active history with no records
   (encrypted on macOS and Windows). Already-loaded transcripts remain visible in History
   and Home, in memory only, until restart. Off does not delete the history key
-  or archives. If settings/history cannot be read, the existing error gate
-  prevents this rewrite; it must not erase unavailable history.
+  or backups. If settings or history can't be read, Voxloom doesn't do this
+  rewrite, so unavailable history is never erased.
 - **Keep only recent ones:** **30 days** drops older active records on every
   save and launch. **Forever** keeps active records until you delete them.
 - **Remove local history files manually:** quit Voxloom first, then remove
-  `history.json`, its `history.json.unreadable-*.bak` archives and any legacy
+  `history.json`, its `history.json.unreadable-*.bak` backups and any
   `history.json.tmp` or `history.json.encrypted-*.tmp` files from the folder
-  above. A missing primary is empty history, never an invitation to restore an
-  archive; encrypted artifacts still require their original key. Preserve any
-  files you want to recover before manual removal. Deleting the entire folder
-  also removes settings, dictionary words and downloaded models.
+  above. A missing `history.json` starts an empty history; Voxloom never
+  restores it from a backup. Keep any files you might want back. Deleting the
+  entire folder also removes settings, dictionary words and downloaded models.
 
 File removal does not erase copies captured by Time Machine, other backup or
 sync tools, nor promise forensic erasure on SSDs. Encryption cannot retract
-transcripts already copied or inserted elsewhere. For the format and recovery
-invariants, see [Contributing](CONTRIBUTING.md#history-encryption-and-recovery).
+transcripts already copied or inserted elsewhere.
 
 ## Accessibility
 

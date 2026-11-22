@@ -3,44 +3,28 @@ import { invoke } from '@tauri-apps/api/core';
 /** Store files that can be preserved before an unreadable file is replaced. */
 export type BackupStore = 'dictionary' | 'history' | 'settings';
 
-/** Optional context for a backup attempt; omission keeps explicit-backup semantics. */
-export interface BackupOptions {
-  /** @deprecated History read failures no longer request backups. Legacy true
-   * requests skip history copies without protected-key access; never authorizes writes. */
-  automaticReadError?: boolean;
-}
-
 /**
  * Copy the on-disk store file aside (Tauri `store_backup`). Resolves to the
- * backup path, or `null` for no file / a skipped automatic encrypted backup.
- * Never modifies the original; a skip never authorizes replacing it.
+ * backup path, or `null` when no file existed. Never modifies the original.
  */
-export function tauriBackup(store: BackupStore): (options?: BackupOptions) => Promise<string | null> {
-  return (options) => invoke<string | null>('store_backup', {
-    store,
-    ...(options?.automaticReadError ? { automaticReadError: true } : {}),
-  });
+export function tauriBackup(store: BackupStore): () => Promise<string | null> {
+  return () => invoke<string | null>('store_backup', { store });
 }
 
 export type BackupOutcome =
   | { ok: true; path: string }
-  | { ok: false; skipped: true }
   | { ok: false; error: string };
 
 /** Run an optional IO backup hook, never throwing. */
 export async function runBackup(
-  backup: ((options?: BackupOptions) => Promise<string | null>) | undefined,
-  options?: BackupOptions,
+  backup: (() => Promise<string | null>) | undefined,
 ): Promise<BackupOutcome> {
   if (!backup) return { error: 'no backup support', ok: false };
   try {
-    const path = await (options ? backup(options) : backup());
+    const path = await backup();
     // No file copied (vanished, not a regular file, unreadable dir): that
     // is not a backup, so nothing may be overwritten on its strength.
-    if (!path) {
-      if (options?.automaticReadError) return { ok: false, skipped: true };
-      return { error: 'no file was backed up', ok: false };
-    }
+    if (!path) return { error: 'no file was backed up', ok: false };
     return { ok: true, path };
   } catch (error: unknown) {
     return {
@@ -66,7 +50,6 @@ export function memoryBackups(read: () => string | null) {
 }
 
 export function describeBackup(outcome: BackupOutcome): string {
-  if ('skipped' in outcome) return ' (automatic backup skipped; file left untouched)';
   if (!outcome.ok) return ` (backup failed: ${outcome.error}; file left untouched)`;
   return ` (original kept at ${outcome.path})`;
 }
