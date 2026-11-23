@@ -106,7 +106,7 @@ describe('dogfood cleanup dictionary snapshot (BUS-198)', () => {
     expect(request.dictionary).toEqual([]);
     expect(promptDictionary(request.prompt)).toEqual([]);
     expect(await cleanup.provenance(outcome)).toMatchObject({
-      dictionaryDigest: digest([]), promptVersion: 'cleanup-v2',
+      dictionaryDigest: digest([]), promptVersion: 'cleanup-v4',
     });
   });
 

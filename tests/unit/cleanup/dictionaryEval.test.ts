@@ -10,14 +10,14 @@
 // sentence through the real prompt, the real worker and the real output check,
 // then through the deterministic dictionary step, exactly as dictation does.
 // Greedy decoding, CPU: indicative of the model's behaviour, not of Metal.
-import { spawn } from 'node:child_process';
-import { closeSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import defaultCorpus from '../../fixtures/dictionary-eval/corpus.json';
 import { buildCleanupPrompt, snapshotDictionary } from '../../../src/services/cleanup/prompt';
 import { validateCleanupOutput } from '../../../src/services/cleanup/validation';
 import { replaceDictionaryTerms } from '../../../src/services/dictionary/replace';
+import { askWorker, type Reply } from './realWorker';
 
 const MODEL = process.env.VOXLOOM_TEST_CLEANUP_MODEL;
 const WORKER = process.env.VOXLOOM_TEST_CLEANUP_WORKER;
@@ -26,36 +26,9 @@ const corpus: { dictionary: string[]; items: Item[] } = process.env.VOXLOOM_EVAL
   ? JSON.parse(readFileSync(process.env.VOXLOOM_EVAL_CORPUS, 'utf8'))
   : defaultCorpus;
 
-interface Reply { ms: number; text: string | null }
-
 /** One framed request on stdin and the model on fd 3, as the app does. */
 function ask(prompt: string): Promise<Reply> {
-  const model = openSync(MODEL!, 'r');
-  const started = Date.now();
-  return new Promise((resolve, reject) => {
-    const child = spawn(WORKER!, [], { stdio: ['pipe', 'pipe', 'ignore', model] });
-    const { stdin, stdout } = child as typeof child & {
-      stdin: NodeJS.WritableStream; stdout: NodeJS.ReadableStream;
-    };
-    const chunks: Buffer[] = [];
-    stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-    child.on('error', reject);
-    child.on('close', () => {
-      closeSync(model);
-      const frame = Buffer.concat(chunks);
-      if (frame.length < 4) return reject(new Error('worker sent no reply frame'));
-      const reply = JSON.parse(frame.subarray(4).toString('utf8')) as
-        { status: string; text?: string };
-      resolve({ ms: Date.now() - started, text: reply.status === 'ok' ? reply.text ?? null : null });
-    });
-    const body = Buffer.from(JSON.stringify({
-      modelPath: '/dev/fd/3', prompt, requestId: 'eval',
-    }));
-    const head = Buffer.alloc(4);
-    head.writeUInt32BE(body.length);
-    stdin.write(Buffer.concat([head, body]));
-    stdout.once('end', () => stdin.end());
-  });
+  return askWorker(WORKER!, MODEL!, prompt);
 }
 
 type Outcome = 'fixed' | 'missed' | 'false-fix' | 'kept';
@@ -86,7 +59,7 @@ describe.skipIf(!MODEL || !WORKER)('dictionary cleanup, real model', () => {
       const prompt = buildCleanupPrompt({ dictionary, rawText: heard, style: 'casual' });
       const reply = await ask(prompt);
       const checked = reply.text === null
-        ? null : validateCleanupOutput(heard, reply.text, dictionary);
+        ? null : validateCleanupOutput(heard, reply.text, dictionary, 'casual');
       const final = replaceDictionaryTerms(checked ?? heard, dictionary);
       const expected = item.expect ?? [];
       const added = dictionary.filter((word) => mentions(final, word)

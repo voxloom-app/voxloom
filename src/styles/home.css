@@ -101,3 +101,8 @@
   color: var(--mut);
   opacity: 1;
 }
+
+/* BUS-229: why the Home writing-style picker is disabled, and the one fix. */
+.home-hero .hs-note { align-items: center; color: var(--mut); display: flex; flex-basis: 100%; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 4px 10px; line-height: 1.5; margin: -4px 0 0; }
+.home-hero .hs-note .btn.ghost { color: var(--fg); font-size: var(--fs-secondary); margin-left: -8px; min-height: 28px; padding: 3px 8px; text-decoration: underline; text-decoration-color: var(--ctl-line); text-underline-offset: 3px; }
+.home-hero .hs-note .bar { height: 5px; width: 160px; }

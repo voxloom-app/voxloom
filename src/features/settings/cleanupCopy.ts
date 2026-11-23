@@ -11,6 +11,9 @@ export const CLEANUP_REFRESH = 'Check again';
 /** BUS-181: one-click download; the size is the pinned file's (396,705,472 B). */
 export const CLEANUP_DOWNLOAD = 'Download (397 MB)';
 export const CLEANUP_DOWNLOAD_CANCEL = 'Cancel';
+/** BUS-229: the Capture writing-style hint, by whether cleanup is on. */
+export const STYLE_HELP_ON = 'Used by local cleanup';
+export const STYLE_HELP_OFF = 'Styles apply only when local cleanup is on.';
 export const CLEANUP_DOWNLOAD_CANCELLED = 'Download cancelled.';
 export const CLEANUP_DOWNLOAD_CHECKSUM =
   'The downloaded file didn\'t match the expected checksum and was deleted. Try again.';

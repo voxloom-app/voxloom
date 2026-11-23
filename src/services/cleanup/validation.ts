@@ -1,6 +1,8 @@
+import type { WritingStyle } from '../../domain/types';
 import { preservesContent, sameMultiset } from './contentGuard';
+import { preservesFormalFacts } from './formalGuard';
 import { preservesMarks } from './marks';
-import { isDroppableFiller, quoteMarkIndices } from './tokens';
+import { CASUAL_FILLERS, FILLERS, isDroppableFiller, quoteMarkIndices } from './tokens';
 
 export const CLEANUP_OUTPUT_MAX_BYTES = 32_000;
 export const CLEANUP_OUTPUT_EXTRA_CHARS = 256;
@@ -58,6 +60,14 @@ function unwrapQuotedOutput(raw: string, cleaned: string): string {
   const inner = (pair?.[1] ?? pair?.[2])?.trim();
   if (!inner) return cleaned;
   return pair?.[3] && !/[.!?…。！？]$/u.test(inner) ? `${inner}.` : inner;
+}
+
+// Small models sometimes echo the prompt's field name: `transcript: Send it.`
+const ECHOED_LABEL = /^(?:edited |rewritten )?(?:transcript|text)\s*:\s*/iu;
+
+/** The output without an echoed `transcript:` label the speaker did not dictate (BUS-229). */
+function unwrapLabel(raw: string, cleaned: string): string {
+  return ECHOED_LABEL.test(raw.trim()) ? cleaned : cleaned.replace(ECHOED_LABEL, '');
 }
 
 // An uppercase stem of 2+ letters, optionally plural or possessive: ER, APIs,
@@ -140,13 +150,19 @@ function hasUnsafeEncoding(text: string): boolean {
   return false;
 }
 
+/**
+ * The checked output, or null to fall back to the raw text. Without a style
+ * the strictest (Very Casual) check applies. Casual may also drop `ah`;
+ * Formal checks facts instead of word order (BUS-229, formalGuard.ts).
+ */
 export function validateCleanupOutput(
   rawText: string,
   candidate: string,
   dictionary: readonly string[] = [],
+  style?: WritingStyle,
 ): string | null {
   if (hasUnsafeEncoding(candidate)) return null;
-  const cleaned = unwrapQuotedOutput(rawText, candidate.trim());
+  const cleaned = unwrapQuotedOutput(rawText, unwrapLabel(rawText, candidate.trim()));
   if (!cleaned) return null;
   if (encoder.encode(cleaned).byteLength > CLEANUP_OUTPUT_MAX_BYTES) {
     return null;
@@ -158,8 +174,10 @@ export function validateCleanupOutput(
   if (!preservesProtectedValues(rawText, cleaned, dictionary)) return null;
   if (!preservesCapitalization(rawText, cleaned)) return null;
   if (JSON.stringify(symbols(rawText)) !== JSON.stringify(symbols(cleaned))) return null;
-  if (!preservesMarks(rawText, cleaned, dictionary)) return null;
   if (wrapsWholeText(rawText) !== wrapsWholeText(cleaned)) return null;
-  if (!preservesContent(rawText, cleaned, dictionary)) return null;
+  if (style === 'formal') return preservesFormalFacts(rawText, cleaned, dictionary) ? cleaned : null;
+  const fillers = style === 'casual' ? CASUAL_FILLERS : FILLERS;
+  if (!preservesMarks(rawText, cleaned, dictionary, fillers)) return null;
+  if (!preservesContent(rawText, cleaned, dictionary, fillers)) return null;
   return cleaned;
 }
