@@ -1,13 +1,15 @@
 /// One cleanup model status per window (BUS-16 PR 2c). `cleanup_model_status`
-/// hashes the whole 397 MB GGUF, so it is read once, on first use, and again
-/// only on an explicit action (Check again). A download applies the status the
-/// download itself returns. Remounting Home or switching tabs never re-reads it.
-/// A #77-style native verified marker that makes the read cheap is a PR 3/4
-/// target (BUS-16 comment 10486).
+/// hashes every installed GGUF it hasn't verified yet in this app session
+/// (397 MB, plus 2.5 GB with the optional 4B), so it is read once, on first
+/// use, and again only on an explicit action (Check again). A download or a
+/// removal applies the status it returns. Remounting Home or switching tabs
+/// never re-reads it. Natively, a verified file is remembered by its identity
+/// (dev/inode/size/mtime/ctime) for the session, so later reads and runs skip
+/// the hash (BUS-229); nothing is persisted across launches.
 
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import { createTauriCleanupModelStore } from '../../services/cleanup/tauriAdapter';
-import type { CleanupModelStatus } from '../../services/cleanup/types';
+import type { CleanupModelEntry, CleanupModelStatus } from '../../services/cleanup/types';
 import type { CleanupModelView } from './cleanupCopy';
 
 export interface CleanupModelSnapshot {
@@ -23,10 +25,16 @@ const message = (reason: unknown): string => {
   return String(reason);
 };
 
+function checkedEntry(entry: CleanupModelEntry | undefined): boolean {
+  return typeof entry?.available === 'boolean' && typeof entry.id === 'string';
+}
+
 function checkedStatus(status: CleanupModelStatus | undefined): CleanupModelStatus {
-  // Native IPC result: check its shape before trusting it.
-  if (typeof status?.available !== 'boolean' || typeof status.runtimeAvailable !== 'boolean'
-    || typeof status.id !== 'string') {
+  // Native IPC result: check its shape before trusting it. The default model
+  // heads `models`, as it does natively.
+  if (!checkedEntry(status) || typeof status?.runtimeAvailable !== 'boolean'
+    || !Array.isArray(status.models) || !status.models.every(checkedEntry)
+    || status.models[0]?.id !== status.id) {
     throw new Error('unexpected status from the app');
   }
   return status;

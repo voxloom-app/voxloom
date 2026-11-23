@@ -6,6 +6,8 @@ import { CleanupEngineError, type CleanupModelStatus } from '../../src/services/
 import {
   deferredStore, flush, noWorker, ready, view, worker,
 } from './cleanupModelCacheFixtures';
+import { cleanupStatus } from './cleanupStatusFixture';
+
 describe('cleanupModelCache', () => {
   it('a failed first read is retried by the next consumer', async () => {
     const { answers, store } = deferredStore();
@@ -73,6 +75,9 @@ describe('cleanupModelCache', () => {
   it.each([
     ['no runtime flag', { ...ready, runtimeAvailable: undefined }],
     ['a non-string id', { ...ready, id: 7 }],
+    ['no model list', { ...ready, models: undefined }],
+    ['a list not headed by the default', { ...ready, models: cleanupStatus({ quality: true }).models.reverse() }],
+    ['a malformed entry', { ...ready, models: [ready.models[0], { id: 'x' }] }],
     ['nothing', null],
   ])('apply throws on a malformed download status (%s) and keeps the worker flag', async (_label, bad) => {
     const { answers } = deferredStore();

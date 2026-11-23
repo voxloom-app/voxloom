@@ -28,6 +28,7 @@ const COMMANDS: &[&str] = &[
     "cleanup_model_status",
     "cleanup_download_model",
     "cleanup_cancel_download",
+    "cleanup_delete_model",
     "delivery_insert_text",
     "delivery_paste_binding",
     "delivery_paste_text",

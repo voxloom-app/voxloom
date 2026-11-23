@@ -7,13 +7,12 @@ import { resetCleanupModelCacheForTests } from '../../src/features/settings/clea
 import { useCleanupModel } from '../../src/features/settings/useCleanupModel';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
 import { CleanupDownloadError, type CleanupDownloadProgress } from '../../src/services/cleanup/modelDownload';
-import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
+import { CLEANUP_MODEL_ID, type CleanupModelStatus } from '../../src/services/cleanup/types';
 import { renderWithApp } from './testUtils';
+import { cleanupStatus } from './cleanupStatusFixture';
 
-const ready: CleanupModelStatus = {
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable: true, sha256: CLEANUP_MODEL_SHA256,
-};
-const missing: CleanupModelStatus = { ...ready, available: false };
+const ready = cleanupStatus();
+const missing = cleanupStatus({ available: false });
 
 interface Pending {
   progress: (p: CleanupDownloadProgress) => void;
@@ -25,11 +24,10 @@ function downloadingStore(status: CleanupModelStatus = missing) {
   const pending: Pending[] = [];
   const store = {
     cancelDownload: vi.fn().mockResolvedValue(true),
-    download: vi.fn((onProgress?: (p: CleanupDownloadProgress) => void) =>
+    download: vi.fn((_modelId: string, onProgress?: (p: CleanupDownloadProgress) => void) =>
       new Promise<CleanupModelStatus>((resolve, reject) => {
         pending.push({ progress: (p) => onProgress?.(p), reject, resolve });
       })),
-    
     status: vi.fn().mockResolvedValue(status),
   } satisfies CleanupModelStore;
   return { pending, store };
@@ -69,7 +67,7 @@ describe('Cleanup model download', () => {
   it('shows progress and Cancel, blocks Check again meanwhile, then applies the verified status', async () => {
     const { pending, store } = downloadingStore();
     const user = await startDownload(store);
-    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, ratio: 0.42 }); });
+    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, modelId: CLEANUP_MODEL_ID, ratio: 0.42 }); });
     expect(screen.getByRole('button', { name: 'Downloading… 42%' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     const check = screen.getByRole('button', { name: 'Check again' });
@@ -116,7 +114,7 @@ describe('Cleanup model download', () => {
     const first = renderWithApp(<Harness modelStore={store} />);
     await waitFor(() => expect(downloadButton()).toBeInTheDocument());
     await user.click(downloadButton()!);
-    act(() => { pending[0].progress({ bytesReceived: 3, bytesTotal: 10, ratio: 0.3 }); });
+    act(() => { pending[0].progress({ bytesReceived: 3, bytesTotal: 10, modelId: CLEANUP_MODEL_ID, ratio: 0.3 }); });
     first.unmount();
     expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
     renderWithApp(<Harness modelStore={store} />);

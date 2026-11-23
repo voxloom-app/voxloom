@@ -13,10 +13,11 @@ test('cleanup: a failed first status check offers Check again, which recovers', 
     if (cmd === 'cleanup_model_status') {
       statusCalls += 1;
       if (statusCalls === 1) throw { code: 'runtime-error', message: 'model status task failed' };
-      return {
-        available: true, id: 'qwen3-0.6b-q4-k-m', runtimeAvailable: true,
+      const model = {
+        available: true, id: 'qwen3-0.6b-q4-k-m',
         sha256: 'ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a',
       };
+      return { ...model, models: [model], runtimeAvailable: true };
     }
     if (/list|devices/.test(cmd)) return [];
     if (cmd.startsWith('plugin:event|listen')) return 1;

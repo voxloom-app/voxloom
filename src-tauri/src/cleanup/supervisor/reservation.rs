@@ -17,6 +17,8 @@ pub struct WorkerReservation {
     pub(super) deadline: Option<Instant>,
     pub(super) shared: Arc<SharedState>,
     pub(super) request_id: String,
+    /// The model this run loads; a prewarm of another can't take it over.
+    pub(super) model_id: &'static str,
     pub(super) started: bool,
     pub(super) timeout: Duration,
     pub(super) worker_path: PathBuf,
@@ -94,7 +96,7 @@ impl WorkerReservation {
         }
         // A prewarm worker still loading or warming up takes this request
         // over its load instead of a second one (prewarm.rs).
-        if let Some(handoff) = super::handoff::hand_over(&self.shared) {
+        if let Some(handoff) = super::handoff::hand_over(&self.shared, self.model_id) {
             let handle = handoff.process.clone();
             return self.exchange(&request_id, handle, on_started, |deadline| {
                 handoff.exchange(&frame, deadline)

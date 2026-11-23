@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use super::run::OwnedRun;
 use super::{authorized, worker_id, Entry, RequestKey, RequestRegistry, Result};
-use crate::cleanup::model_store::{ModelLease, MODEL_ID};
+use crate::cleanup::model_store::ModelLease;
 use crate::cleanup::CleanupCommandError;
 
 pub(in crate::cleanup) struct Acquisition {
@@ -69,26 +69,27 @@ impl RequestRegistry {
     pub fn start_run(&self, owner: u64, id: &str, model_id: &str) -> Result<OwnedRun> {
         let mut inner = self.inner.lock().unwrap();
         authorized(&inner, owner)?;
-        if model_id != MODEL_ID {
-            return Err(CleanupCommandError::model(
-                "cleanup model lease does not match request".into(),
-            ));
-        }
         let key = RequestKey {
             owner,
             id: id.to_owned(),
         };
-        let Some(Entry::Pending(ticket, _)) = inner.entries.get(&key) else {
+        let Some(Entry::Pending(ticket, lease)) = inner.entries.get(&key) else {
             return Err(CleanupCommandError::model(
                 "cleanup model lease is unavailable".into(),
             ));
         };
-        let ticket = *ticket;
+        // The run loads what was leased (BUS-229: one of two models).
+        if lease.model_id() != model_id {
+            return Err(CleanupCommandError::model(
+                "cleanup model lease does not match request".into(),
+            ));
+        }
+        let (ticket, leased_model) = (*ticket, lease.model_id());
         // Short, atomic reservation under the registry lock: retirement cannot
         // slip between transfer to running and supervisor admission.
         let permit = self
             .supervisor
-            .reserve(worker_id(&key, ticket))
+            .reserve(worker_id(&key, ticket), leased_model)
             .map_err(CleanupCommandError::from)?;
         let Some(Entry::Pending(_, lease)) = inner.entries.remove(&key) else {
             unreachable!()

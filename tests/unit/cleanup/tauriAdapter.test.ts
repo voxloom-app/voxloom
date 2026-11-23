@@ -174,13 +174,26 @@ describe('Tauri cleanup adapters', () => {
   });
 
   it.each([null, 'text', { text: 'text', attempt: null },
-    { text: 'text', attempt: { ...attempt, modelId: null } }])(
+    { text: 'text', attempt: { ...attempt, modelId: null } },
+    { text: 'text', attempt: { ...attempt, modelId: 'qwen3-4b-instruct-2507-q4-k-m' } },
+    { text: 'text', attempt: { ...attempt, modelId: 'toString' } }])(
     'rejects malformed success envelopes: %j', async (value) => {
       invoke.mockImplementation(async (command: string) => command === 'cleanup_session_open'
         ? 'native-owner-1' : value);
       await expect(createTauriCleanupEngine().run(request)).rejects.toMatchObject({ code: 'runtime-error' });
     },
   );
+
+  it('accepts the optional 4B with its own pinned digest (BUS-229)', async () => {
+    const quality = {
+      modelId: 'qwen3-4b-instruct-2507-q4-k-m',
+      modelDigest: '3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597',
+    };
+    invoke.mockImplementation(async (command: string) => command === 'cleanup_session_open'
+      ? 'native-owner-1' : { text: 'Cleaned.', attempt: quality });
+    await expect(createTauriCleanupEngine().run({ ...request, modelId: quality.modelId }))
+      .resolves.toEqual({ text: 'Cleaned.', attempt: quality });
+  });
 
   it('drains a running result after cancellation before reporting settlement', async () => {
     let reject!: (value: unknown) => void;

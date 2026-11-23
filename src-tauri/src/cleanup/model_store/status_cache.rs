@@ -1,9 +1,11 @@
-//! Fingerprint cache so status() can skip a full SHA-256 when the
-//! on-disk model is unchanged (dev/ino/size/mtime/ctime).
+//! Fingerprint cache so status() and a run can skip a full SHA-256 when the
+//! model is unchanged (dev/ino/size/mtime/ctime).
 
-use std::fs;
+use std::fs::{self, File, Metadata};
 use std::path::Path;
 use std::time::SystemTime;
+
+use super::super::artifact::ArtifactSpec;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct FileFingerprint {
@@ -16,12 +18,32 @@ pub(super) struct FileFingerprint {
     /// Change-time (content or metadata). Userspace cannot set it back, so it
     /// usually catches an in-place rewrite that restores mtime. It is only as
     /// fine as the filesystem clock tick, though: a rewrite in the same tick
-    /// keeps the fingerprint. Status is a hint; the lease re-hash
-    /// (ModelLease::verify) is the real guard and drops this cache on failure.
+    /// keeps the fingerprint. The same holds for the hash it saves; any write
+    /// through the app (download, delete) drops the cache first.
     #[cfg(unix)]
     pub(super) ctime_secs: i64,
     #[cfg(unix)]
     pub(super) ctime_nsecs: i64,
+}
+
+/// A model's last successful hash: which file, checked against which digest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Verified {
+    pub(super) fingerprint: FileFingerprint,
+    sha256: &'static str,
+}
+
+impl Verified {
+    pub(super) fn new(fingerprint: FileFingerprint, artifact: ArtifactSpec) -> Self {
+        Self {
+            fingerprint,
+            sha256: artifact.sha256,
+        }
+    }
+
+    pub(super) fn matches(&self, fingerprint: &FileFingerprint, artifact: ArtifactSpec) -> bool {
+        self.fingerprint == *fingerprint && self.sha256 == artifact.sha256
+    }
 }
 
 pub(super) fn fingerprint(path: &Path) -> Result<FileFingerprint, String> {
@@ -30,6 +52,19 @@ pub(super) fn fingerprint(path: &Path) -> Result<FileFingerprint, String> {
     if !metadata.file_type().is_file() || metadata.file_type().is_symlink() {
         return Err("cleanup model must be a regular non-symlink file".into());
     }
+    of(&metadata)
+}
+
+/// The open descriptor's fingerprint (fstat): what a lease hands the worker.
+pub(super) fn descriptor_fingerprint(file: &File) -> Result<FileFingerprint, String> {
+    let metadata = file.metadata().map_err(|error| error.to_string())?;
+    if !metadata.is_file() {
+        return Err("cleanup model must be a regular file".into());
+    }
+    of(&metadata)
+}
+
+fn of(metadata: &Metadata) -> Result<FileFingerprint, String> {
     let modified = metadata
         .modified()
         .map_err(|error| format!("read cleanup model mtime: {error}"))?;

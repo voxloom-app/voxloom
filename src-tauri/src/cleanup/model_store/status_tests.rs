@@ -1,5 +1,6 @@
 //! status() fingerprint cache: hits, invalidation, and the unlocked hash window.
 
+use super::status_cache::FileFingerprint;
 use super::*;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -18,9 +19,9 @@ fn spec_for(bytes: &[u8]) -> ArtifactSpec {
     }
 }
 
-/// A fingerprint no real file has, to plant a stale cache entry.
-fn stale_fingerprint() -> FileFingerprint {
-    FileFingerprint {
+/// A cache entry no real file matches.
+pub(super) fn stale_fingerprint() -> Verified {
+    let fingerprint = FileFingerprint {
         #[cfg(unix)]
         dev: 0,
         #[cfg(unix)]
@@ -31,11 +32,12 @@ fn stale_fingerprint() -> FileFingerprint {
         ctime_secs: 0,
         #[cfg(unix)]
         ctime_nsecs: 0,
-    }
+    };
+    Verified::new(fingerprint, DEFAULT_MODEL.artifact)
 }
 
 #[cfg(unix)]
-fn ctime(path: &Path) -> (i64, i64) {
+pub(super) fn ctime(path: &Path) -> (i64, i64) {
     use std::os::unix::fs::MetadataExt;
     let metadata = fs::symlink_metadata(path).unwrap();
     (metadata.ctime(), metadata.ctime_nsec())
@@ -45,7 +47,7 @@ fn ctime(path: &Path) -> (i64, i64) {
 /// fine as that tick (coarse on e.g. Linux ext4), so back-to-back writes can
 /// share one ctime. A probe in the same directory shows when it has moved.
 #[cfg(unix)]
-fn wait_for_ctime_tick(dir: &Path, after: (i64, i64)) {
+pub(super) fn wait_for_ctime_tick(dir: &Path, after: (i64, i64)) {
     use std::time::{Duration, Instant};
     let probe = dir.join("ctime-probe");
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -68,12 +70,16 @@ fn status_reuses_fingerprint_until_the_file_changes() {
     fs::write(store.model_path(), b"GGUFtest").unwrap();
     assert!(store.status_available_for(artifact));
     assert!(
-        store.inner.lock().unwrap().verified.is_some(),
+        store.inner.lock().unwrap().verified.contains_key(MODEL_ID),
         "successful status must remember the fingerprint"
     );
     // Unchanged fingerprint: a cache hit, so the hash step must not run.
-    assert!(store.available_with(|_| panic!("cache hit must not re-hash")));
-    assert!(store.inner.lock().unwrap().verified.is_some());
+    let spec = ModelSpec {
+        artifact,
+        ..DEFAULT_MODEL
+    };
+    assert!(store.available_with(spec, |_| panic!("cache hit must not re-hash")));
+    assert!(store.inner.lock().unwrap().verified.contains_key(MODEL_ID));
     // Same length, different bytes, after a clock tick → re-hash and miss.
     #[cfg(unix)]
     wait_for_ctime_tick(&root, ctime(&store.model_path()));
@@ -81,7 +87,7 @@ fn status_reuses_fingerprint_until_the_file_changes() {
     std::thread::sleep(std::time::Duration::from_millis(20));
     fs::write(store.model_path(), b"GGUFevil").unwrap();
     assert!(!store.status_available_for(artifact));
-    assert!(store.inner.lock().unwrap().verified.is_none());
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -89,9 +95,14 @@ fn status_reuses_fingerprint_until_the_file_changes() {
 fn missing_model_clears_stale_status_cache() {
     let root = temp_root("missing");
     let store = CleanupModelStore::new(root.clone());
-    store.inner.lock().unwrap().verified = Some(stale_fingerprint());
+    store
+        .inner
+        .lock()
+        .unwrap()
+        .verified
+        .insert(MODEL_ID, stale_fingerprint());
     assert!(!store.status().available);
-    assert!(store.inner.lock().unwrap().verified.is_none());
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -102,7 +113,7 @@ fn lease_is_not_blocked_while_status_hashes() {
     let store = CleanupModelStore::new(root.clone());
     fs::write(store.model_path(), b"GGUFtest").unwrap();
     let mut inside = false;
-    let available = store.available_with(|path| {
+    let available = store.available_with(DEFAULT_MODEL, |path| {
         inside = true;
         // Deterministically inside the hash window: the store lock must be
         // free here, so lease (and import) proceed while status hashes.
@@ -117,8 +128,8 @@ fn lease_is_not_blocked_while_status_hashes() {
     });
     assert!(inside, "cache miss must hash");
     assert!(available);
-    assert!(store.inner.lock().unwrap().verified.is_some());
-    assert_eq!(store.inner.lock().unwrap().leases, 0);
+    assert!(store.inner.lock().unwrap().verified.contains_key(MODEL_ID));
+    assert!(store.inner.lock().unwrap().leases.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -127,14 +138,14 @@ fn status_does_not_cache_a_file_that_changed_mid_hash() {
     let root = temp_root("changed-mid-hash");
     let store = CleanupModelStore::new(root.clone());
     fs::write(store.model_path(), b"GGUFtest").unwrap();
-    let available = store.available_with(|path| {
+    let available = store.available_with(DEFAULT_MODEL, |path| {
         // A different length always changes the fingerprint.
         fs::write(path, b"GGUFlonger").unwrap();
         true
     });
     assert!(available, "status reports this hash's own result");
     assert!(
-        store.inner.lock().unwrap().verified.is_none(),
+        store.inner.lock().unwrap().verified.is_empty(),
         "neither the hashed nor the new fingerprint may be cached"
     );
     let _ = fs::remove_dir_all(root);
@@ -145,13 +156,18 @@ fn status_clears_cache_when_the_file_vanishes_mid_hash() {
     let root = temp_root("vanished-mid-hash");
     let store = CleanupModelStore::new(root.clone());
     fs::write(store.model_path(), b"GGUFtest").unwrap();
-    store.inner.lock().unwrap().verified = Some(stale_fingerprint());
-    let available = store.available_with(|path| {
+    store
+        .inner
+        .lock()
+        .unwrap()
+        .verified
+        .insert(MODEL_ID, stale_fingerprint());
+    let available = store.available_with(DEFAULT_MODEL, |path| {
         fs::remove_file(path).unwrap();
         false
     });
     assert!(!available);
-    assert!(store.inner.lock().unwrap().verified.is_none());
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -165,7 +181,7 @@ fn status_detects_in_place_rewrite_when_mtime_restored() {
     let path = store.model_path();
     fs::write(&path, b"GGUFtest").unwrap();
     assert!(store.status_available_for(artifact));
-    let cached = store.inner.lock().unwrap().verified.unwrap();
+    let cached = store.inner.lock().unwrap().verified[MODEL_ID].fingerprint;
     let prior_mtime = fs::symlink_metadata(&path).unwrap().modified().unwrap();
 
     // Without a tick the rewrite can share the cached ctime and hit the cache.
@@ -185,7 +201,7 @@ fn status_detects_in_place_rewrite_when_mtime_restored() {
         !store.status_available_for(artifact),
         "ctime must invalidate the status cache after an in-place rewrite"
     );
-    assert!(store.inner.lock().unwrap().verified.is_none());
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -200,33 +216,11 @@ fn status_does_not_follow_a_symlinked_model() {
     std::os::unix::fs::symlink(&target, store.model_path()).unwrap();
     assert!(fingerprint(&store.model_path()).is_err());
     // Even a cache entry matching the target must not make a symlink count.
-    store.inner.lock().unwrap().verified = Some(fingerprint(&target).unwrap());
-    assert!(!store.status_available_for(artifact));
-    assert!(store.inner.lock().unwrap().verified.is_none());
-    let _ = fs::remove_dir_all(root);
-}
-
-#[test]
-fn verify_failure_invalidates_status_cache() {
-    let root = temp_root("verify-invalidate");
-    let artifact = spec_for(b"GGUFtest");
-    let store = CleanupModelStore::new(root.clone());
-    fs::write(store.model_path(), b"GGUFevil").unwrap();
-    // Plant a matching fingerprint so status would trust the cache.
-    let planted = fingerprint(&store.model_path()).unwrap();
-    store.inner.lock().unwrap().verified = Some(planted);
-    assert!(
-        store.status_available_for(artifact),
-        "planted cache must hit"
-    );
-
-    let mut lease = store.lease_artifact(MODEL_ID, artifact).unwrap();
-    assert!(lease.verify().unwrap_err().contains("SHA-256 mismatch"));
-    assert!(
-        store.inner.lock().unwrap().verified.is_none(),
-        "failed verify must drop the status cache"
+    store.inner.lock().unwrap().verified.insert(
+        MODEL_ID,
+        Verified::new(fingerprint(&target).unwrap(), artifact),
     );
     assert!(!store.status_available_for(artifact));
-    drop(lease);
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     let _ = fs::remove_dir_all(root);
 }

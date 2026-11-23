@@ -4,8 +4,10 @@ import { Switch } from '../../components/Switch';
 import { isCleanupActive } from '../../domain/cleanup';
 import {
   CLEANUP_DOWNLOAD, CLEANUP_DOWNLOAD_CANCEL, CLEANUP_HELP, CLEANUP_LABEL, CLEANUP_MODEL_LABEL, CLEANUP_REFRESH, CLEANUP_SWITCH, CLEANUP_TAG,
-  cleanupDownloadingLabel, cleanupModelNote, cleanupReady,
+  cleanupDownloadingLabel, cleanupModelNote,
 } from './cleanupCopy';
+import { chosenCleanupModel, chosenModelReady } from './cleanupModelChoice';
+import { CleanupQualityModel } from './CleanupQualityModel';
 import { useCleanupDownload } from './useCleanupDownload';
 import { cleanupShown, type CleanupModel } from './useCleanupModel';
 
@@ -17,8 +19,9 @@ function focusableIn(row: Element | null | undefined): HTMLElement | null {
 
 /**
  * Local cleanup rows (BUS-16 PR 2c). Turning cleanup on is the only place
- * that writes the explicit `cleanupOptIn` key; it needs a verified model and
- * a bundled worker. Turning it off is always allowed. Rendered only when
+ * that writes the explicit `cleanupOptIn` key; it needs the chosen model
+ * verified (Qwen3 0.6B unless the 4B was picked, BUS-229) and a bundled
+ * worker. Turning it off is always allowed. Rendered only when
  * `cleanupShown` says so, the same gate as the writing-style captions.
  */
 export function CleanupSettings({ isNative, model }: { isNative: boolean; model: CleanupModel }) {
@@ -30,7 +33,10 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
   const busy = download.downloading;
   const shown = cleanupShown(model, active);
   const firstRow = useRef<HTMLDivElement>(null);
-  const lastRow = useRef<HTMLDivElement>(null);
+  const modelRow = useRef<HTMLDivElement>(null);
+  const qualityRow = useRef<HTMLDivElement>(null);
+  const savedModel = state.settings.cleanupModelId;
+  const ready = chosenModelReady(view, savedModel);
   const focusAfterHide = useRef<HTMLElement | null>(null);
   const checking = view.kind === 'checking';
 
@@ -44,11 +50,12 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
 
   const setActive = (on: boolean) => {
     if (on) {
-      if (!cleanupReady(view)) return;
-      update({ key: 'cleanupModelId', value: view.status.id });
+      if (!chosenModelReady(view, savedModel)) return;
+      update({ key: 'cleanupModelId', value: chosenCleanupModel(view.status, savedModel).id });
     }
     if (!on && !cleanupShown(model, false)) {
-      focusAfterHide.current = focusableIn(lastRow.current?.nextElementSibling)
+      const lastRow = qualityRow.current ?? modelRow.current;
+      focusAfterHide.current = focusableIn(lastRow?.nextElementSibling)
         ?? focusableIn(firstRow.current?.previousElementSibling);
     }
     // Sophie's single-key call: only the opt-in is written. The legacy
@@ -58,7 +65,10 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
 
   if (!shown) return null;
 
-  const notes = [cleanupModelNote(view), download.note].filter(Boolean).join(' ');
+  // This row is the default model's; the 4B row shows its own download.
+  const ownDownload = view.kind === 'status' && download.modelId === view.status.id;
+  const downloading = ownDownload && download.downloading;
+  const notes = [cleanupModelNote(view), ownDownload ? download.note : null].filter(Boolean).join(' ');
   // BUS-181: offered only once the status says the model is missing.
   const offerDownload = download.supported && view.kind === 'status' && !view.status.available;
   const noteId = 'settings-cleanup-model-note';
@@ -72,13 +82,13 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
       <Switch
         aria-describedby={`settings-cleanup-help ${noteId}`}
         checked={active}
-        disabled={!active && !cleanupReady(view)}
+        disabled={!active && !ready}
         hideLabel
         label={CLEANUP_SWITCH}
         onChange={setActive}
       />
     </div>
-    <div className="frow" ref={lastRow}>
+    <div className="frow" ref={modelRow}>
       <span className="frow__label">
         <span>{CLEANUP_MODEL_LABEL}</span>
         <small className="frow__help" id={noteId} role="status">
@@ -88,17 +98,17 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
       {isNative && (
         <span className="frow__control">
           {/* aria-disabled, not disabled: a disabled button drops focus to the body. */}
-          {(offerDownload || download.downloading) && (
+          {(offerDownload || downloading) && (
             <button
               aria-disabled={busy}
               className="btn"
-              onClick={() => { if (!busy) void download.start(); }}
+              onClick={() => { if (!busy && view.kind === 'status') void download.start(view.status.id); }}
               type="button"
             >
-              {download.downloading ? cleanupDownloadingLabel(download.ratio) : CLEANUP_DOWNLOAD}
+              {downloading ? cleanupDownloadingLabel(download.ratio) : CLEANUP_DOWNLOAD}
             </button>
           )}
-          {download.downloading && (
+          {downloading && (
             <button className="btn" onClick={download.cancel} type="button">{CLEANUP_DOWNLOAD_CANCEL}</button>
           )}
           <button
@@ -112,5 +122,8 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
         </span>
       )}
     </div>
+    {isNative && view.kind === 'status' && (
+      <CleanupQualityModel download={download} model={model} rowRef={qualityRow} status={view.status} />
+    )}
   </>;
 }

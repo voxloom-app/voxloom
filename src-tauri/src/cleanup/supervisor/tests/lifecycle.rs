@@ -5,13 +5,15 @@ use super::*;
 #[test]
 fn cancelled_reservation_keeps_the_slot_until_its_owner_settles() {
     let supervisor = WorkerSupervisor::new(success_worker("reserved-cancel"));
-    let reservation = supervisor.reserve("reserved".into()).unwrap();
+    let reservation = supervisor.reserve("reserved".into(), MODEL_ID).unwrap();
     supervisor.cancel("reserved");
     supervisor.release("reserved");
     assert!(reservation.cancelled());
-    assert!(supervisor.reserve("too-early".into()).is_err());
+    assert!(supervisor.reserve("too-early".into(), MODEL_ID).is_err());
     drop(reservation);
-    assert!(supervisor.reserve("after-settlement".into()).is_ok());
+    assert!(supervisor
+        .reserve("after-settlement".into(), MODEL_ID)
+        .is_ok());
 }
 
 #[test]

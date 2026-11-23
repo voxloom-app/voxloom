@@ -52,6 +52,7 @@
     "allow-cleanup-model-status",
     "allow-cleanup-download-model",
     "allow-cleanup-cancel-download",
+    "allow-cleanup-delete-model",
     "allow-delivery-insert-text",
     "allow-delivery-paste-binding",
     "allow-delivery-paste-text",

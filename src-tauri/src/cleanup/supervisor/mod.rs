@@ -106,7 +106,12 @@ impl WorkerSupervisor {
         false
     }
 
-    pub fn reserve(&self, request_id: String) -> Result<WorkerReservation, SupervisorError> {
+    /// Admit a run of `model_id` (an offered model's id).
+    pub fn reserve(
+        &self,
+        request_id: String,
+        model_id: &'static str,
+    ) -> Result<WorkerReservation, SupervisorError> {
         let mut state = self.shared.state.lock().unwrap();
         if let Some(index) = state.cancelled.iter().position(|id| id == &request_id) {
             state.cancelled.remove(index);
@@ -117,15 +122,21 @@ impl WorkerSupervisor {
                 "cleanup worker is already processing",
             ));
         }
-        handoff::on_reserve(&mut state.prewarm);
+        let other_load = handoff::on_reserve(&mut state.prewarm, model_id);
         state.active = Some(ActiveWorker {
             process: None,
             cancelled: false,
             request_id: request_id.clone(),
         });
+        drop(state);
+        // Not under the lock, as for a disarm: the prewarm's thread reaps it.
+        if let Some(process) = other_load {
+            process.cancel();
+        }
         Ok(WorkerReservation {
             shared: Arc::clone(&self.shared),
             request_id,
+            model_id,
             deadline: None,
             started: false,
             timeout: self.timeout,

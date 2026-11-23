@@ -93,6 +93,9 @@ fn cleanup_download_model() {}
 fn cleanup_cancel_download() {}
 
 #[tauri::command]
+fn cleanup_delete_model() {}
+
+#[tauri::command]
 fn lone_key_arm() {}
 
 #[tauri::command]
@@ -140,6 +143,7 @@ fn cleanup_models_are_available_in_settings_but_worker_execution_is_main_only() 
         "cleanup_model_status",
         "cleanup_download_model",
         "cleanup_cancel_download",
+        "cleanup_delete_model",
     ] {
         let app = mock_builder()
             .invoke_handler(tauri::generate_handler![
@@ -148,7 +152,8 @@ fn cleanup_models_are_available_in_settings_but_worker_execution_is_main_only() 
                 cleanup_prewarm_disarm,
                 cleanup_model_status,
                 cleanup_download_model,
-                cleanup_cancel_download
+                cleanup_cancel_download,
+                cleanup_delete_model
             ])
             .build(crate::app_context())
             .expect("mock app");

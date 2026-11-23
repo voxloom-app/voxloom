@@ -3,14 +3,14 @@ import type {
   CleanupEngine,
   CleanupModelStore,
 } from './contracts';
-import { cancelCleanupDownload, downloadCleanupModel } from './modelDownload';
+import { cancelCleanupDownload, deleteCleanupModel, downloadCleanupModel } from './modelDownload';
 import type {
   CleanupAttempt,
   CleanupModelStatus,
   CleanupResult,
 } from './types';
 import {
-  CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, CLEANUP_REASONS,
+  CLEANUP_MODEL_DIGESTS, CLEANUP_REASONS,
   CleanupEngineError, type CleanupReason,
 } from './types';
 
@@ -22,9 +22,10 @@ interface NativeCleanupError {
 
 function parseAttempt(value: unknown): CleanupAttempt | undefined {
   const candidate = value as Partial<CleanupAttempt> | null;
-  return candidate?.modelId === CLEANUP_MODEL_ID
-    && candidate.modelDigest === CLEANUP_MODEL_SHA256
-    ? { modelId: candidate.modelId, modelDigest: candidate.modelDigest } : undefined;
+  const { modelDigest, modelId } = candidate ?? {};
+  return typeof modelId === 'string' && Object.hasOwn(CLEANUP_MODEL_DIGESTS, modelId)
+    && modelDigest === CLEANUP_MODEL_DIGESTS[modelId]
+    ? { modelId, modelDigest } : undefined;
 }
 
 function runtimeError(error: unknown): CleanupEngineError {
@@ -175,6 +176,7 @@ async function modelInvoke<T>(command: string): Promise<T> {
 export function createTauriCleanupModelStore(): CleanupModelStore {
   return {
     cancelDownload: cancelCleanupDownload,
+    delete: deleteCleanupModel,
     download: downloadCleanupModel,
     async status() {
       return modelInvoke<CleanupModelStatus>('cleanup_model_status');

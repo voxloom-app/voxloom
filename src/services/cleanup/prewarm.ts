@@ -16,9 +16,11 @@ export const PREWARM_LAUNCH_DELAY_MS = 5_000;
 
 export type PrewarmTrigger = 'launch' | 'switch-on';
 
-export type Prewarm = (trigger: PrewarmTrigger) => Promise<unknown>;
+/** Warms `modelId`, the chosen model (BUS-229), so a dictation reuses its load. */
+export type Prewarm = (trigger: PrewarmTrigger, modelId: string) => Promise<unknown>;
 
-export const prewarmCleanup: Prewarm = (trigger) => invoke('cleanup_prewarm', { trigger });
+export const prewarmCleanup: Prewarm = (trigger, modelId) =>
+  invoke('cleanup_prewarm', { modelId, trigger });
 
 export type DisarmPrewarm = () => Promise<unknown>;
 

@@ -57,6 +57,7 @@ export function App() {
   useCleanupPrewarm({
     active: isCleanupActive(state.settings),
     disarm: isTauriEnv() ? disarmCleanupPrewarm : undefined,
+    modelId: state.settings.cleanupModelId,
     prewarm: isTauriEnv() ? prewarmCleanup : undefined,
     ready: bootReady,
   });

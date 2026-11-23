@@ -3,23 +3,26 @@
 //! reservation, framing and response rules even where cleanup is unavailable.
 
 use super::*;
+use crate::cleanup::model_store::MODEL_ID;
 use crate::cleanup::protocol::WorkerResponse;
 use serde_json::json;
 
 #[test]
 fn cancellation_keeps_the_slot_until_the_reservation_owner_settles() {
     let supervisor = WorkerSupervisor::new(PathBuf::new());
-    let mut reservation = supervisor.reserve("reserved".into()).unwrap();
+    let mut reservation = supervisor.reserve("reserved".into(), MODEL_ID).unwrap();
     assert!(supervisor.cancel("reserved"));
     supervisor.release("reserved");
     assert!(reservation.cancelled());
-    assert!(supervisor.reserve("too-early".into()).is_err());
+    assert!(supervisor.reserve("too-early".into(), MODEL_ID).is_err());
     let error = reservation
         .run_with_spawn("p".into(), || panic!("cancelled requests cannot spawn"))
         .unwrap_err();
     assert_eq!(error.code, "cancelled");
     drop(reservation);
-    assert!(supervisor.reserve("after-settlement".into()).is_ok());
+    assert!(supervisor
+        .reserve("after-settlement".into(), MODEL_ID)
+        .is_ok());
 }
 
 #[test]
@@ -27,13 +30,17 @@ fn prestart_cancellation_is_consumed_and_release_allows_reuse() {
     let supervisor = WorkerSupervisor::new(PathBuf::new());
     supervisor.cancel("queued");
     assert_eq!(
-        supervisor.reserve("queued".into()).err().unwrap().code,
+        supervisor
+            .reserve("queued".into(), MODEL_ID)
+            .err()
+            .unwrap()
+            .code,
         "cancelled"
     );
-    drop(supervisor.reserve("queued".into()).unwrap());
+    drop(supervisor.reserve("queued".into(), MODEL_ID).unwrap());
     supervisor.cancel("released");
     supervisor.release("released");
-    assert!(supervisor.reserve("released".into()).is_ok());
+    assert!(supervisor.reserve("released".into(), MODEL_ID).is_ok());
 }
 
 #[test]
@@ -46,12 +53,16 @@ fn cancellation_metadata_is_bounded_independently_of_admission() {
         supervisor.shared.state.lock().unwrap().cancelled.len(),
         CANCELLED_REQUEST_LIMIT
     );
-    drop(supervisor.reserve("cancel-0".into()).unwrap());
+    drop(supervisor.reserve("cancel-0".into(), MODEL_ID).unwrap());
     assert_eq!(
-        supervisor.reserve("cancel-1".into()).err().unwrap().code,
+        supervisor
+            .reserve("cancel-1".into(), MODEL_ID)
+            .err()
+            .unwrap()
+            .code,
         "cancelled"
     );
-    assert!(supervisor.reserve("fresh".into()).is_ok());
+    assert!(supervisor.reserve("fresh".into(), MODEL_ID).is_ok());
 }
 
 #[test]
@@ -61,15 +72,15 @@ fn preflight_failure_never_spawns_and_drop_recovers_the_slot() {
         ("oversize", "x".repeat(128 * 1024), "context-overflow"),
         ("missing-worker", "p".into(), "runtime-error"),
     ] {
-        let mut reservation = supervisor.reserve(id.into()).unwrap();
+        let mut reservation = supervisor.reserve(id.into(), MODEL_ID).unwrap();
         let error = reservation
             .run_with_spawn(prompt, || panic!("preflight failure cannot spawn"))
             .unwrap_err();
         assert_eq!(error.code, code);
-        assert!(supervisor.reserve("overlap".into()).is_err());
+        assert!(supervisor.reserve("overlap".into(), MODEL_ID).is_err());
         drop(reservation);
     }
-    assert!(supervisor.reserve("recovered".into()).is_ok());
+    assert!(supervisor.reserve("recovered".into(), MODEL_ID).is_ok());
 }
 
 #[test]

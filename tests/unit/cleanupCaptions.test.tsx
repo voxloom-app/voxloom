@@ -12,8 +12,9 @@ import { HomeHero } from '../../src/features/home/HomeHero';
 import { CaptureTab } from '../../src/features/settings/CaptureTab';
 import { Settings as SettingsWindow } from '../../src/features/settings/Settings';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
-import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
+import { CLEANUP_MODEL_ID, type CleanupModelStatus } from '../../src/services/cleanup/types';
 import { renderWithApp } from './testUtils';
+import { cleanupStatus } from './cleanupStatusFixture';
 
 vi.mock('../../src/services/capture/useCaptureState', () => ({
   useCaptureState: () => ({
@@ -24,9 +25,7 @@ vi.mock('../../src/services/capture/useCaptureState', () => ({
 }));
 vi.mock('../../src/services/capture/captureService', () => ({ isTauriEnv: vi.fn().mockReturnValue(true) }));
 
-const status = (runtimeAvailable: boolean): CleanupModelStatus => ({
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable, sha256: CLEANUP_MODEL_SHA256,
-});
+const status = (runtimeAvailable: boolean): CleanupModelStatus => cleanupStatus({ runtimeAvailable });
 const store = (next: CleanupModelStatus): CleanupModelStore => ({
   status: vi.fn().mockResolvedValue(next),
 });

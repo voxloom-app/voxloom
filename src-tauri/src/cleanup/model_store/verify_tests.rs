@@ -66,10 +66,13 @@ fn a_hash_nobody_stops_verifies_every_chunk() {
 fn stopping_keeps_the_status_cache_and_a_mismatch_still_drops_it() {
     let (store, mut lease, root) = big_lease("cache");
     let path = store.model_path();
-    store.remember_verified(&path);
+    // An entry this file doesn't match, so the hash runs (no cache hit).
+    let stale = super::status_tests::stale_fingerprint();
+    store.inner.lock().unwrap().verified.insert(MODEL_ID, stale);
     assert_eq!(lease.verify_while(|| false), Ok(false));
-    assert!(
-        store.inner.lock().unwrap().verified.is_some(),
+    assert_eq!(
+        store.inner.lock().unwrap().verified.get(MODEL_ID),
+        Some(&stale),
         "a stopped hash found nothing wrong"
     );
     // The lease holds this inode: change a byte past the header, same size.
@@ -77,7 +80,7 @@ fn stopping_keeps_the_status_cache_and_a_mismatch_still_drops_it() {
     bytes[MIB] ^= 1;
     fs::write(&path, bytes).unwrap();
     assert!(lease.verify_while(|| true).is_err());
-    assert!(store.inner.lock().unwrap().verified.is_none());
+    assert!(store.inner.lock().unwrap().verified.is_empty());
     drop(lease);
     fs::remove_dir_all(root).unwrap();
 }

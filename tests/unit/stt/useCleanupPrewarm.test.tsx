@@ -7,12 +7,17 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 import { PREWARM_LAUNCH_DELAY_MS, disarmCleanupPrewarm, prewarmCleanup } from '../../../src/services/cleanup/prewarm';
 import { useCleanupPrewarm, type CleanupPrewarmOptions } from '../../../src/services/stt/useCleanupPrewarm';
+import { CLEANUP_MODEL_ID, QUALITY_CLEANUP_MODEL_ID } from '../../../src/services/cleanup/types';
 
-function setup(initial: Omit<CleanupPrewarmOptions, 'prewarm'>, wrapper?: (props: { children: ReactNode }) => ReactNode) {
-  const prewarm = vi.fn(() => Promise.resolve('started'));
+const M = CLEANUP_MODEL_ID;
+/** Options without `prewarm`; `modelId` defaults to the 0.6B. */
+type Props = Omit<CleanupPrewarmOptions, 'prewarm' | 'modelId'> & { modelId?: string | null };
+
+function setup(initial: Props, wrapper?: (props: { children: ReactNode }) => ReactNode) {
+  const prewarm = vi.fn<(trigger: string, modelId: string) => Promise<string>>(() => Promise.resolve('started'));
   const disarm = vi.fn(() => Promise.resolve('stopped'));
   const hook = renderHook(
-    (props: Omit<CleanupPrewarmOptions, 'prewarm'>) => useCleanupPrewarm({ ...props, disarm, prewarm }),
+    (props: Props) => useCleanupPrewarm({ modelId: M, ...props, disarm, prewarm }),
     { initialProps: initial, wrapper },
   );
   return { disarm, hook, prewarm };
@@ -27,7 +32,7 @@ describe('cleanup prewarm triggers (BUS-16 3c-2c C2)', () => {
     vi.advanceTimersByTime(PREWARM_LAUNCH_DELAY_MS - 1);
     expect(prewarm).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch', M);
     vi.advanceTimersByTime(60_000);
     expect(prewarm).toHaveBeenCalledOnce();
   });
@@ -43,7 +48,7 @@ describe('cleanup prewarm triggers (BUS-16 3c-2c C2)', () => {
     hook.rerender({ active: true, ready: true });
     expect(prewarm).not.toHaveBeenCalled();
     vi.advanceTimersByTime(PREWARM_LAUNCH_DELAY_MS);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch', M);
   });
 
   it('waits for hydration before deciding anything', () => {
@@ -55,13 +60,13 @@ describe('cleanup prewarm triggers (BUS-16 3c-2c C2)', () => {
   it('prewarms at once on every switch-on', async () => {
     const { hook, prewarm } = setup({ active: false, ready: true });
     hook.rerender({ active: true, ready: true });
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on', M);
     hook.rerender({ active: true, ready: true });
     hook.rerender({ active: false, ready: true });
     hook.rerender({ active: true, ready: true });
     // After the switch-off's disarm (BUS-121), a microtask later.
     await vi.advanceTimersByTimeAsync(0);
-    expect(prewarm.mock.calls).toEqual([['switch-on'], ['switch-on']]);
+    expect(prewarm.mock.calls).toEqual([['switch-on', M], ['switch-on', M]]);
     vi.advanceTimersByTime(60_000);
     expect(prewarm).toHaveBeenCalledTimes(2);
   });
@@ -74,19 +79,19 @@ describe('cleanup prewarm triggers (BUS-16 3c-2c C2)', () => {
     expect(prewarm).not.toHaveBeenCalled();
     hook.rerender({ active: true, ready: true });
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on', M);
   });
 
   it('fires the launch prewarm once under StrictMode', () => {
     const { prewarm } = setup({ active: true, ready: true }, StrictMode);
     vi.advanceTimersByTime(PREWARM_LAUNCH_DELAY_MS);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch', M);
   });
 
   it('fires one switch-on under StrictMode', () => {
     const { hook, prewarm } = setup({ active: false, ready: true }, StrictMode);
     hook.rerender({ active: true, ready: true });
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on', M);
   });
 
   it('stops a pending launch prewarm on unmount, and does nothing without native', () => {
@@ -94,22 +99,22 @@ describe('cleanup prewarm triggers (BUS-16 3c-2c C2)', () => {
     hook.unmount();
     vi.advanceTimersByTime(60_000);
     expect(prewarm).not.toHaveBeenCalled();
-    const browser = renderHook(() => useCleanupPrewarm({ active: true, ready: true }));
+    const browser = renderHook(() => useCleanupPrewarm({ active: true, modelId: M, ready: true }));
     vi.advanceTimersByTime(60_000);
     browser.unmount();
   });
 
   it('swallows a failed prewarm', async () => {
     const prewarm = vi.fn(() => Promise.reject(new Error('no worker')));
-    renderHook(() => useCleanupPrewarm({ active: true, prewarm, ready: true }));
+    renderHook(() => useCleanupPrewarm({ active: true, modelId: M, prewarm, ready: true }));
     await vi.advanceTimersByTimeAsync(PREWARM_LAUNCH_DELAY_MS);
     expect(prewarm).toHaveBeenCalledOnce();
   });
 
   it('asks native with the trigger', async () => {
     invoke.mockResolvedValueOnce('low-power');
-    await expect(prewarmCleanup('launch')).resolves.toBe('low-power');
-    expect(invoke).toHaveBeenCalledWith('cleanup_prewarm', { trigger: 'launch' });
+    await expect(prewarmCleanup('launch', M)).resolves.toBe('low-power');
+    expect(invoke).toHaveBeenCalledWith('cleanup_prewarm', { modelId: M, trigger: 'launch' });
   });
 
   it('asks native to disarm', async () => {
@@ -169,7 +174,7 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
     const { disarm, hook } = setup({ active: true, ready: true });
     hook.unmount();
     expect(disarm).not.toHaveBeenCalled();
-    const browser = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, ready: true }), {
+    const browser = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, modelId: M, ready: true }), {
       initialProps: { active: true },
     });
     browser.rerender({ active: false });
@@ -179,7 +184,7 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
   it('swallows a failed disarm', async () => {
     const disarm = vi.fn(() => Promise.reject(new Error('no worker')));
     const prewarm = vi.fn(() => Promise.resolve('started'));
-    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, prewarm, ready: true }), {
+    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, modelId: M, prewarm, ready: true }), {
       initialProps: { active: true },
     });
     hook.rerender({ active: false });
@@ -187,7 +192,7 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
     expect(disarm).toHaveBeenCalledOnce();
     hook.rerender({ active: true });
     await vi.advanceTimersByTimeAsync(0);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on', M);
   });
 
   it('starts a switch-on prewarm only after the disarm before it has finished', async () => {
@@ -206,7 +211,7 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
       order.push('prewarm');
       return Promise.resolve('started');
     });
-    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, prewarm, ready: true }), {
+    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, modelId: M, prewarm, ready: true }), {
       initialProps: { active: true },
     });
     hook.rerender({ active: false });
@@ -216,12 +221,12 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
     finishDisarm();
     await vi.advanceTimersByTimeAsync(0);
     expect(order).toEqual(['disarmed', 'prewarm']);
-    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on');
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('switch-on', M);
   });
 
   it('does not start a switch-on prewarm when cleanup is switched off again before it starts', async () => {
     const { calls, disarm, finish, prewarm } = deferredDisarms();
-    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, prewarm, ready: true }), {
+    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, modelId: M, prewarm, ready: true }), {
       initialProps: { active: true },
     });
     hook.rerender({ active: false });
@@ -238,7 +243,7 @@ describe('switching cleanup off disarms the prewarm (BUS-121)', () => {
 
   it('keeps a switch-on waiting for the latest disarm when an earlier one finishes first', async () => {
     const { calls, disarm, finish, prewarm } = deferredDisarms();
-    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, prewarm, ready: true }), {
+    const hook = renderHook((props: { active: boolean }) => useCleanupPrewarm({ ...props, disarm, modelId: M, prewarm, ready: true }), {
       initialProps: { active: true },
     });
     hook.rerender({ active: false });
@@ -273,3 +278,36 @@ function deferredDisarms() {
   const finish = (index: number) => pending[index]?.();
   return { calls, disarm, finish, prewarm };
 }
+
+describe('choosing another model while cleanup is on (BUS-229)', () => {
+  it('disarms the old model and warms the new one once that disarm is done', async () => {
+    const { disarm, hook, prewarm } = setup({ active: true, ready: true });
+    vi.advanceTimersByTime(PREWARM_LAUNCH_DELAY_MS);
+    expect(prewarm).toHaveBeenCalledExactlyOnceWith('launch', M);
+    hook.rerender({ active: true, modelId: QUALITY_CLEANUP_MODEL_ID, ready: true });
+    expect(disarm).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(prewarm).toHaveBeenLastCalledWith('switch-on', QUALITY_CLEANUP_MODEL_ID);
+    expect(prewarm).toHaveBeenCalledTimes(2);
+  });
+
+  it('warms the chosen model at launch, and a change before then replaces the launch prewarm', async () => {
+    const quality = setup({ active: true, modelId: QUALITY_CLEANUP_MODEL_ID, ready: true });
+    vi.advanceTimersByTime(PREWARM_LAUNCH_DELAY_MS);
+    expect(quality.prewarm).toHaveBeenCalledExactlyOnceWith('launch', QUALITY_CLEANUP_MODEL_ID);
+    const changed = setup({ active: true, ready: true });
+    changed.hook.rerender({ active: true, modelId: QUALITY_CLEANUP_MODEL_ID, ready: true });
+    await vi.advanceTimersByTimeAsync(PREWARM_LAUNCH_DELAY_MS);
+    expect(changed.prewarm.mock.calls).toEqual([['switch-on', QUALITY_CLEANUP_MODEL_ID]]);
+  });
+
+  it('does nothing when the model changes while cleanup is off, or with no model', () => {
+    const off = setup({ active: false, ready: true });
+    off.hook.rerender({ active: false, modelId: QUALITY_CLEANUP_MODEL_ID, ready: true });
+    const none = setup({ active: true, modelId: null, ready: true });
+    vi.advanceTimersByTime(60_000);
+    expect(off.prewarm).not.toHaveBeenCalled();
+    expect(off.disarm).not.toHaveBeenCalled();
+    expect(none.prewarm).not.toHaveBeenCalled();
+  });
+});
