@@ -1,6 +1,7 @@
 import { useState, type RefObject } from 'react';
 import { useApp } from '../../app/AppContext';
 import { Switch } from '../../components/Switch';
+import { isCleanupActive } from '../../domain/cleanup';
 import type { CleanupModelStatus } from '../../services/cleanup/types';
 import { cleanupDownloadingLabel, CLEANUP_DOWNLOAD_CANCEL } from './cleanupCopy';
 import { chosenCleanupModel, qualityCleanupModel } from './cleanupModelChoice';
@@ -51,15 +52,20 @@ export function CleanupQualityModel({ download, model, rowRef, status }: {
     }
   };
 
-  const note = [qualityModelNote(quality, chosen), mine ? download.note : null, removeNote]
-    .filter(Boolean).join(' ');
+  const note = [
+    qualityModelNote(quality, chosen, isCleanupActive(state.settings)),
+    mine ? download.note : null,
+    removeNote,
+  ].filter(Boolean).join(' ');
   const noteId = 'settings-cleanup-quality-note';
   return (
     <div className="frow" ref={rowRef}>
       <span className="frow__label">
         <span>{QUALITY_LABEL}</span>
-        <small className="frow__help" id="settings-cleanup-quality-help">{QUALITY_HELP}</small>
-        <small className="frow__help" id={noteId} role="status">{note}</small>
+        <span className="frow__help frow__help--stack">
+          <small id="settings-cleanup-quality-help">{QUALITY_HELP}</small>
+          <small id={noteId} role="status">{note}</small>
+        </span>
       </span>
       <span className="frow__control">
         {(quality.available || chosen) && (

@@ -98,12 +98,35 @@ describe('Qwen3 4B cleanup model', () => {
     await waitFor(() => expect(qualitySwitch()).toBeEnabled());
     await user.click(qualitySwitch()!);
     expect(latest.cleanupModelId).toBe(QUALITY_CLEANUP_MODEL_ID);
-    expect(qualityNote()).toBe('Qwen3 4B is in use.');
+    expect(qualityNote()).toBe('Qwen3 4B is installed.');
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
     await user.click(mainSwitch());
     expect(latest).toMatchObject({ cleanupModelId: QUALITY_CLEANUP_MODEL_ID, cleanupOptIn: true });
+    expect(qualityNote()).toBe('Qwen3 4B is in use.');
     await user.click(qualitySwitch()!);
     expect(latest.cleanupModelId).toBe(CLEANUP_MODEL_ID);
+  });
+
+  it('wraps the help and note in one help slot so they do not overlap in two-column Settings', async () => {
+    renderRow(cleanupStatus({ quality: true }));
+    const help = await screen.findByText(HELP);
+    const note = document.getElementById('settings-cleanup-quality-note');
+    expect(note).toHaveTextContent('Qwen3 4B is installed.');
+    const slot = help.closest('.frow__help');
+    expect(slot).toContainElement(note);
+    const label = help.closest('.frow__label');
+    expect([...label!.children].filter((el) => el.classList.contains('frow__help'))).toHaveLength(1);
+  });
+
+  it('says the 4B is in use only when it is chosen and local cleanup is on', async () => {
+    const user = userEvent.setup();
+    renderRow(cleanupStatus({ quality: true }), { cleanupModelId: QUALITY_CLEANUP_MODEL_ID });
+    await waitFor(() => expect(qualitySwitch()).toHaveAttribute('aria-checked', 'true'));
+    expect(qualityNote()).toBe('Qwen3 4B is installed.');
+    await user.click(mainSwitch());
+    expect(qualityNote()).toBe('Qwen3 4B is in use.');
+    await user.click(mainSwitch());
+    expect(qualityNote()).toBe('Qwen3 4B is installed.');
   });
 
   it.each([[null], [CLEANUP_MODEL_ID]])('saved model %s stays on Qwen3 0.6B', async (saved) => {

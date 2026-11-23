@@ -11,11 +11,13 @@ export const QUALITY_SWITCH = 'Use Qwen3 4B';
 export const QUALITY_REMOVE = 'Remove';
 export const QUALITY_REMOVING = 'Removing…';
 
-export function qualityModelNote(model: CleanupModelEntry, chosen: boolean): string {
+export function qualityModelNote(
+  model: CleanupModelEntry, chosen: boolean, cleanupOn: boolean,
+): string {
   if (!model.available) {
     return chosen ? 'Not installed. Download it again, or turn it off to use Qwen3 0.6B.' : 'Not installed.';
   }
-  return chosen ? 'Qwen3 4B is in use.' : 'Qwen3 4B is installed.';
+  return chosen && cleanupOn ? 'Qwen3 4B is in use.' : 'Qwen3 4B is installed.';
 }
 
 export function qualityRemoveFailedNote(reason: string): string {
