@@ -116,6 +116,10 @@ describe('Qwen3 4B cleanup model', () => {
     expect(slot).toContainElement(note);
     const label = help.closest('.frow__label');
     expect([...label!.children].filter((el) => el.classList.contains('frow__help'))).toHaveLength(1);
+    // Nested <small> would shrink under the UA `font-size: smaller` rule
+    // (13px → ~10.83px). Spans inherit the 13px .frow__help size.
+    expect(help.tagName).toBe('SPAN');
+    expect(note!.tagName).toBe('SPAN');
   });
 
   it('says the 4B is in use only when it is chosen and local cleanup is on', async () => {

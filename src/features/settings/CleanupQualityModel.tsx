@@ -63,8 +63,8 @@ export function CleanupQualityModel({ download, model, rowRef, status }: {
       <span className="frow__label">
         <span>{QUALITY_LABEL}</span>
         <span className="frow__help frow__help--stack">
-          <small id="settings-cleanup-quality-help">{QUALITY_HELP}</small>
-          <small id={noteId} role="status">{note}</small>
+          <span id="settings-cleanup-quality-help">{QUALITY_HELP}</span>
+          <span id={noteId} role="status">{note}</span>
         </span>
       </span>
       <span className="frow__control">
