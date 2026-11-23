@@ -4,7 +4,7 @@ import type { CleanupModelStatus } from '../../services/cleanup/types';
 export const CLEANUP_LABEL = 'Local cleanup';
 export const CLEANUP_TAG = 'Experimental';
 export const CLEANUP_HELP =
-  'Fixes punctuation and drops filler words on this Mac. If cleanup fails or changes your words, Voxloom types what you said.';
+  'Fixes capitalization and punctuation on this Mac. Formal drops filler words; Casual and Very Casual can keep them. If cleanup fails or changes your words, Voxloom types what you said.';
 export const CLEANUP_SWITCH = 'Clean up transcripts locally';
 export const CLEANUP_MODEL_LABEL = 'Cleanup model';
 export const CLEANUP_REFRESH = 'Check again';
