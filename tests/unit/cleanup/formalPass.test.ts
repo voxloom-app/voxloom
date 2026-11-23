@@ -60,6 +60,29 @@ describe('formalPass', () => {
     expect(formalPass('Ask Like Inc. about it.')).toBe('Ask Like Inc. about it.');
   });
 
+  it.each([
+    ['So basically we need, um, 25 servers by March 3rd, and the budget is $4,500.',
+      'So basically we need 25 servers by March 3rd, and the budget is $4,500.'],
+    ['Open, um, src/foo.ts now.', 'Open src/foo.ts now.'],
+    ['Um, https://example.com', 'https://example.com'],
+    ['He said, um, "don\'t go" to me.', 'He said "don\'t go" to me.'],
+    ['Um, 25 servers are down.', '25 servers are down.'],
+    ['We shipped. Um, `npm test` passes.', 'We shipped. `npm test` passes.'],
+  ])('keeps a protected value right after a removed filler (CR #199): %s', (raw, expected) => {
+    expect(formalPass(raw)).toBe(expected);
+  });
+
+  it.each([
+    'Everyone\'s laptop is broken.',
+    'Someone\'s car is blocking the driveway.',
+  ])('leaves an everyone/someone possessive alone (CR #199): %s', (raw) => {
+    expect(formalPass(raw)).toBe(raw);
+  });
+
+  it('reads has/is past a removed filler (CR #199)', () => {
+    expect(formalPass('It\'s, um, been fine.')).toBe('It has been fine.');
+  });
+
   it('is idempotent', () => {
     const once = formalPass(TICKET);
     expect(formalPass(once)).toBe(once);

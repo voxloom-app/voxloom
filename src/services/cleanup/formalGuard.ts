@@ -3,7 +3,8 @@
 // and Very Casual use (contentGuard.ts) would reject every one and fall back
 // to the raw text. Formal checks facts instead: negation and pronouns,
 // names (kept, none new), number words, quoted text, enough shared content in both
-// directions, and no preamble, label or JSON. Protected values (numbers,
+// directions, a capitalized sentence opener kept, a question left a question,
+// and no preamble, label or JSON. Protected values (numbers,
 // code, paths, URLs), symbols, capitalization, length and reasoning markers
 // are checked for every style in validation.ts.
 import { applySourceCorrection, contentWords } from './contentGuard';
@@ -30,6 +31,14 @@ const ENVELOPE = /["“]?(?:transcript|canonicalSpellings)["”]?\s*:/iu;
 const STRUCTURE = /[#&*|()[\]{}§%]/gu;
 const QUOTED = /["“]([^"“”]*)["”]/gu;
 const ACRONYM = /^\p{Lu}{2,}$/u;
+/**
+ * Sentence openers a Formal rewrite may drop or reword: discourse markers and
+ * fillers. Any other capitalized opener may be a name (Rowan will ship …).
+ */
+const OPENERS_DROPPABLE = new Set(`like yeah yep yup nope um umm uh uhh uhm erm er hmm ah ahh basically
+  honestly literally anyway anyways actually alright right sorry now look listen maybe perhaps plus
+  kinda sorta gonna wanna gotta let lets let's let’s thanks thank great cool sure`.split(/\s+/u));
+const WH_QUESTION = /(?:^|[.!?…]\s+)(?:what|who|whom|whose|where|which|when|why|how)\s+(?:is|are|was|were|do|does|did|can|could|will|would|should|has|have|had)\b/giu;
 
 /**
  * Words after the Formal pass on both sides. A source word also matches its
@@ -43,15 +52,6 @@ function sourceWords(text: string, dictionary: readonly string[]): string[][] {
 
 function outputWords(text: string, dictionary: readonly string[]): string[] {
   return contentWords(formalPass(text), dictionary).map(({ word }) => word);
-}
-
-function multisetIncludes(outer: readonly string[], inner: readonly string[]): boolean {
-  const left = [...outer];
-  return inner.every((word) => {
-    const at = left.indexOf(word);
-    if (at >= 0) left.splice(at, 1);
-    return at >= 0;
-  });
 }
 
 function sameGuarded(ref: string[], out: string[], guarded: ReadonlySet<string>): boolean {
@@ -86,10 +86,45 @@ export function names(text: string): string[] {
   return found;
 }
 
+/**
+ * Capitalized words opening a sentence, lowercased, that are content words
+ * and not a discourse marker: a sentence-initial name looks like any other
+ * opener, so the rewrite must keep it (Rowan will ship → Ship is a drop).
+ */
+function openers(text: string): string[] {
+  const found: string[] = [];
+  for (const match of text.normalize('NFC').matchAll(/[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu)) {
+    const before = text.slice(0, match.index).replace(/["'“”‘’(\s]+$/u, '');
+    if (before !== '' && !/[.!?…:]$/u.test(before)) continue;
+    const word = match[0].replace(/['’]s$/u, '');
+    const lower = word.toLowerCase();
+    if (!/^\p{Lu}\p{Ll}/u.test(word) || OPENERS_DROPPABLE.has(lower) || NUMBER_WORDS.has(lower)) continue;
+    if (isContent(lower)) found.push(lower);
+  }
+  return found;
+}
+
+/** Every capitalized word, sentence openers included, without a trailing `'s`. */
+function capitalized(text: string): string[] {
+  return [...text.normalize('NFC').matchAll(/[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu)]
+    .map(([word]) => word.replace(/['’]s$/u, '')).filter((word) => /^\p{Lu}/u.test(word));
+}
+
+/** Sentences that ask something: end in `?`, or open with a wh-word and a verb. */
+function questions(text: string): number {
+  const marked = text.match(/\?/gu)?.length ?? 0;
+  return Math.max(marked, text.match(WH_QUESTION)?.length ?? 0);
+}
+
+function sentences(text: string): number {
+  return text.trim().split(/[.!?…]+(?:\s+|$)/u).filter((part) => /[\p{L}\p{N}]/u.test(part)).length;
+}
+
 function shares(ref: string[][], out: string[]): boolean {
   const source = ref.filter(([word]) => isContent(word)).map((keys) => keys.map(stem));
   const output = out.filter(isContent).map(stem);
-  if (!source.length) return true;
+  // Nothing to keep is not a license to add: `Hello, what is that?` → `The server crashed.`
+  if (!source.length) return output.length === 0;
   const known = new Set(source.flat());
   const present = source.map((keys) => keys.some((key) => output.includes(key)));
   const kept = present.filter(Boolean).length;
@@ -114,14 +149,30 @@ function factsHold(ref: string, candidate: string, dictionary: readonly string[]
   const output = outputWords(candidate, dictionary);
   if (!sameGuarded(source, output, NEGATION) || !sameGuarded(source, output, PRONOUNS)) return false;
   const outputNames = names(candidate);
-  // A dictionary repair may respell a name the recognizer misheard.
-  const repaired = dictionary.some((term) => candidate.includes(term) && !ref.includes(term));
-  if (!repaired && !multisetIncludes(outputNames, names(ref))) return false;
+  // A dictionary repair may respell the name it repairs (Voxlom → Voxloom),
+  // and only that one: every other source name must still be there.
+  const spoken = new Set(sourceKeys.flatMap((keys) => keys.slice(1)));
+  // A source name may open the rewrite (`Um, Rowan will` → `Rowan will`).
+  const left = capitalized(candidate);
+  const missing = names(ref).filter((name) => {
+    const at = left.indexOf(name);
+    if (at >= 0) left.splice(at, 1);
+    return at < 0;
+  });
+  if (missing.some((name) => !spoken.has(name.toLowerCase()))) return false;
+  // A capitalized opener may be a name too: it stays, as itself or its repair.
+  const kept = new Set(output.map(stem));
+  const keysOf = (word: string) => sourceKeys.find((keys) => keys.includes(word)) ?? [word];
+  if (openers(ref).some((word) => !keysOf(word).some((key) => kept.has(stem(key))))) return false;
   // No new names: an answer ("… is Paris") or a swapped person is not a rewrite.
   const known = new Set([...source, ...dictionary.map((term) => term.toLowerCase())]);
   if (outputNames.some((name) => !known.has(name.toLowerCase()))) return false;
-  const numbers = (list: string[]) => list.filter((word) => NUMBER_WORDS.has(word));
-  if (!multisetIncludes(numbers(source), numbers(output))) return false;
+  // A question stays a question, with no answer sentence after it (Paris is the capital.).
+  const asked = questions(formalPass(ref));
+  if (asked && ((candidate.match(/\?/gu)?.length ?? 0) < asked || sentences(candidate) > sentences(ref))) return false;
+  // Number words both ways: `ten servers` → `servers` drops a fact as surely as adding one.
+  const numbers = (list: string[]) => list.filter((word) => NUMBER_WORDS.has(word)).sort().join(' ');
+  if (numbers(source) !== numbers(output)) return false;
   return quotedKept(ref, candidate) && shares(sourceKeys, output);
 }
 

@@ -15,10 +15,13 @@ const LIKE_FOLLOWERS = new Set([
   'actually', 'super', 'very', 'kinda', 'maybe', 'yeah', ...HESITATIONS,
 ]);
 const CONJUNCTIONS = new Set(['and', 'but', 'so', 'or']);
-/** `'s` is `is` (or `has` before been/got) only after these words, never a possessive. */
+/**
+ * `'s` is `is` (or `has` before been/got) only after these words, never a
+ * possessive. Not everyone/someone: `Everyone's laptop` is a possessive.
+ */
 const IS_HOSTS = new Set([
   'it', 'that', 'what', 'there', 'here', 'he', 'she', 'where', 'who', 'how',
-  'everything', 'nothing', 'something', 'everyone', 'someone',
+  'everything', 'nothing', 'something',
 ]);
 const WHOLE: Record<string, string> = {
   'can\'t': 'cannot', 'won\'t': 'will not', 'shan\'t': 'shall not', 'i\'m': 'I am',
@@ -100,7 +103,8 @@ function join(pieces: Piece[]): string {
     if (!piece.removed) {
       let text = piece.text;
       if (capitalize && piece.word && !/\p{Lu}/u.test(text)) text = text[0].toUpperCase() + text.slice(1);
-      if (piece.word) capitalize = false;
+      // A protected value (number, path, quote) also ends the capitalization run.
+      if (piece.word || text.includes('\uE000')) capitalize = false;
       out += text;
       i++;
       continue;
@@ -114,6 +118,14 @@ function join(pieces: Piece[]): string {
     let parenthetical = false;
     for (; i < pieces.length && (pieces[i].removed || !pieces[i].word); i++) {
       const lower = pieces[i].text.toLowerCase();
+      // A protected value is never part of the gap: keep the separator before
+      // it and leave the value and the rest of the piece to be emitted as is.
+      const protectedAt = pieces[i].removed ? -1 : pieces[i].text.indexOf('\uE000');
+      if (protectedAt >= 0) {
+        gap += pieces[i].text.slice(0, protectedAt);
+        pieces[i] = { ...pieces[i], text: pieces[i].text.slice(protectedAt) };
+        break;
+      }
       if (pieces[i].removed && !HESITATIONS.has(lower) && lower !== 'like') parenthetical = true;
       gap += pieces[i].removed ? ' ' : pieces[i].text;
     }
@@ -144,7 +156,7 @@ export function formalPass(text: string): string {
   markFillers(pieces);
   pieces.forEach((piece, index) => {
     if (!piece.word || piece.removed || !editable(piece.text, true)) return;
-    const next = pieces.slice(index + 1).find((later) => later.word)?.text.toLowerCase();
+    const next = pieces.slice(index + 1).find((later) => later.word && !later.removed)?.text.toLowerCase();
     piece.text = expandWord(piece.text, next);
   });
   return join(pieces).replace(/\uE000(\d+)\uE001/gu, (_, at: string) => kept[Number(at)]).trim();

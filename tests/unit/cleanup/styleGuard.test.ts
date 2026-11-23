@@ -65,6 +65,34 @@ describe('Formal still rejects output that changes the meaning', () => {
   });
 });
 
+describe('Formal guard bypasses found in review (CR #199)', () => {
+  it.each([
+    ['adds content to a source with none', 'Hello, what is that?', 'The server crashed.', []],
+    ['drops a number word', 'We need ten servers', 'We need servers.', []],
+    ['drops part of a number', 'We have two thousand users', 'We have two users.', []],
+    ['drops a sentence-initial name', 'Rowan will ship the build.', 'Ship the build.', []],
+    ['answers a question', 'What is the capital?', 'Paris is the capital.', []],
+    ['answers an unpunctuated question', 'what is the capital', 'Paris is the capital.', []],
+    ['answers after the question', 'What is the capital?', 'What is the capital? Paris is the capital.', []],
+    ['drops a name beside a repair', 'Tell Rowan and Casey to check box loom', 'Tell Rowan to check Voxloom.', ['Voxloom']],
+  ])('%s', (_, raw, candidate, dictionary) => {
+    expect(validateCleanupOutput(raw, candidate, dictionary, 'formal')).toBeNull();
+  });
+
+  it.each([
+    ['Tell Rowan and Casey to check box loom', 'Tell Rowan and Casey to check Voxloom.', ['Voxloom']],
+    ['Rowan will ship the build.', 'Rowan will ship the build.', []],
+    ['Um, Rowan will ship the build.', 'Rowan will ship the build.', []],
+    ['Basically we need to ship it.', 'We need to ship it.', []],
+    ['What is the capital?', 'What is the capital?', []],
+    ['We need ten servers', 'We require ten servers.', []],
+    ['Hello, what is that?', 'Hello, what is that?', []],
+    ['Voxlom is great, honestly.', 'Voxloom is great.', ['Voxloom']],
+  ])('still accepts %s → %s', (raw, candidate, dictionary) => {
+    expect(validateCleanupOutput(raw, candidate, dictionary, 'formal')).toBe(candidate);
+  });
+});
+
 describe('Casual and Very Casual', () => {
   const raw = 'So yeah, ah, we should meet at 3 PM.';
   const trimmed = 'So yeah, we should meet at 3 PM.';
