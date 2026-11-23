@@ -20,6 +20,20 @@ function protectedValues(text: string): string[] {
 }
 
 /**
+ * Every inline code span the speaker dictated (`vox loom`), byte for byte and
+ * as often as it was said: text inside backticks is never cleaned or repaired.
+ */
+function preservesCodeSpans(raw: string, candidate: string): boolean {
+  const spans = (text: string): string[] => text.match(/`[^`\n]*`/gu) ?? [];
+  const left = spans(candidate);
+  return spans(raw).every((span) => {
+    const index = left.indexOf(span);
+    if (index >= 0) left.splice(index, 1);
+    return index >= 0;
+  });
+}
+
+/**
  * Protected values, except that an exact all-letter dictionary spelling
  * (StupidJargon, WhisperKit) is the join or repair the content guard checks,
  * not a technical value: the output may add one. One the speaker already
@@ -172,6 +186,7 @@ export function validateCleanupOutput(
   if (cleaned.length > maxChars) return null;
   if (reasoningMarkers(cleaned) > reasoningMarkers(rawText)) return null;
   if (!preservesProtectedValues(rawText, cleaned, dictionary)) return null;
+  if (!preservesCodeSpans(rawText, cleaned)) return null;
   if (!preservesCapitalization(rawText, cleaned)) return null;
   if (JSON.stringify(symbols(rawText)) !== JSON.stringify(symbols(cleaned))) return null;
   if (wrapsWholeText(rawText) !== wrapsWholeText(cleaned)) return null;
