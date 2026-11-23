@@ -16,7 +16,7 @@ import {
 import { cleanupStatus } from './cleanupStatusFixture';
 import { renderWithApp } from './testUtils';
 
-const HELP = 'Qwen3 4B improves Formal rewriting. It\'s a 2.5 GB download, uses about 4 GB of memory while it runs, and the first cleanup after launch is slower.';
+const HELP = 'It\'s a 2.5 GB download and uses about 4 GB of memory while it runs. The first cleanup after launch takes longer than later ones.';
 
 let latest: Settings = initialSettings;
 function Probe({ start }: { start?: Partial<Settings> }) {
@@ -55,20 +55,20 @@ function renderRow(status: CleanupModelStatus, start?: Partial<Settings>) {
 }
 
 const mainSwitch = () => screen.getByRole('switch', { name: 'Clean up transcripts locally' });
-const qualitySwitch = () => screen.queryByRole('switch', { name: 'Use the higher quality model' });
+const qualitySwitch = () => screen.queryByRole('switch', { name: 'Use Qwen3 4B' });
 const qualityNote = () => document.getElementById('settings-cleanup-quality-note')?.textContent;
 
-describe('Higher quality cleanup model', () => {
+describe('Qwen3 4B cleanup model', () => {
   it('is hidden when the build does not offer the 4B (Windows, BUS-247)', async () => {
     renderRow(cleanupStatus());
     await waitFor(() => expect(mainSwitch()).toBeEnabled());
-    expect(screen.queryByText('Higher quality model')).toBeNull();
+    expect(screen.queryByText('Qwen3 4B')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Download (2.5 GB)' })).toBeNull();
   });
 
   it('offers a 2.5 GB download when not installed, with the size, memory and speed copy', async () => {
     renderRow(cleanupStatus({ quality: false }));
-    await waitFor(() => expect(screen.getByText('Higher quality model')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Qwen3 4B')).toBeInTheDocument());
     expect(screen.getByText(HELP)).toBeInTheDocument();
     expect(qualityNote()).toBe('Not installed.');
     expect(qualitySwitch()).toBeNull();

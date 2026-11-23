@@ -2,12 +2,12 @@
 import type { CleanupModelEntry } from '../../services/cleanup/types';
 import { endSentence } from './cleanupCopy';
 
-export const QUALITY_LABEL = 'Higher quality model';
+export const QUALITY_LABEL = 'Qwen3 4B';
 /** The size is the pinned file's (2,497,281,120 B); RAM is the measured M5 peak (4117 MiB). */
 export const QUALITY_HELP =
-  'Qwen3 4B improves Formal rewriting. It\'s a 2.5 GB download, uses about 4 GB of memory while it runs, and the first cleanup after launch is slower.';
+  'It\'s a 2.5 GB download and uses about 4 GB of memory while it runs. The first cleanup after launch takes longer than later ones.';
 export const QUALITY_DOWNLOAD = 'Download (2.5 GB)';
-export const QUALITY_SWITCH = 'Use the higher quality model';
+export const QUALITY_SWITCH = 'Use Qwen3 4B';
 export const QUALITY_REMOVE = 'Remove';
 export const QUALITY_REMOVING = 'Removing…';
 
