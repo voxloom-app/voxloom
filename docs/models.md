@@ -84,8 +84,8 @@ for helper builds and tests.
 
 ## Optional local cleanup
 
-Experimental cleanup fixes punctuation and, depending on the writing style,
-drops filler words on the Mac.
+Experimental cleanup fixes capitalization and punctuation and, depending on
+the writing style, drops filler words on the Mac.
 If cleanup fails or its output changes the words beyond the permitted checks,
 Voxloom uses the original transcript.
 
@@ -95,8 +95,9 @@ fillers and expands contractions, before and after the model, without touching
 quoted text, code, paths or URLs. Its output check looks at facts (names,
 numbers, negation, pronouns, protected values, shared content) rather than
 word order, so a rewrite is not refused. Casual may drop um, uh and ah; Very
-Casual keeps fillers and only fixes capitalization and punctuation, with the
-strict in-order check. With cleanup off, Home shows the style picker disabled
+Casual asks the model to keep fillers and only fix capitalization and
+punctuation; the strict in-order check still allows it to drop hesitation
+sounds such as um and uh. With cleanup off, Home shows the style picker disabled
 with a note and a way to turn cleanup on; Settings → Capture keeps it live.
 `tests/unit/cleanup/styleEval.test.ts` runs the style corpus through the real
 model when `VOXLOOM_TEST_CLEANUP_MODEL` and `VOXLOOM_TEST_CLEANUP_WORKER` are set.
