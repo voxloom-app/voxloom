@@ -99,11 +99,12 @@
   --navon: #e0efe5; /* mint selected nav */
   --mut-on-nav: #525b66; /* 5.79:1 on navon */
   --accfg: #376b00; /* 5.40 on navon; white text on it 6.43 */
-  --ok: #156d2b;
-  --info: #00717f;
-  --warn: #945600;
-  --err: #bf2c32;
+  --ok: #156d2b; /* AA text: 5.25+ on all surfaces; 10% badge tint: 4.58 seg, 5.05 field, 5.28 bg, 5.56 panel */
+  --info: #00717f; /* AA: 4.65 seg, 4.81 navon, 5.19 field, 5.42 bg, 5.72 panel */
+  --warn: #945600; /* AA: 4.76 seg, 4.92 navon, 5.30 field, 5.54 bg, 5.85 panel */
+  --err: #bf2c32; /* AA: 4.72 seg, 4.87 navon, 5.25 field, 5.49 bg, 5.80 panel */
   --accent-text: #ffffff;
+  /* >=3:1 vs bg 3.68, panel 3.88, field 3.52, side 3.43; white knob on it 3.88 */
   --switch-off: #7a828e;
   /* Frost + mint (new) */
   --mint: #e8f6ee;
