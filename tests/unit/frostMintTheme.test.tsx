@@ -155,3 +155,35 @@ describe('Frost + mint AA contrast (29 pairs)', () => {
     }
   });
 });
+
+describe('V3 Layered regular primaries', () => {
+  const layered = css('primary-layered.css');
+
+  it('imports primary-layered.css immediately before home.css, then home-actions.css', () => {
+    expect(css('index.css')).toMatch(
+      /@import "\.\/primary-layered\.css";\n@import "\.\/home\.css";\n@import "\.\/home-actions\.css";/,
+    );
+  });
+
+  it('scopes every rule to :not(:disabled) except the reduced-motion transition: none line', () => {
+    const withoutComments = layered.replace(/\/\*[\s\S]*?\*\//g, '');
+    const selectors: string[] = [];
+    for (const match of withoutComments.matchAll(/([^{}]+)\{/g)) {
+      for (const selector of match[1].split(',')) {
+        const trimmed = selector.replace(/\s+/g, ' ').trim();
+        const start = trimmed.indexOf('.btn.primary');
+        if (start >= 0) selectors.push(trimmed.slice(start));
+      }
+    }
+    expect(selectors.length).toBeGreaterThan(0);
+    const exempt = selectors.filter((selector) => !selector.includes(':not(:disabled)'));
+    expect(exempt).toEqual(['.btn.primary']);
+    expect(layered).toMatch(/\.btn\.primary \{ transition: none; \}/);
+    expect(layered).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    expect(layered).toMatch(/transform: none/);
+  });
+
+  it('stays under 200 lines', () => {
+    expect(layered.split('\n').length).toBeLessThan(200);
+  });
+});

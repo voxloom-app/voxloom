@@ -1,0 +1,49 @@
+/* V3 "Layered" for regular primary buttons (Add term, Save, Done, onboarding steps, Retry download).
+   Same gradient + sheen as Start/Stop; shadows scaled for the 36px button. Geometry is unchanged:
+   the darker edge is an inset shadow, so `border: 0` from home.css stays. Every rule is :not(:disabled),
+   so disabled primaries keep home.css's flat --seg look. Imported just before home.css (0,3,0 beats its 0,2,0) and before home-actions.css, whose
+   .btn.primary.big rules have equal or higher specificity and keep Start/Stop exactly as they are. */
+.btn.primary:not(:disabled) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .38), rgba(255, 255, 255, 0) 55%), linear-gradient(90deg, var(--brand-a), var(--brand-b));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 0 rgba(0, 60, 40, .14),
+    0 1px 1px rgba(15, 23, 42, .12), 0 3px 7px -2px rgba(15, 23, 42, .16), 0 8px 16px -8px color-mix(in srgb, var(--brand-b) 55%, transparent);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn.primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(0, 60, 40, .14),
+    0 2px 2px rgba(15, 23, 42, .12), 0 5px 10px -3px rgba(15, 23, 42, .2), 0 10px 20px -8px color-mix(in srgb, var(--brand-b) 65%, transparent);
+}
+.btn.primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 2px 4px rgba(0, 40, 30, .25), 0 1px 1px rgba(15, 23, 42, .12);
+}
+/* Focus after hover/active at equal specificity, so the ring stays under focus+hover/press (as 51cd7dc for Start/Stop). */
+.btn.primary:focus-visible:not(:disabled) {
+  outline: 3px solid transparent;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px var(--accfg), inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .7), 0 3px 7px -2px rgba(15, 23, 42, .16);
+}
+
+/* Dark: the same tight, attached shadows as Start/Stop (round 3). */
+[data-appearance-resolved="dark"] .btn.primary:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -1px 0 rgba(0, 60, 40, .14),
+    0 1px 0 rgba(0, 0, 0, .6), 0 2px 4px -1px rgba(0, 0, 0, .55), 0 1px 6px -2px color-mix(in srgb, var(--brand-b) 30%, transparent);
+}
+[data-appearance-resolved="dark"] .btn.primary:hover:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -1px 0 rgba(0, 60, 40, .14),
+    0 2px 0 rgba(0, 0, 0, .6), 0 3px 6px -1px rgba(0, 0, 0, .6), 0 2px 8px -2px color-mix(in srgb, var(--brand-b) 38%, transparent);
+}
+[data-appearance-resolved="dark"] .btn.primary:active:not(:disabled) {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent), inset 0 2px 4px rgba(0, 40, 30, .25), 0 1px 0 rgba(0, 0, 0, .6);
+}
+[data-appearance-resolved="dark"] .btn.primary:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px var(--accfg), inset 0 0 0 1px color-mix(in srgb, #1f5f3a 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, .7), 0 2px 4px -1px rgba(0, 0, 0, .55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary { transition: none; }
+  .btn.primary:hover:not(:disabled),
+  .btn.primary:active:not(:disabled) { transform: none; }
+}
