@@ -84,9 +84,23 @@ for helper builds and tests.
 
 ## Optional local cleanup
 
-Experimental cleanup fixes punctuation and drops filler words on the Mac.
+Experimental cleanup fixes capitalization and punctuation and, depending on
+the writing style, drops filler words on the Mac.
 If cleanup fails or its output changes the words beyond the permitted checks,
 Voxloom uses the original transcript.
+
+Writing styles only change text through cleanup (BUS-229). Formal removes
+fillers and asks for formal wording; a deterministic pass also strips clear
+fillers and expands contractions, before and after the model, without touching
+quoted text, code, paths or URLs. Its output check looks at facts (names,
+numbers, negation, pronouns, protected values, shared content) rather than
+word order, so a rewrite is not refused. Casual may drop um, uh and ah; Very
+Casual asks the model to keep fillers and only fix capitalization and
+punctuation; the strict in-order check still allows it to drop hesitation
+sounds such as um and uh. With cleanup off, Home shows the style picker disabled
+with a note and a way to turn cleanup on; Settings → Capture keeps it live.
+`tests/unit/cleanup/styleEval.test.ts` runs the style corpus through the real
+model when `VOXLOOM_TEST_CLEANUP_MODEL` and `VOXLOOM_TEST_CLEANUP_WORKER` are set.
 
 Settings → Cleanup model offers Download (397 MB). The pinned model is
 Qwen3 0.6B Q4_K_M, a 396,705,472-byte GGUF from `unsloth/Qwen3-0.6B-GGUF`.
@@ -131,7 +145,8 @@ The dictionary stays on the Mac and works in several ways:
 
 The cleanup prompt includes at most 64 dictionary words, 2 KB in total and
 128 bytes per word. These are prompt limits, not a cap on the saved dictionary.
-With no entries it uses `cleanup-v2`; dictionary context uses `cleanup-v3`.
+With no entries it uses `cleanup-v4`; dictionary context uses `cleanup-v5`
+(BUS-229 per-style rules; `cleanup-v2`/`cleanup-v3` were the earlier pair).
 
 `dictionary.json` retains its format. Words are stored oldest-added first
 while the Dictionary UI lists them alphabetically. Older alphabetical files

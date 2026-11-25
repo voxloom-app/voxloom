@@ -3,7 +3,9 @@
 // ones that open a sentence (Whisper capitalizes "Um"), but never inside a
 // quotation, where the source is kept verbatim.
 
-export const FILLERS = new Set(['um', 'uh', 'erm', 'er', 'hmm']);
+export const FILLERS: ReadonlySet<string> = new Set(['um', 'uh', 'erm', 'er', 'hmm']);
+/** Casual may also drop `ah` (BUS-229); Very Casual keeps the strict set. */
+export const CASUAL_FILLERS: ReadonlySet<string> = new Set([...FILLERS, 'ah']);
 export const ARTICLES = new Set(['a', 'an', 'the']);
 /** A sign-off the speaker can lose only as a sentence of its own. */
 const STANDALONE = new Set(['okay', 'ok']);
@@ -102,7 +104,7 @@ function opensSentence(text: string, start: number): boolean {
  * a sentence (Whisper writes "Um", "The"); never "UM", "ER", "THE" or a
  * mid-sentence "A", which are content.
  */
-function isDroppable(words: Set<string>, word: string, sentenceStart: boolean): boolean {
+function isDroppable(words: ReadonlySet<string>, word: string, sentenceStart: boolean): boolean {
   const lower = word.toLowerCase();
   if (!words.has(lower)) return false;
   return word === lower || (sentenceStart && /^\p{Lu}\p{Ll}*$/u.test(word));
@@ -126,8 +128,9 @@ export function isDroppableFiller(word: string, sentenceStart: boolean): boolean
 /**
  * One pass over the NFC text. Contractions expand per word (don't → do not),
  * so every token keeps its source offset for anchoring quotes and marks.
+ * `fillers` are the hesitation words the output may drop (style-dependent).
  */
-export function tokenize(text: string): Token[] {
+export function tokenize(text: string, fillers: ReadonlySet<string> = FILLERS): Token[] {
   const normalized = text.normalize('NFC');
   // scanQuotes works on code points; map its indices to string offsets.
   const characters = Array.from(normalized);
@@ -145,7 +148,7 @@ export function tokenize(text: string): Token[] {
     parts.forEach((word, part) => {
       const sentenceStart = part === 0 && opensSentence(normalized, start);
       const skippable = !quoted && (isDroppable(ARTICLES, word, sentenceStart)
-        || isDroppable(FILLERS, word, sentenceStart));
+        || isDroppable(fillers, word, sentenceStart));
       if (!quoted && parts.length === 1 && STANDALONE.has(word.toLowerCase())
         && isStandaloneSentence(normalized, start, start + match[0].length)) {
         standalone.push(tokens.length);

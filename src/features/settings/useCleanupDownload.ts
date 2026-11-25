@@ -18,7 +18,12 @@ interface DownloadSnapshot {
 export interface CleanupDownload extends DownloadSnapshot {
   /** The store can download (the native one can; test fakes may not). */
   supported: boolean;
-  start: () => Promise<void>;
+  /**
+   * Starts a download. onVerified runs once with the verified status, even if
+   * the caller has unmounted by then (Home's "Turn on local cleanup" uses it);
+   * a failed or cancelled download drops it.
+   */
+  start: (onVerified?: (status: CleanupModelStatus) => void) => Promise<void>;
   cancel: () => void;
 }
 
@@ -50,12 +55,17 @@ async function start(
   store: CleanupModelStore,
   apply: (status: CleanupModelStatus) => void,
   refresh: () => Promise<void>,
+  onVerified?: (status: CleanupModelStatus) => void,
 ) {
   if (snapshot.downloading || !store.download) return;
   publish({ downloading: true, note: null, ratio: 0 });
   try {
     // The verified status comes back with the download: no second hash.
-    apply(await store.download((progress) => { publish({ ratio: progress.ratio }); }));
+    const status = await store.download((progress) => { publish({ ratio: progress.ratio }); });
+    // Same tick as the status and the end of the download, so React renders
+    // the result once.
+    apply(status);
+    onVerified?.(status);
     publish({ downloading: false });
   } catch (reason: unknown) {
     publish({ downloading: false, note: downloadNote(reason) });
@@ -87,7 +97,7 @@ export function useCleanupDownload(model: Pick<CleanupModel, 'apply' | 'refresh'
     ...current,
     // The pending download rejects as cancelled; that sets the note.
     cancel: () => { void store().cancelDownload?.().catch(() => {}); },
-    start: () => start(store(), apply, refresh),
+    start: (onVerified) => start(store(), apply, refresh, onVerified),
     supported: typeof store().download === 'function',
   };
 }

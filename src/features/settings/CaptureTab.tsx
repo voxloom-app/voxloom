@@ -7,6 +7,7 @@ import { isTauriEnv } from '../../services/capture/captureService';
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import { isCleanupActive } from '../../domain/cleanup';
 import { CleanupSettings } from './CleanupSettings';
+import { STYLE_HELP_OFF, STYLE_HELP_ON } from './cleanupCopy';
 import { cleanupShown, useCleanupModel } from './useCleanupModel';
 import { MicrophoneRows } from './MicrophoneRows';
 import { ShortcutRecorder } from './ShortcutRecorder';
@@ -31,7 +32,10 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
   const update = settings.update;
   const cleanupModel = useCleanupModel(isNative, cleanupModelStore);
   // Same gate as the Local cleanup block: no cleanup wording while it's hidden.
-  const mentionCleanup = isNative && cleanupShown(cleanupModel, isCleanupActive(state.settings));
+  const cleanupActive = isCleanupActive(state.settings);
+  const mentionCleanup = isNative && cleanupShown(cleanupModel, cleanupActive);
+  // BUS-229: the picker stays live here so the preference can be set ahead.
+  const styleHelp = cleanupActive ? STYLE_HELP_ON : STYLE_HELP_OFF;
   return (
     <div className="settings-rows">
       <div className="frow frow--recorder">
@@ -72,10 +76,11 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
       <div className="frow">
         <span className="frow__label">
           <span>Writing style</span>
-          {mentionCleanup && <small className="frow__help">Used by local cleanup</small>}
+          {mentionCleanup && <small className="frow__help">{styleHelp}</small>}
         </span>
         <SegmentedControl
-          label={mentionCleanup ? 'Style preference · used by local cleanup'
+          label={mentionCleanup ? (cleanupActive ? 'Style preference · used by local cleanup'
+            : 'Style preference · applies only when local cleanup is on')
             : isNative ? 'Style preference' : 'Current style'}
           onChange={(value) => update({ key: 'style', value })}
           options={styles}

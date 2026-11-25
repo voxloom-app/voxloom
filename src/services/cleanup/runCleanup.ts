@@ -11,6 +11,7 @@ import type {
   CleanupSnapshot,
 } from './types';
 import { CleanupEngineError } from './types';
+import { formalPass } from './formalPass';
 import { validateCleanupOutput } from './validation';
 
 
@@ -86,12 +87,13 @@ export async function runCleanup(input: {
     attempt ? { ...outcome, attempt } : outcome;
   let prompt: string;
   const dictionary = snapshotDictionary(input.snapshot.dictionary);
+  const { style } = input.snapshot;
+  // BUS-229: Formal sends the model the transcript after the deterministic
+  // Formal pass, so a small model starts without fillers. The output is still
+  // checked against what the speaker said, and a fallback is that raw text.
+  const modelText = style === 'formal' ? formalPass(input.rawText) : input.rawText;
   try {
-    prompt = buildCleanupPrompt({
-      dictionary,
-      rawText: input.rawText,
-      style: input.snapshot.style,
-    });
+    prompt = buildCleanupPrompt({ dictionary, rawText: modelText, style });
   } catch {
     await cancelSafely(input.engine, input.requestId);
     if (input.signal.aborted) return { reason: 'cancelled', status: 'cancelled' };
@@ -116,9 +118,9 @@ export async function runCleanup(input: {
     dictionary,
     modelId,
     prompt,
-    rawText: input.rawText,
+    rawText: modelText,
     requestId: input.requestId,
-    style: input.snapshot.style,
+    style,
     // The worker caps its reply by this (BUS-16 3c-2c); this timer still
     // decides, and the native side counts its re-hash against it too.
     timeLeftMs,
@@ -171,7 +173,12 @@ export async function runCleanup(input: {
       status: 'fallback',
     });
   }
-  const finalText = validateCleanupOutput(input.rawText, result.text, dictionary);
+  const checked = validateCleanupOutput(input.rawText, result.text, dictionary, style);
+  // Formal output gets the same pass (the model may put fillers back), kept
+  // only if the result still passes the same check.
+  const finalText = checked && style === 'formal'
+    ? validateCleanupOutput(input.rawText, formalPass(checked), dictionary, style) ?? checked
+    : checked;
   return withAttempt(finalText
     ? { finalText, status: 'cleaned' }
     : {
