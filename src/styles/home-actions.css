@@ -1,0 +1,64 @@
+/* Light Frost + mint surfaces and V3 "Layered" Home actions (Start capture, Copy, chips, links).
+   Light-only surfaces; shared button rules; dark-only shadow override. Dark tokens untouched. */
+[data-appearance-resolved="light"] .home-hero {
+  background: radial-gradient(520px 220px at 0% 50%, color-mix(in srgb, var(--accfg) 16%, transparent), transparent), var(--hero-wash);
+  border-color: var(--mint-line);
+}
+[data-appearance-resolved="light"] .home-card--dictate { background: var(--dictate-wash); border-color: var(--mint-line); }
+
+/* Start capture / Stop (.btn.primary.big, DictateCard only) */
+.btn.primary.big {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .38), rgba(255, 255, 255, 0) 55%), linear-gradient(90deg, var(--brand-a), var(--brand-b));
+  border: 1px solid color-mix(in srgb, #1f5f3a 40%, transparent);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 1px 1px rgba(15, 23, 42, .12),
+    0 4px 10px -2px rgba(15, 23, 42, .18), 0 12px 24px -10px color-mix(in srgb, var(--brand-b) 60%, transparent);
+  min-height: 42px;
+  padding: 9px 18px;
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn.primary.big:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 2px 2px rgba(15, 23, 42, .12),
+    0 8px 16px -4px rgba(15, 23, 42, .22), 0 16px 30px -10px color-mix(in srgb, var(--brand-b) 70%, transparent);
+}
+.btn.primary.big:active:not(:disabled) { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(0, 40, 30, .25), 0 1px 1px rgba(15, 23, 42, .12); }
+/* Focus: 2px panel gap + 3px accent ring (box-shadow follows the radius on Safari 16.2); transparent outline kept for forced colors. */
+.btn.primary.big:focus-visible {
+  outline: 3px solid transparent;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px var(--accfg), 0 4px 10px -2px rgba(15, 23, 42, .18);
+}
+.btn.primary.big:disabled { background: var(--seg); border-color: transparent; box-shadow: none; transform: none; }
+
+/* Secondary family on Home */
+.home .btn:not(.primary):not(.ghost) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 96%, white), var(--panel));
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 1px 2px rgba(15, 23, 42, .12);
+}
+.home .btn:not(.primary):not(.ghost):hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5), 0 3px 8px -2px rgba(15, 23, 42, .18); }
+.home .seg__item.on { box-shadow: inset 0 0 0 1px var(--sel-edge), inset 0 1px 0 rgba(255, 255, 255, .6), 0 1px 3px rgba(15, 23, 42, .2); }
+.home .link-button, .home-hero .hs-note .btn.ghost { font-weight: 600; }
+.home .link-button:hover, .home-hero .hs-note .btn.ghost:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Dark-only: shadows hug the controls (round 3). */
+[data-appearance-resolved="dark"] .btn.primary.big {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 1px 0 rgba(0, 0, 0, .6),
+    0 2px 4px -1px rgba(0, 0, 0, .55), 0 1px 6px -2px color-mix(in srgb, var(--brand-b) 30%, transparent);
+}
+[data-appearance-resolved="dark"] .btn.primary.big:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 2px 0 rgba(0, 0, 0, .6),
+    0 3px 6px -1px rgba(0, 0, 0, .6), 0 2px 8px -2px color-mix(in srgb, var(--brand-b) 38%, transparent);
+}
+[data-appearance-resolved="dark"] .btn.primary.big:active:not(:disabled) { box-shadow: inset 0 2px 5px rgba(0, 40, 30, .25), 0 1px 0 rgba(0, 0, 0, .6); }
+[data-appearance-resolved="dark"] .btn.primary.big:focus-visible { box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px var(--accfg), 0 2px 4px -1px rgba(0, 0, 0, .55); }
+[data-appearance-resolved="dark"] .btn.primary.big:disabled { box-shadow: none; }
+[data-appearance-resolved="dark"] .home .btn:not(.primary):not(.ghost) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 1px 0 rgba(0, 0, 0, .5), 0 1px 3px -1px rgba(0, 0, 0, .5); }
+[data-appearance-resolved="dark"] .home .btn:not(.primary):not(.ghost):hover { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 0 rgba(0, 0, 0, .55), 0 2px 5px -1px rgba(0, 0, 0, .55); }
+[data-appearance-resolved="dark"] .home .seg__item.on { box-shadow: inset 0 0 0 1px var(--sel-edge), inset 0 1px 0 rgba(255, 255, 255, .08), 0 1px 2px rgba(0, 0, 0, .5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.primary.big { transition: none; }
+  .btn.primary.big:hover:not(:disabled),
+  .btn.primary.big:active:not(:disabled) { transform: none; }
+}

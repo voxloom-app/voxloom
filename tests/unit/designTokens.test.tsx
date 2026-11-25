@@ -28,7 +28,7 @@ describe('Console design tokens (UI PR 1)', () => {
   it('defines dark defaults and light overrides (Sodium Rain removed) on the theme attribute', () => {
     const tokens = css('tokens.css');
     expect(tokens).toMatch(/:root \{[^}]*--bg: #0b0b10;[^}]*--accfg: #b6ff3c;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--bg: #fbfbf8;[^}]*--accfg: #376b00;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--bg: #f7f9fb;[^}]*--accfg: #376b00;/);
     expect(tokens).not.toContain('sodium-rain');
   });
 
@@ -58,7 +58,7 @@ describe('Switch styling (UI PR 2)', () => {
     const tokens = css('tokens.css');
     // Per-theme literal values so each theme resolves its own track (no :root-only var() mixing).
     expect(tokens).toMatch(/:root \{[^}]*--switch-off: #66667a;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-off: #808389;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-off: #7a828e;/);
     // Designer: solid ON track in light only; dark keeps the brand gradient.
     expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-on: #4c8a00;/);
     expect(tokens).not.toMatch(/:root \{[^}]*--switch-on:/);
@@ -83,7 +83,7 @@ describe('light --ok on its 10% badge tint (review #43)', () => {
     const light = readFileSync('src/styles/tokens.css', 'utf8').split('[data-appearance-resolved="light"]')[1];
     const ok = hex(/--ok: (#[0-9a-f]{6})/.exec(light)![1]);
     // field, bg, panel, seg, navon (selected row)
-    for (const surface of ['#f3f4ef', '#fbfbf8', '#ffffff', '#e7e9e1', '#e7eadf']) {
+    for (const surface of ['#f1f4f7', '#f7f9fb', '#ffffff', '#e4e8ee', '#e0efe5']) {
       const s = hex(surface);
       const tint = s.map((c, i) => Math.round(0.1 * ok[i] + 0.9 * c));
       expect(ratio(ok, tint)).toBeGreaterThanOrEqual(4.5);
@@ -101,7 +101,7 @@ describe('designer #37: focus ring, tag pill, disabled ON switch', () => {
     const { readFileSync } = await import('node:fs');
     const light = readFileSync('src/styles/tokens.css', 'utf8').split('[data-appearance-resolved="light"]')[1];
     const focus = /--focus: (#[0-9a-f]{6});/.exec(light)![1];
-    for (const surface of ['#fbfbf8', '#ffffff', '#f3f4ef', '#f2f3ee', '#e7e9e1']) {
+    for (const surface of ['#f7f9fb', '#ffffff', '#f1f4f7', '#eef1f5', '#e4e8ee']) {
       expect(ratio(focus, surface)).toBeGreaterThanOrEqual(3);
     }
     expect(readFileSync('src/styles/base.css', 'utf8')).toMatch(/outline: 3px solid var\(--focus\)/);
@@ -182,12 +182,12 @@ describe('BUS-48 contrast tokens', () => {
   const tokens = css('tokens.css');
   it('raises dark --mut and keeps light --mut', () => {
     expect(tokens).toMatch(/:root \{[^}]*--mut: #9494a3;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mut: #5d6068;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mut: #57606b;/);
   });
 
   it('defines per-theme --ctl-line and --sel-edge', () => {
     expect(tokens).toMatch(/:root \{[^}]*--ctl-line: #6a6a80;[^}]*--sel-edge: #70943a;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--ctl-line: #808389;[^}]*--sel-edge: #376b00;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--ctl-line: #7a828e;[^}]*--sel-edge: #376b00;/);
   });
 
   it('borders form controls and .btn with --ctl-line', () => {
@@ -202,5 +202,92 @@ describe('BUS-48 contrast tokens', () => {
     expect(css('shell.css')).toMatch(/\.nav-button\[aria-current="page"\] \{[^}]*box-shadow: inset 3px 0 0 var\(--sel-edge\)/);
     expect(css('settings.css')).toMatch(/\.settings-tab\[aria-selected="true"\] \{[^}]*box-shadow: inset 0 -2px 0 var\(--sel-edge\)/);
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*box-shadow: inset 0 0 0 1px var\(--sel-edge\)/);
+  });
+});
+
+describe('Light Frost + mint palette and V3 Layered Home actions', () => {
+  const tokens = css('tokens.css');
+  const actions = css('home-actions.css');
+
+  it('adds light-only mint tokens and leaves :root (dark) colors unchanged', () => {
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mint: #e8f6ee;[^}]*--mint-line: #c4e3cf;[^}]*--seg-on-fg: #0f3d1c;[^}]*--hero-wash: linear-gradient\(120deg, var\(--mint\), var\(--panel\) 78%\);[^}]*--dictate-wash: linear-gradient\(180deg, var\(--mint\), var\(--panel\) 85%\);/);
+    expect(tokens).not.toMatch(/:root \{[^}]*--mint:/);
+    const root = tokens.split('[data-appearance-resolved="light"]')[0];
+    expect(root).toMatch(/:root \{[^}]*--bg: #0b0b10;[^}]*--side: #0e0e14;[^}]*--panel: #121219;[^}]*--field: #1a1a23;[^}]*--seg: #1c1c26;[^}]*--segon: #2c2c3a;[^}]*--line: #23232e;[^}]*--fg: #ececf1;[^}]*--mut: #9494a3;[^}]*--ctl-line: #6a6a80;[^}]*--navon: #2a2a38;[^}]*--accfg: #b6ff3c;/);
+  });
+
+  it('styles the selected chip label with --seg-on-fg, falling back to --fg in dark', () => {
+    expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*color: var\(--seg-on-fg, var\(--fg\)\);/);
+  });
+
+  it('marks the Dictate card with home-card--dictate', () => {
+    const src = readFileSync(join(root, 'features/home/DictateCard.tsx'), 'utf8');
+    expect(src).toContain('className="card home-card home-card--dictate"');
+    expect(src).not.toContain(':has(#capture-title)');
+  });
+
+  it('scopes V3 Layered rules to Home actions, keeps ghost links, and stills motion', () => {
+    expect(actions).toContain('.home-card--dictate');
+    expect(actions).toContain('var(--hero-wash)');
+    expect(actions).toContain('var(--dictate-wash)');
+    expect(actions).toContain('.btn.primary.big');
+    expect(actions).toContain('.home .btn:not(.primary):not(.ghost)');
+    expect(actions).toMatch(/\.btn\.primary\.big:disabled \{[^}]*box-shadow: none;[^}]*transform: none;/);
+    expect(actions).toMatch(/\.btn\.primary\.big:hover:not\(:disabled\)[^}]*transform: translateY\(-1px\)/);
+    expect(actions).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(actions).toContain('.btn.primary.big { transition: none; }');
+    expect(actions).toMatch(/\.btn\.primary\.big:active:not\(:disabled\) \{ transform: none; \}/);
+  });
+
+  it('imports home-actions.css immediately after home.css', () => {
+    expect(css('index.css')).toMatch(/@import "\.\/home\.css";\n@import "\.\/home-actions\.css";/);
+  });
+});
+
+describe('Frost + mint AA contrast (29 pairs)', () => {
+  const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+  const hex = (s: string) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
+  const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+  const ratio = (a: string, b: string) => {
+    const [x, y] = [lum(hex(a)), lum(hex(b))].sort((m, n) => n - m);
+    return (x + 0.05) / (y + 0.05);
+  };
+
+  it('passes every listed pair at the documented minimum', () => {
+    const pairs: [string, string, number][] = [
+      ['#0b0e14', '#cce0c8', 4.5],
+      ['#57606b', '#cce0c8', 4.5],
+      ['#525b66', '#e0efe5', 4.5],
+      ['#376b00', '#cce0c8', 4.5],
+      ['#ffffff', '#376b00', 4.5],
+      ['#0f3d1c', '#e2f5e7', 4.5],
+      ['#156d2b', '#e0ebe6', 4.5],
+      ['#00717f', '#deebef', 4.5],
+      ['#bf2c32', '#f9eaeb', 4.5],
+      ['#945600', '#f7f9fb', 4.5],
+      ['#7a828e', '#e4e8ee', 3],
+      ['#376b00', '#cce0c8', 3],
+      ['#7a828e', '#eef1f5', 3],
+      ['#4c8a00', '#eef1f5', 3],
+      ['#08080c', '#b6ff3c', 4.5],
+      ['#08080c', '#3cf0ff', 4.5],
+      ['#08080c', '#86f6ff', 4.5],
+      ['#08080c', '#2dbec7', 4.5],
+      ['#376b00', '#ffffff', 3],
+      ['#376b00', '#e8f6ee', 3],
+      ['#b6ff3c', '#121219', 3],
+      ['#121219', '#3cf0ff', 3],
+      ['#0b0e14', '#ffffff', 4.5],
+      ['#7a828e', '#f1f4f7', 3],
+      ['#ececf1', '#202027', 4.5],
+      ['#6a6a80', '#1a1a23', 3],
+      ['#ececf1', '#2c2c3a', 4.5],
+      ['#70943a', '#2c2c3a', 3],
+      ['#b6ff3c', '#121219', 4.5],
+    ];
+    expect(pairs).toHaveLength(29);
+    for (const [a, b, min] of pairs) {
+      expect(ratio(a, b), `${a} on ${b}`).toBeGreaterThanOrEqual(min);
+    }
   });
 });

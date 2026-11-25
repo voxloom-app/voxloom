@@ -17,7 +17,7 @@ export function DictateCard({ dogfood, isNative, onCopy }: Props) {
   const transcript = dogfood.transcript?.text;
 
   return (
-    <section aria-labelledby="capture-title" className="card home-card">
+    <section aria-labelledby="capture-title" className="card home-card home-card--dictate">
       <h2 id="capture-title">Dictate</h2>
       <div className="capline">
         <div className="action-group dogfood-capture-actions">
