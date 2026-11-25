@@ -1,0 +1,39 @@
+== DARK head vs base (main 8a9dc48)
+settings diffpx 0 maxdelta 0 regions 0 []
+history diffpx 0 maxdelta 0 regions 0 []
+home diffpx 56278 maxdelta 245 regions 17 [(687, 160, 761, 195), (290, 280, 1068, 331), (295, 340, 817, 354), (295, 359, 823, 373), (295, 378, 371, 392), (295, 405, 1068, 415), (307, 422, 1058, 480), (276, 485, 1087, 514), (276, 527, 1087, 546), (296, 551, 1062, 564), (299, 593, 1056, 613), (295, 626, 1068, 628)]
+home-off diffpx 47249 maxdelta 245 regions 18 [(578, 160, 652, 195), (657, 209, 792, 222), (290, 314, 1068, 365), (295, 374, 817, 388), (295, 393, 823, 407), (295, 412, 371, 426), (276, 440, 1087, 476), (276, 489, 1087, 508), (296, 513, 1062, 526), (299, 555, 1056, 574), (295, 587, 1068, 589), (299, 602, 1056, 621)]
+== LIGHT/DARK head vs final renders
+home light diffpx 0 maxdelta 0 regions 0 []
+home dark diffpx 76 maxdelta 2 regions 4 [(287, 232, 1076, 233), (276, 243, 1087, 249), (276, 498, 1087, 503), (276, 540, 1087, 546)]
+home-off light diffpx 0 maxdelta 0 regions 0 []
+home-off dark diffpx 0 maxdelta 0 regions 0 []
+history light diffpx 0 maxdelta 0 regions 0 []
+history dark diffpx 5 maxdelta 1 regions 1 [(740, 259, 741, 262)]
+settings light diffpx 4 maxdelta 1 regions 1 [(561, 114, 699, 115)]
+settings dark diffpx 0 maxdelta 0 regions 0 []
+== head vs Dev build-shots
+qa-dark-2x-chip.png 0 0 0
+qa-dark-2x-copy-hover.png 0 0 0
+qa-dark-2x-copy.png 0 0 0
+qa-dark-2x-focus.png 0 0 0
+qa-dark-2x-hover.png 0 0 0
+qa-dark-2x-rest.png 0 0 0
+qa-history-dark-760x660.png 0 0 0
+qa-history-light-760x660.png 0 0 0
+qa-home-dark-1120x760.png 0 0 0
+qa-home-light-1120x760.png 0 0 0
+qa-home-off-dark-1120x760.png 0 0 0
+qa-home-off-light-1120x760.png 0 0 0
+qa-home-stop-dark-1120x760.png 73 3 1
+qa-home-stop-light-1120x760.png 0 0 0
+qa-light-2x-chip.png 0 0 0
+qa-light-2x-copy-hover.png 0 0 0
+qa-light-2x-copy.png 0 0 0
+qa-light-2x-focus.png 0 0 0
+qa-light-2x-hover.png 0 0 0
+qa-light-2x-rest.png 0 0 0
+qa-settings-dark-760x660.png 2078 227 2
+qa-settings-light-760x660.png 2099 255 3
+qa-stop-dark-2x-rest.png 0 0 0
+qa-stop-light-2x-rest.png 268 3 1

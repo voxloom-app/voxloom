@@ -1,0 +1,33 @@
+| Pair | Colors | Min | Ratio |
+|---|---|---|---|
+| L body text (worst: hero) | #0b0e14 / #cce0c8 | 4.5 | 13.86 PASS |
+| L muted / help / secondary (worst: hero) | #57606b / #cce0c8 | 4.5 | 4.58 PASS |
+| L muted on selected nav | #525b66 / #e0efe5 | 4.5 | 5.79 PASS |
+| L green accent text, View all link (worst: hero) | #376b00 / #cce0c8 | 4.5 | 4.61 PASS |
+| L white on green | #ffffff / #376b00 | 4.5 | 6.43 PASS |
+| L selected chip label (--seg-on-fg) | #0f3d1c / #e2f5e7 | 4.5 | 10.82 PASS |
+| L badge Inserted (10% tint on bg) | #156d2b / #e0ebe6 | 4.5 | 5.28 PASS |
+| L badge Copied (10% tint on bg) | #00717f / #deebef | 4.5 | 4.70 PASS |
+| L badge Failed (10% tint on panel) | #bf2c32 / #f9eaeb | 4.5 | 4.97 PASS |
+| L warning text on bg | #945600 / #f7f9fb | 4.5 | 5.54 PASS |
+| L control borders (ctl-line) (worst: seg) | #7a828e / #e4e8ee | 3 | 3.16 PASS |
+| L focus ring / sel-edge (worst: hero) | #376b00 / #cce0c8 | 3 | 4.61 PASS |
+| L switch off track (worst: side) | #7a828e / #eef1f5 | 3 | 3.43 PASS |
+| L switch on track (worst: side) | #4c8a00 / #eef1f5 | 3 | 3.75 PASS |
+| Start label vs lime stop | #08080c / #b6ff3c | 4.5 | 16.53 PASS |
+| Start label vs cyan stop below sheen (worst) | #08080c / #3cf0ff | 4.5 | 14.38 PASS |
+| Start label vs cyan under sheen | #08080c / #86f6ff | 4.5 | 15.84 PASS |
+| Start label at pressed inset edge | #08080c / #2dbec7 | 4.5 | 8.86 PASS |
+| L Start focus ring vs white gap | #376b00 / #ffffff | 3 | 6.43 PASS |
+| L Start focus ring vs Dictate mint wash | #376b00 / #e8f6ee | 3 | 5.77 PASS |
+| D Start focus ring vs panel gap | #b6ff3c / #121219 | 3 | 15.41 PASS |
+| D panel gap vs button cyan edge | #121219 / #3cf0ff | 3 | 13.41 PASS |
+| L Copy label on panel | #0b0e14 / #ffffff | 4.5 | 19.32 PASS |
+| L Copy border vs transcript box | #7a828e / #f1f4f7 | 3 | 3.52 PASS |
+| D Copy label on 6% highlight | #ececf1 / #202027 | 4.5 | 13.75 PASS |
+| D Copy border vs transcript box | #6a6a80 / #1a1a23 | 3 | 3.28 PASS |
+| D selected chip label / segon | #ececf1 / #2c2c3a | 4.5 | 11.67 PASS |
+| D selected chip edge vs segon | #70943a / #2c2c3a | 3 | 3.92 PASS |
+| D View all link on panel | #b6ff3c / #121219 | 4.5 | 15.41 PASS |
+
+Failures: 0
