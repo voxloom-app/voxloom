@@ -13,17 +13,30 @@ use super::prewarm::{Reply, Slot};
 use super::SharedState;
 
 /// A dictation's admission: a prewarm that hasn't spawned gives way, and one
-/// that is still loading or warming up is kept for it.
-pub(super) fn on_reserve(slot: &mut Option<Slot>) {
+/// still loading or warming up the same model is kept for it. One loading
+/// the other model (BUS-229) can't serve it and would only compete with it
+/// for memory: it is closed to claims, as a disarm does, and returned for the
+/// caller to kill once the lock is released.
+pub(super) fn on_reserve(slot: &mut Option<Slot>, model_id: &str) -> Option<ProcessHandle> {
     match slot {
         Some(Slot::Reserved { abandoned }) => *abandoned = true,
         Some(Slot::Running {
             warmed: false,
             claimed,
+            model_id: loaded,
             ..
-        }) => *claimed = true,
+        }) if *loaded == model_id => *claimed = true,
+        Some(Slot::Running {
+            warmed: warmed @ false,
+            process,
+            ..
+        }) => {
+            *warmed = true;
+            return Some(process.clone());
+        }
         _ => {}
     }
+    None
 }
 
 /// The dictation's reservation ended, whether or not it handed over.
@@ -42,8 +55,8 @@ pub(super) struct Handoff {
 }
 
 /// The running prewarm worker, unless it warmed up before this dictation
-/// claimed it (or isn't there).
-pub(super) fn hand_over(shared: &SharedState) -> Option<Handoff> {
+/// claimed it, loads another model (or isn't there).
+pub(super) fn hand_over(shared: &SharedState, model_id: &str) -> Option<Handoff> {
     let mut state = shared.state.lock().unwrap();
     let Some(Slot::Running {
         process,
@@ -51,11 +64,12 @@ pub(super) fn hand_over(shared: &SharedState) -> Option<Handoff> {
         handoff,
         warmed,
         claimed,
+        model_id: loaded,
     }) = state.prewarm.as_mut()
     else {
         return None;
     };
-    if *warmed && !*claimed {
+    if *loaded != model_id || (*warmed && !*claimed) {
         return None;
     }
     let stdin = stdin.take()?;

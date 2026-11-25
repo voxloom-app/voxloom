@@ -1,27 +1,30 @@
-use std::fs::File;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 use tauri::{AppHandle, Manager};
 
-use super::artifact::{
-    open_regular, validate as validate_artifact, validate_file_while, ArtifactSpec,
-};
+#[cfg(test)]
+use super::artifact::ArtifactSpec;
+use super::artifact::{open_regular, validate as validate_artifact};
 
+mod catalog;
 pub mod download;
 mod guard;
+mod lease;
 mod pin;
+mod pin_4b;
 mod status_cache;
+pub use catalog::ModelSpec;
+use catalog::{offered_on, DEFAULT_MODEL};
+pub use lease::ModelLease;
+#[cfg(test)]
 pub use pin::MODEL_ID;
-use pin::{MODEL_FILE, MODEL_SHA256, MODEL_SIZE};
-use status_cache::{fingerprint, FileFingerprint};
+use status_cache::{fingerprint, Verified};
 
-const ARTIFACT: ArtifactSpec = ArtifactSpec {
-    sha256: MODEL_SHA256,
-    size: MODEL_SIZE,
-};
-
+/// The default model's status, kept at the top level for existing callers,
+/// and every model this build offers (BUS-229), default first.
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelStatus {
@@ -29,72 +32,35 @@ pub struct ModelStatus {
     pub id: &'static str,
     pub runtime_available: bool,
     pub sha256: &'static str,
+    pub models: Vec<ModelEntry>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelEntry {
+    pub available: bool,
+    pub id: &'static str,
+    pub sha256: &'static str,
+}
+
+#[derive(Debug, Default)]
 struct StoreInner {
-    /// A download (or test install) is replacing the file.
-    writing: bool,
-    leases: usize,
+    /// The model a download (or test install, or delete) is replacing. One
+    /// write at a time across the store.
+    writing: Option<&'static str>,
+    /// Open descriptors per model id.
+    leases: HashMap<&'static str, usize>,
     /// Cancel flag of the running download (BUS-181), if any.
     download: Option<Arc<AtomicBool>>,
-    /// Last successful status() hash, keyed by dev/ino/size/mtime/ctime.
-    verified: Option<FileFingerprint>,
+    /// Last successful hash per model id, keyed by dev/ino/size/mtime/ctime
+    /// and the digest it was checked against.
+    verified: HashMap<&'static str, Verified>,
 }
 
 pub struct CleanupModelStore {
     inner: Arc<Mutex<StoreInner>>,
     root: PathBuf,
-}
-
-#[derive(Debug)]
-pub struct ModelLease {
-    pub file: File,
-    artifact: ArtifactSpec,
-    inner: Arc<Mutex<StoreInner>>,
-}
-
-impl ModelLease {
-    pub(super) fn identity(&self) -> super::CleanupAttempt {
-        super::CleanupAttempt {
-            model_id: MODEL_ID,
-            model_digest: self.artifact.sha256,
-        }
-    }
-
-    /// Hash the already reserved descriptor, without holding the store lock.
-    pub fn verify(&mut self) -> Result<(), String> {
-        self.verify_while(|| true).map(drop)
-    }
-
-    /// `verify`, stopped between chunks of the hash once `keep_going` says
-    /// no: Ok(true) if verified, Ok(false) if stopped. A stopped hash found
-    /// nothing wrong, so the status cache is kept.
-    pub fn verify_while(&mut self, keep_going: impl FnMut() -> bool) -> Result<bool, String> {
-        match validate_file_while(&mut self.file, self.artifact, keep_going) {
-            Ok(verified) => Ok(verified),
-            Err(error) => {
-                // Status may still trust a stale fingerprint (e.g. in-place
-                // rewrite that restored mtime before ctime was keyed). Drop it.
-                self.inner.lock().unwrap().verified = None;
-                Err(error)
-            }
-        }
-    }
-}
-
-/// A prewarm spawns from the lease and keeps it until the worker is reaped.
-impl std::borrow::Borrow<File> for ModelLease {
-    fn borrow(&self) -> &File {
-        &self.file
-    }
-}
-
-impl Drop for ModelLease {
-    fn drop(&mut self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.leases = inner.leases.saturating_sub(1);
-    }
+    catalog: &'static [ModelSpec],
 }
 
 impl CleanupModelStore {
@@ -107,81 +73,122 @@ impl CleanupModelStore {
         Ok(Self::new(root))
     }
 
+    /// The models offered on the OS this build targets.
     pub fn new(root: PathBuf) -> Self {
+        Self::with_catalog(root, offered_on(std::env::consts::OS))
+    }
+
+    fn with_catalog(root: PathBuf, catalog: &'static [ModelSpec]) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(StoreInner {
-                download: None,
-                writing: false,
-                leases: 0,
-                verified: None,
-            })),
+            inner: Arc::new(Mutex::new(StoreInner::default())),
             root,
+            catalog,
         }
     }
 
     pub fn status(&self) -> ModelStatus {
+        let models: Vec<ModelEntry> = self
+            .catalog
+            .iter()
+            .map(|spec| ModelEntry {
+                available: self.available_for(*spec),
+                id: spec.id,
+                sha256: spec.artifact.sha256,
+            })
+            .collect();
         ModelStatus {
-            available: self.available_for(ARTIFACT),
-            id: MODEL_ID,
+            available: models[0].available,
+            id: DEFAULT_MODEL.id,
             runtime_available: false,
-            sha256: MODEL_SHA256,
+            sha256: DEFAULT_MODEL.artifact.sha256,
+            models,
         }
     }
 
-    #[cfg(test)]
-    fn status_available_for(&self, artifact: ArtifactSpec) -> bool {
-        self.available_for(artifact)
+    /// An offered model, or an error naming the unknown id.
+    pub fn spec(&self, model_id: &str) -> Result<ModelSpec, String> {
+        self.catalog
+            .iter()
+            .find(|spec| spec.id == model_id)
+            .copied()
+            .ok_or_else(|| format!("unknown cleanup model: {model_id}"))
     }
 
     pub fn lease(&self, model_id: &str) -> Result<ModelLease, String> {
-        self.lease_artifact(model_id, ARTIFACT)
+        let spec = self.spec(model_id)?;
+        self.lease_spec(spec)
     }
 
+    /// Test seam: lease an offered model, checked against `artifact`.
+    #[cfg(test)]
     pub(super) fn lease_artifact(
         &self,
         model_id: &str,
         artifact: ArtifactSpec,
     ) -> Result<ModelLease, String> {
-        if model_id != MODEL_ID {
-            return Err(format!("unknown cleanup model: {model_id}"));
-        }
+        let spec = self.spec(model_id)?;
+        self.lease_spec(ModelSpec { artifact, ..spec })
+    }
+
+    fn lease_spec(&self, spec: ModelSpec) -> Result<ModelLease, String> {
         let mut inner = self.inner.lock().unwrap();
-        if inner.writing {
+        if inner.writing == Some(spec.id) {
             return Err("cleanup model is being installed".into());
         }
-        if inner.leases >= 2 {
+        if inner.leases.values().sum::<usize>() >= 2 {
             return Err("cleanup model descriptor capacity is full".into());
         }
-        let file = open_regular(&self.model_path())?;
-        inner.leases += 1;
+        let file = open_regular(&self.path_of(spec))?;
+        *inner.leases.entry(spec.id).or_default() += 1;
         Ok(ModelLease {
             file,
-            artifact,
+            spec,
             inner: Arc::clone(&self.inner),
         })
     }
 
+    fn path_of(&self, spec: ModelSpec) -> PathBuf {
+        self.root.join(spec.file)
+    }
+
+    /// The default model's path, as most store tests use it.
+    #[cfg(test)]
     fn model_path(&self) -> PathBuf {
-        self.root.join(MODEL_FILE)
+        self.path_of(DEFAULT_MODEL)
+    }
+
+    #[cfg(test)]
+    fn status_available_for(&self, artifact: ArtifactSpec) -> bool {
+        self.available_for(ModelSpec {
+            artifact,
+            ..DEFAULT_MODEL
+        })
     }
 
     /// Cheap status path: skip a full re-hash when the fingerprint matches.
     /// Hashing runs without the store lock so lease/download are not blocked.
-    fn available_for(&self, artifact: ArtifactSpec) -> bool {
-        self.available_with(|path| validate_artifact(path, artifact).is_ok())
+    fn available_for(&self, spec: ModelSpec) -> bool {
+        self.available_with(spec, |path| validate_artifact(path, spec.artifact).is_ok())
     }
 
     /// `available_for` with the hash step injected, so tests can act inside
     /// the unlocked hash window.
-    fn available_with(&self, hash: impl FnOnce(&Path) -> bool) -> bool {
-        let path = self.model_path();
+    fn available_with(&self, spec: ModelSpec, hash: impl FnOnce(&Path) -> bool) -> bool {
+        let path = self.path_of(spec);
         let to_hash = {
             let mut inner = self.inner.lock().unwrap();
             match fingerprint(&path) {
-                Ok(fp) if inner.verified == Some(fp) => return true,
+                Ok(fp)
+                    if inner
+                        .verified
+                        .get(spec.id)
+                        .is_some_and(|verified| verified.matches(&fp, spec.artifact)) =>
+                {
+                    return true
+                }
                 Ok(fp) => fp,
                 Err(_) => {
-                    inner.verified = None;
+                    inner.verified.remove(spec.id);
                     return false;
                 }
             }
@@ -192,10 +199,15 @@ impl CleanupModelStore {
         let mut inner = self.inner.lock().unwrap();
         match fingerprint(&path) {
             Ok(current) if current == to_hash => {
-                inner.verified = hash_ok.then_some(current);
+                if hash_ok {
+                    let verified = Verified::new(current, spec.artifact);
+                    inner.verified.insert(spec.id, verified);
+                } else {
+                    inner.verified.remove(spec.id);
+                }
             }
             Err(_) => {
-                inner.verified = None;
+                inner.verified.remove(spec.id);
             }
             Ok(_) => {
                 // File changed while we hashed; leave cache alone.
@@ -204,15 +216,24 @@ impl CleanupModelStore {
         hash_ok
     }
 
-    fn remember_verified(&self, path: &Path) {
-        if let Ok(fp) = fingerprint(path) {
-            self.inner.lock().unwrap().verified = Some(fp);
+    fn remember_verified(&self, spec: ModelSpec) {
+        if let Ok(fp) = fingerprint(&self.path_of(spec)) {
+            let verified = Verified::new(fp, spec.artifact);
+            self.inner
+                .lock()
+                .unwrap()
+                .verified
+                .insert(spec.id, verified);
         }
     }
 }
 
 #[cfg(test)]
+mod catalog_tests;
+#[cfg(test)]
 mod fixture;
+#[cfg(all(test, unix))]
+mod run_cache_tests;
 #[cfg(test)]
 mod status_tests;
 #[cfg(test)]

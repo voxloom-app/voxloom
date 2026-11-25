@@ -24,6 +24,7 @@
     "allow-cleanup-model-status",
     "allow-cleanup-download-model",
     "allow-cleanup-cancel-download",
+    "allow-cleanup-delete-model",
     "allow-stt-list-models",
     "allow-stt-model-status",
     "allow-stt-download-model",

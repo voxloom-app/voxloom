@@ -8,6 +8,8 @@ import {
 import type { CleanupModel } from './useCleanupModel';
 
 interface DownloadSnapshot {
+  /** The model of the running or last download (one at a time natively). */
+  modelId: string | null;
   downloading: boolean;
   /** Last progress ratio, 0..1. */
   ratio: number;
@@ -19,11 +21,12 @@ export interface CleanupDownload extends DownloadSnapshot {
   /** The store can download (the native one can; test fakes may not). */
   supported: boolean;
   /**
-   * Starts a download. onVerified runs once with the verified status, even if
-   * the caller has unmounted by then (Home's "Turn on local cleanup" uses it);
-   * a failed or cancelled download drops it.
+   * Starts a download of modelId. onVerified runs once with the verified
+   * status, even if the caller has unmounted by then (Home's "Turn on local
+   * cleanup" uses it); a failed or cancelled download drops it.
    */
-  start: (onVerified?: (status: CleanupModelStatus) => void) => Promise<void>;
+  start: (modelId: string, onVerified?: (status: CleanupModelStatus) => void) => Promise<void>;
+  /** Stops the running download, whichever model it is. */
   cancel: () => void;
 }
 
@@ -37,7 +40,7 @@ export function downloadNote(reason: unknown): string {
 
 // Window-level, like cleanupModelCache: switching Settings tabs unmounts the
 // row, but the native download keeps running, so its state must outlive it.
-const IDLE: DownloadSnapshot = { downloading: false, note: null, ratio: 0 };
+const IDLE: DownloadSnapshot = { downloading: false, modelId: null, note: null, ratio: 0 };
 let snapshot = IDLE;
 const listeners = new Set<() => void>();
 
@@ -53,15 +56,16 @@ function subscribe(listener: () => void): () => void {
 
 async function start(
   store: CleanupModelStore,
+  modelId: string,
   apply: (status: CleanupModelStatus) => void,
   refresh: () => Promise<void>,
   onVerified?: (status: CleanupModelStatus) => void,
 ) {
   if (snapshot.downloading || !store.download) return;
-  publish({ downloading: true, note: null, ratio: 0 });
+  publish({ downloading: true, modelId, note: null, ratio: 0 });
   try {
     // The verified status comes back with the download: no second hash.
-    const status = await store.download((progress) => { publish({ ratio: progress.ratio }); });
+    const status = await store.download(modelId, (progress) => { publish({ ratio: progress.ratio }); });
     // Same tick as the status and the end of the download, so React renders
     // the result once.
     apply(status);
@@ -87,8 +91,9 @@ if (import.meta.env.MODE === 'test') {
 }
 
 /**
- * BUS-181: one-click download state for the Cleanup model row. A failure
- * leaves nothing on disk natively, so a retry starts clean.
+ * BUS-181: one-click download state for the cleanup model rows (the default
+ * and, since BUS-229, the optional 4B). A failure leaves nothing on disk
+ * natively, so a retry starts clean.
  */
 export function useCleanupDownload(model: Pick<CleanupModel, 'apply' | 'refresh' | 'store'>): CleanupDownload {
   const { apply, refresh, store } = model;
@@ -96,8 +101,10 @@ export function useCleanupDownload(model: Pick<CleanupModel, 'apply' | 'refresh'
   return {
     ...current,
     // The pending download rejects as cancelled; that sets the note.
-    cancel: () => { void store().cancelDownload?.().catch(() => {}); },
-    start: (onVerified) => start(store(), apply, refresh, onVerified),
+    cancel: () => {
+      if (current.modelId) void store().cancelDownload?.(current.modelId).catch(() => {});
+    },
+    start: (modelId, onVerified) => start(store(), modelId, apply, refresh, onVerified),
     supported: typeof store().download === 'function',
   };
 }

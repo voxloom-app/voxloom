@@ -55,6 +55,7 @@ fn switch_on_always_prewarms_even_in_low_power_mode() {
     let outcome = prewarm(
         &supervisor,
         Trigger::SwitchOn,
+        MODEL_ID,
         || true,
         || store.lease_artifact(MODEL_ID, spec),
     );
@@ -67,16 +68,16 @@ fn launch_prewarms_unless_low_power_mode() {
     let (store, spec, supervisor, log) = fixture("launch");
     let lease = || store.lease_artifact(MODEL_ID, spec);
     assert_eq!(
-        prewarm(&supervisor, Trigger::Launch, || true, lease),
+        prewarm(&supervisor, Trigger::Launch, MODEL_ID, || true, lease),
         "low-power"
     );
     assert!(!log.exists(), "nothing spawned in Low Power Mode");
     assert!(
-        supervisor.reserve_prewarm().is_some(),
+        supervisor.reserve_prewarm(MODEL_ID).is_some(),
         "nothing reserved either"
     );
     assert_eq!(
-        prewarm(&supervisor, Trigger::Launch, || false, lease),
+        prewarm(&supervisor, Trigger::Launch, MODEL_ID, || false, lease),
         "started"
     );
     assert!(spawned(&log));
@@ -87,7 +88,7 @@ fn no_model_or_a_bad_one_skips_and_frees_the_slot() {
     let (store, spec, supervisor, log) = fixture("no-model");
     let missing = || Err::<_, String>("no cleanup model".into());
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, missing),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, missing),
         "unavailable"
     );
     let wrong = ArtifactSpec {
@@ -96,13 +97,13 @@ fn no_model_or_a_bad_one_skips_and_frees_the_slot() {
     };
     let tampered = || store.lease_artifact(MODEL_ID, wrong);
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, tampered),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, tampered),
         "unavailable"
     );
     assert!(!log.exists());
     let good = || store.lease_artifact(MODEL_ID, spec);
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, good),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, good),
         "started"
     );
 }
@@ -111,15 +112,15 @@ fn no_model_or_a_bad_one_skips_and_frees_the_slot() {
 fn a_running_dictation_or_missing_worker_skips_it() {
     let (store, spec, supervisor, log) = fixture("busy");
     let lease = || store.lease_artifact(MODEL_ID, spec);
-    let reservation = supervisor.reserve("dictation".into()).unwrap();
+    let reservation = supervisor.reserve("dictation".into(), MODEL_ID).unwrap();
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, lease),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, lease),
         "busy"
     );
     drop(reservation);
     let none = WorkerSupervisor::new(PathBuf::new());
     assert_eq!(
-        prewarm(&none, Trigger::SwitchOn, || false, lease),
+        prewarm(&none, Trigger::SwitchOn, MODEL_ID, || false, lease),
         "unavailable"
     );
     assert!(!log.exists());
@@ -136,15 +137,18 @@ fn a_prewarm_abandoned_before_its_hash_never_hashes_or_spawns() {
         size: 8,
     };
     let lease = || {
-        drop(supervisor.reserve("dictation".into()).unwrap());
+        drop(supervisor.reserve("dictation".into(), MODEL_ID).unwrap());
         store.lease_artifact(MODEL_ID, wrong)
     };
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, lease),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, lease),
         "abandoned"
     );
     assert!(!log.exists(), "an abandoned prewarm never spawns");
-    assert!(supervisor.reserve_prewarm().is_some(), "the slot is free");
+    assert!(
+        supervisor.reserve_prewarm(MODEL_ID).is_some(),
+        "the slot is free"
+    );
 }
 
 #[test]
@@ -156,11 +160,14 @@ fn a_disarm_during_the_hash_is_reported_and_the_prewarm_never_spawns() {
         store.lease_artifact(MODEL_ID, spec)
     };
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, lease),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, lease),
         "abandoned"
     );
     assert!(!log.exists(), "a disarmed prewarm never spawns");
-    assert!(supervisor.reserve_prewarm().is_some(), "the slot is free");
+    assert!(
+        supervisor.reserve_prewarm(MODEL_ID).is_some(),
+        "the slot is free"
+    );
 }
 
 #[test]
@@ -169,7 +176,7 @@ fn a_disarm_with_nothing_armed_says_so() {
     assert_eq!(disarm(&supervisor), "nothing");
     let lease = || store.lease_artifact(MODEL_ID, spec);
     assert_eq!(
-        prewarm(&supervisor, Trigger::SwitchOn, || false, lease),
+        prewarm(&supervisor, Trigger::SwitchOn, MODEL_ID, || false, lease),
         "started"
     );
     assert!(spawned(&log));
@@ -178,9 +185,9 @@ fn a_disarm_with_nothing_armed_says_so() {
 #[test]
 fn the_ticket_knows_when_a_dictation_took_its_turn() {
     let (_store, _spec, supervisor, _log) = fixture("ticket");
-    let ticket = supervisor.reserve_prewarm().unwrap();
+    let ticket = supervisor.reserve_prewarm(MODEL_ID).unwrap();
     assert!(!ticket.abandoned());
-    drop(supervisor.reserve("dictation".into()).unwrap());
+    drop(supervisor.reserve("dictation".into(), MODEL_ID).unwrap());
     assert!(ticket.abandoned(), "stays abandoned after the run ends");
 }
 

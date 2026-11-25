@@ -3,14 +3,16 @@
 //! 10 s budget. The renderer calls it when the switch is turned on, and a
 //! little after launch when cleanup is already on; at launch only, macOS
 //! Low Power Mode skips it (battery alone doesn't). It runs in the
-//! background: the command returns once the worker has started.
+//! background: the command returns once the worker has started. It warms
+//! the model the renderer selected (BUS-229), so a dictation of that model
+//! takes the load over; the renderer prewarms again when the model changes.
 
 use std::sync::Arc;
 
 use tauri::{Runtime, State, Webview};
 
 use super::auth::require_main;
-use super::model_store::{ModelLease, MODEL_ID};
+use super::model_store::ModelLease;
 use super::supervisor::{Disarmed, LowPowerMode, WorkerSupervisor};
 use super::{CleanupCommandError, CleanupState};
 
@@ -35,14 +37,20 @@ pub async fn cleanup_prewarm<R: Runtime>(
     webview: Webview<R>,
     state: State<'_, CleanupState>,
     trigger: String,
+    model_id: String,
 ) -> Result<&'static str, CleanupCommandError> {
     require_main(&webview)?;
     let trigger = Trigger::parse(&trigger)?;
+    let model_id = state
+        .models
+        .spec(&model_id)
+        .map_err(CleanupCommandError::runtime)?
+        .id;
     let models = Arc::clone(&state.models);
     let supervisor = Arc::clone(&state.supervisor);
     tauri::async_runtime::spawn_blocking(move || {
-        prewarm(&supervisor, trigger, low_power_mode, || {
-            models.lease(MODEL_ID)
+        prewarm(&supervisor, trigger, model_id, low_power_mode, || {
+            models.lease(model_id)
         })
     })
     .await
@@ -81,6 +89,7 @@ pub(super) fn disarm(supervisor: &WorkerSupervisor) -> &'static str {
 pub(super) fn prewarm(
     supervisor: &WorkerSupervisor,
     trigger: Trigger,
+    model_id: &'static str,
     low_power_mode: LowPowerMode,
     lease: impl FnOnce() -> Result<ModelLease, String>,
 ) -> &'static str {
@@ -91,7 +100,7 @@ pub(super) fn prewarm(
         return "unavailable";
     }
     // Before the hash, so a dictation arriving meanwhile is never refused.
-    let Some(ticket) = supervisor.reserve_prewarm() else {
+    let Some(ticket) = supervisor.reserve_prewarm(model_id) else {
         return "busy";
     };
     let Ok(mut lease) = lease() else {

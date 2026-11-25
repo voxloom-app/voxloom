@@ -9,8 +9,12 @@ fn temp_root(name: &str) -> PathBuf {
 #[test]
 fn refuses_a_write_while_a_model_is_leased() {
     let store = CleanupModelStore::new(temp_root("leased"));
-    store.inner.lock().unwrap().leases = 1;
-    assert!(store.begin_write().err().unwrap().contains("in use"));
+    store.inner.lock().unwrap().leases.insert(MODEL_ID, 1);
+    assert!(store
+        .begin_write(DEFAULT_MODEL)
+        .err()
+        .unwrap()
+        .contains("in use"));
 }
 
 #[test]
@@ -52,9 +56,9 @@ fn lease_rejects_same_size_tampering() {
         .unwrap();
     let error = lease.verify().unwrap_err();
     assert!(error.contains("SHA-256 mismatch"));
-    assert_eq!(store.inner.lock().unwrap().leases, 1);
+    assert_eq!(store.inner.lock().unwrap().leases.get(MODEL_ID), Some(&1));
     drop(lease);
-    assert_eq!(store.inner.lock().unwrap().leases, 0);
+    assert!(store.inner.lock().unwrap().leases.is_empty());
     let _ = fs::remove_dir_all(root);
 }
 
@@ -118,11 +122,19 @@ fn verified_lease_blocks_a_write_until_drop() {
     fs::write(store.model_path(), b"GGUFtest").unwrap();
     let first = store.lease(MODEL_ID).unwrap();
     let queued = store.lease(MODEL_ID).unwrap();
-    assert!(store.begin_write().err().unwrap().contains("in use"));
+    assert!(store
+        .begin_write(DEFAULT_MODEL)
+        .err()
+        .unwrap()
+        .contains("in use"));
     drop(first);
-    assert!(store.begin_write().err().unwrap().contains("in use"));
+    assert!(store
+        .begin_write(DEFAULT_MODEL)
+        .err()
+        .unwrap()
+        .contains("in use"));
     drop(queued);
-    assert!(store.begin_write().is_ok());
+    assert!(store.begin_write(DEFAULT_MODEL).is_ok());
     let _ = fs::remove_dir_all(root);
 }
 

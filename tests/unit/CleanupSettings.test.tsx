@@ -12,10 +12,9 @@ import { useCleanupModel } from '../../src/features/settings/useCleanupModel';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
 import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
 import { renderWithApp } from './testUtils';
+import { cleanupStatus } from './cleanupStatusFixture';
 
-const ready: CleanupModelStatus = {
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable: true, sha256: CLEANUP_MODEL_SHA256,
-};
+const ready: CleanupModelStatus = cleanupStatus();
 
 function store(...statuses: CleanupModelStatus[]): CleanupModelStore {
   const status = vi.fn();
@@ -70,7 +69,7 @@ describe('CleanupSettings', () => {
   });
 
   it.each([
-    ['no model', { ...ready, available: false }, /Not installed/],
+    ['no model', cleanupStatus({ available: false }), /Not installed/],
     ['no worker', { ...ready, runtimeAvailable: false }, /doesn't include the cleanup worker/],
   ])('dev build: cannot turn on with %s', async (_label, status, note) => {
     renderCleanup(store(status));
@@ -142,7 +141,7 @@ describe('CleanupSettings in a production build', () => {
 
   it('lights up once the worker is available, with no model installed', async () => {
     prod();
-    renderCleanup(store({ ...ready, available: false }));
+    renderCleanup(store(cleanupStatus({ available: false })));
     await waitFor(() => expect(block()).toBeInTheDocument());
     expect(screen.getByText(/Not installed/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check again' })).toBeEnabled();
@@ -176,7 +175,7 @@ describe('CleanupSettings in a production build', () => {
 
 describe('CleanupSettings in a production build, after the worker is known', () => {
   afterEach(() => { vi.unstubAllEnvs(); });
-  const missingModel = { ...ready, available: false };
+  const missingModel = cleanupStatus({ available: false });
 
   it('Check again keeps the block and focus while it checks, and through an error', async () => {
     vi.stubEnv('DEV', false);
@@ -276,7 +275,7 @@ describe('cleanup model status: one read per window', () => {
     await user.click(check);
     await user.click(check);
     expect(models.status).toHaveBeenCalledTimes(2); // boot + one Check again
-    await act(async () => { finish({ ...ready, available: false }); });
+    await act(async () => { finish(cleanupStatus({ available: false })); });
     await waitFor(() => expect(screen.getByText(/Not installed/)).toBeInTheDocument());
   });
 

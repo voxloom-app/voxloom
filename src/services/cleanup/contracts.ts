@@ -21,8 +21,12 @@ export interface CleanupEngine {
 
 export interface CleanupModelStore {
   status(): Promise<CleanupModelStatus>;
-  /** BUS-181: one-click download, the only way to install the model. Test fakes may omit it. */
-  download?(onProgress?: (progress: CleanupDownloadProgress) => void): Promise<CleanupModelStatus>;
-  /** Stops a running download; false when none was running. */
-  cancelDownload?(): Promise<boolean>;
+  /** BUS-181: one-click download, the only way to install a model. Test fakes may omit it. */
+  download?(
+    modelId: string, onProgress?: (progress: CleanupDownloadProgress) => void,
+  ): Promise<CleanupModelStatus>;
+  /** Stops that model's running download; false when it wasn't downloading. */
+  cancelDownload?(modelId: string): Promise<boolean>;
+  /** BUS-229: removes an installed model; refused while it is in use. */
+  delete?(modelId: string): Promise<CleanupModelStatus>;
 }

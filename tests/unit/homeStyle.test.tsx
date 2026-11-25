@@ -13,20 +13,30 @@ import { homeStyleState } from '../../src/features/home/homeStyleState';
 import type { CleanupModelView } from '../../src/features/settings/cleanupCopy';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
 import { CleanupDownloadError, type CleanupDownloadProgress } from '../../src/services/cleanup/modelDownload';
-import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
+import {
+  CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, QUALITY_CLEANUP_MODEL_ID, QUALITY_CLEANUP_MODEL_SHA256,
+  type CleanupModelEntry, type CleanupModelStatus,
+} from '../../src/services/cleanup/types';
 import { renderWithApp } from './testUtils';
 
-const ready: CleanupModelStatus = {
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable: true, sha256: CLEANUP_MODEL_SHA256,
-};
-const missing: CleanupModelStatus = { ...ready, available: false };
+/** Default (0.6B) and optional 4B availability, as `cleanup_model_status` lists them. */
+function modelStatus(defaultAvailable: boolean, quality?: boolean): CleanupModelStatus {
+  const base: CleanupModelEntry = { available: defaultAvailable, id: CLEANUP_MODEL_ID, sha256: CLEANUP_MODEL_SHA256 };
+  const models: CleanupModelEntry[] = [base];
+  if (quality !== undefined) {
+    models.push({ available: quality, id: QUALITY_CLEANUP_MODEL_ID, sha256: QUALITY_CLEANUP_MODEL_SHA256 });
+  }
+  return { ...base, models, runtimeAvailable: true };
+}
+const ready = modelStatus(true);
+const missing = modelStatus(false);
 const active = { cleanupEnabled: true, cleanupModelId: CLEANUP_MODEL_ID, cleanupOptIn: true };
 
 function downloadingStore(status: CleanupModelStatus) {
   const pending: { progress: (p: CleanupDownloadProgress) => void; resolve: (s: CleanupModelStatus) => void; reject: (e: unknown) => void }[] = [];
   const store = {
     cancelDownload: vi.fn().mockResolvedValue(true),
-    download: vi.fn((onProgress?: (p: CleanupDownloadProgress) => void) =>
+    download: vi.fn((_modelId: string, onProgress?: (p: CleanupDownloadProgress) => void) =>
       new Promise<CleanupModelStatus>((resolve, reject) => {
         pending.push({ progress: (p) => onProgress?.(p), reject, resolve });
       })),
@@ -70,7 +80,8 @@ describe('Home writing style while cleanup is off (BUS-229)', () => {
 
     await userEvent.setup().click(button('Turn on local cleanup')!);
     expect(store.download).toHaveBeenCalledOnce();
-    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, ratio: 0.42 }); });
+    expect(store.download.mock.calls[0][0]).toBe(CLEANUP_MODEL_ID);
+    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, modelId: CLEANUP_MODEL_ID, ratio: 0.42 }); });
     expect(note()).toHaveTextContent('Downloading the cleanup model… 42%');
     expect(screen.getByRole('progressbar', { name: 'Cleanup model download' })).toHaveAttribute('aria-valuenow', '42');
     expect(picker()).toHaveAttribute('aria-disabled', 'true');
@@ -130,6 +141,7 @@ describe('Home writing style while cleanup is off (BUS-229)', () => {
     expect(picker()).toHaveAttribute('aria-disabled', 'true');
     await userEvent.setup().click(button('Download (397 MB)')!);
     expect(store.download).toHaveBeenCalledOnce();
+    expect(store.download.mock.calls[0][0]).toBe(CLEANUP_MODEL_ID);
   });
 
   it('cleanup on and ready: live picker, unchanged caption, no note', async () => {
@@ -223,7 +235,7 @@ describe('Home writing style keyboard access (BUS-229, CR #6b)', () => {
     expect(noteText()).toHaveAttribute('role', 'status');
     expect(noteText()).not.toHaveAttribute('aria-live');
     await userEvent.setup().click(button('Turn on local cleanup')!);
-    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, ratio: 0.42 }); });
+    act(() => { pending[0].progress({ bytesReceived: 42, bytesTotal: 100, modelId: CLEANUP_MODEL_ID, ratio: 0.42 }); });
     expect(noteText()).toHaveTextContent('Downloading the cleanup model… 42%');
     expect(noteText()).toHaveAttribute('aria-live', 'off');
     expect(button('Cancel')).toHaveAttribute('aria-describedby', 'home-style-note-text');
@@ -283,6 +295,43 @@ describe('Home writing style focus after Turn on (BUS-229)', () => {
   });
 });
 
+describe('Home writing style with the optional 4B (BUS-229 PR2)', () => {
+  const chose4b = { cleanupModelId: QUALITY_CLEANUP_MODEL_ID };
+
+  it('4B chosen and installed, 0.6B missing: Turn on uses the 4B with no download', async () => {
+    const { store } = downloadingStore(modelStatus(false, true));
+    await renderHome(store, chose4b);
+    expect(note()).toHaveTextContent('Styles need local cleanup, which is off.');
+    await userEvent.setup().click(button('Turn on local cleanup')!);
+    expect(current.cleanupOptIn).toBe(true);
+    expect(current.cleanupModelId).toBe(QUALITY_CLEANUP_MODEL_ID);
+    expect(store.download).not.toHaveBeenCalled();
+  });
+
+  it('0.6B chosen and installed, 4B installed too: Turn on keeps the 0.6B', async () => {
+    const { store } = downloadingStore(modelStatus(true, true));
+    await renderHome(store, { cleanupModelId: CLEANUP_MODEL_ID });
+    await userEvent.setup().click(button('Turn on local cleanup')!);
+    expect(current.cleanupModelId).toBe(CLEANUP_MODEL_ID);
+  });
+
+  it('4B chosen but missing, 0.6B installed: no Home action, cleanup stays off', async () => {
+    const { store } = downloadingStore(modelStatus(true, false));
+    await renderHome(store, chose4b);
+    expect(note()).toHaveTextContent('Styles need local cleanup, which is off.');
+    expect(button('Turn on local cleanup')).toBeNull();
+    expect(current.cleanupOptIn).not.toBe(true);
+    expect(store.download).not.toHaveBeenCalled();
+  });
+
+  it('cleanup on with the 4B chosen but missing: no 397 MB download on Home', async () => {
+    const { store } = downloadingStore(modelStatus(true, false));
+    await renderHome(store, { ...active, cleanupModelId: QUALITY_CLEANUP_MODEL_ID });
+    expect(note()).toHaveTextContent('The cleanup model is missing, so styles aren’t applied.');
+    expect(button('Download (397 MB)')).toBeNull();
+  });
+});
+
 describe('homeStyleState', () => {
   const base = {
     active: false, download: { downloading: false, note: null as string | null }, isNative: true, shown: true,
@@ -297,6 +346,12 @@ describe('homeStyleState', () => {
     [{ ...base, active: true, view: { kind: 'error' as const, message: 'x' } }, 'on'],
     [{ ...base, download: { downloading: true, note: null }, view: { kind: 'status' as const, status: missing } }, 'downloading'],
     [{ ...base, download: { downloading: false, note: 'Download cancelled.' }, view: { kind: 'status' as const, status: missing } }, 'off-missing'],
+    [{ ...base, download: { downloading: false, note: 'offline' }, view: { kind: 'status' as const, status: missing } }, 'failed'],
+    [{ ...base, savedModelId: QUALITY_CLEANUP_MODEL_ID, view: { kind: 'status' as const, status: modelStatus(false, true) } }, 'off-installed'],
+    [{ ...base, savedModelId: QUALITY_CLEANUP_MODEL_ID, view: { kind: 'status' as const, status: modelStatus(true, false) } }, 'off-unavailable'],
+    [{ ...base, savedModelId: QUALITY_CLEANUP_MODEL_ID, download: { downloading: false, note: 'offline' }, view: { kind: 'status' as const, status: modelStatus(true, false) } }, 'off-unavailable'],
+    [{ ...base, active: true, savedModelId: QUALITY_CLEANUP_MODEL_ID, view: { kind: 'status' as const, status: modelStatus(true, false) } }, 'on-missing'],
+    [{ ...base, active: true, savedModelId: QUALITY_CLEANUP_MODEL_ID, view: { kind: 'status' as const, status: modelStatus(false, true) } }, 'on'],
   ])('%j → %s', (input, expected) => {
     expect(homeStyleState(input)).toBe(expected);
   });

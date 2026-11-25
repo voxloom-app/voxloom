@@ -19,10 +19,10 @@ fn a_dictation_re_hashing_when_the_warm_up_replies_still_reuses_the_load() {
     let (path, log) = prewarm_worker("claim-rehash", 0.2, 0.2);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("claim-rehash"), never));
-    let mut reservation = supervisor.reserve("rehash".into()).unwrap();
+    let mut reservation = supervisor.reserve("rehash".into(), MODEL_ID).unwrap();
     // The lease re-hash, between admission and the run.
     thread::sleep(Duration::from_millis(900));
     let model = model_file("claim-rehash-run");
@@ -40,10 +40,10 @@ fn a_claim_that_ends_unused_ends_the_worker() {
     let (path, log) = prewarm_worker("claim-unused", 0.1, 0.1);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("claim-unused"), never));
-    let reservation = supervisor.reserve("unused".into()).unwrap();
+    let reservation = supervisor.reserve("unused".into(), MODEL_ID).unwrap();
     thread::sleep(Duration::from_millis(600));
     assert!(!idle(&supervisor), "kept for the claiming dictation");
     drop(reservation);
@@ -61,6 +61,7 @@ fn held_slot(supervisor: &WorkerSupervisor, name: &str, warmed: bool) -> Process
             .unwrap()
             .into_parts();
     supervisor.shared.state.lock().unwrap().prewarm = Some(super::super::prewarm::Slot::Running {
+        model_id: MODEL_ID,
         process: process.clone(),
         stdin: Some(stdin),
         handoff: None,
@@ -85,7 +86,7 @@ fn a_warmed_unclaimed_worker_is_not_handed_over() {
 fn settling_without_a_claim_closes_the_handoff() {
     let (path, _) = prewarm_worker("claim-settle", 0.0, 0.0);
     let supervisor = WorkerSupervisor::with_timeout(path, Duration::from_secs(1));
-    let ticket = supervisor.reserve_prewarm().unwrap();
+    let ticket = supervisor.reserve_prewarm(MODEL_ID).unwrap();
     let held = held_slot(&supervisor, "claim-settle", false);
     assert!(ticket.settle().is_none());
     // Warmed and not yet reaped: a dictation now spawns its own worker.
@@ -106,7 +107,7 @@ pub(super) fn hand_over_a_load(
     let (path, log) = prewarm_worker(name, 1.0, 5.0);
     let supervisor = Arc::new(WorkerSupervisor::new(path));
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file(name), low_power_mode));
     let running = Arc::clone(&supervisor);
@@ -157,7 +158,7 @@ fn a_prewarm_that_warms_up_unused_is_not_re_armed() {
     let (path, log) = prewarm_worker("rearm-unused", 0.0, 0.0);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("rearm-unused"), never));
     assert!(wait_until(Duration::from_secs(5), || idle(&supervisor)));
@@ -178,7 +179,7 @@ fn after_the_second_dictation() -> bool {
 #[test]
 fn the_re_arm_waits_for_a_dictation_that_got_in_first() {
     let (supervisor, log) = cancel_a_handed_over_load("rearm-wait", after_the_second_dictation);
-    let mut second = supervisor.reserve("second".into()).unwrap();
+    let mut second = supervisor.reserve("second".into(), MODEL_ID).unwrap();
     SECOND_ADMITTED.store(true, Ordering::SeqCst);
     thread::sleep(Duration::from_millis(300));
     assert_eq!(

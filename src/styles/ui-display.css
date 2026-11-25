@@ -97,6 +97,8 @@
 }
 
 .frow__help { color: var(--mut); font-size: var(--fs-secondary); }
+/* Two help lines in one Settings slot (BUS-229 4B row): stack instead of overlapping. */
+.frow__help--stack { display: grid; gap: 2px; }
 
 .tag {
   background: var(--tag-bg);

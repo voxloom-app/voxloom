@@ -2,11 +2,10 @@
 import { vi } from 'vitest';
 import { cleanupModelCache } from '../../src/features/settings/cleanupModelCache';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
-import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
+import type { CleanupModelStatus } from '../../src/services/cleanup/types';
+import { cleanupStatus } from './cleanupStatusFixture';
 
-export const ready: CleanupModelStatus = {
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable: true, sha256: CLEANUP_MODEL_SHA256,
-};
+export const ready: CleanupModelStatus = cleanupStatus();
 export const noWorker: CleanupModelStatus = { ...ready, runtimeAvailable: false };
 
 /** A store whose status calls each wait for the test to answer them. */

@@ -44,6 +44,9 @@ pub(super) enum Slot {
     Reserved { abandoned: bool },
     /// The worker is loading or warming up.
     Running {
+        /// The model it loads (BUS-229): only a dictation of the same model
+        /// may take it over.
+        model_id: &'static str,
         process: ProcessHandle,
         stdin: Option<ChildStdin>,
         handoff: Option<Sender<Reply>>,
@@ -57,6 +60,7 @@ pub(super) enum Slot {
 /// The one prewarm; dropping it frees the prewarm slot.
 pub struct PrewarmTicket {
     shared: Arc<SharedState>,
+    model_id: &'static str,
     timeout: Duration,
     worker_path: PathBuf,
 }
@@ -65,8 +69,8 @@ pub struct PrewarmTicket {
 pub type LowPowerMode = fn() -> bool;
 
 impl WorkerSupervisor {
-    /// None while a run or another prewarm is in.
-    pub fn reserve_prewarm(&self) -> Option<PrewarmTicket> {
+    /// A prewarm of `model_id`; None while a run or another prewarm is in.
+    pub fn reserve_prewarm(&self, model_id: &'static str) -> Option<PrewarmTicket> {
         let mut state = self.shared.state.lock().unwrap();
         if state.active.is_some() || state.prewarm.is_some() {
             return None;
@@ -74,6 +78,7 @@ impl WorkerSupervisor {
         state.prewarm = Some(Slot::Reserved { abandoned: false });
         Some(PrewarmTicket {
             shared: Arc::clone(&self.shared),
+            model_id,
             timeout: self.prewarm_timeout,
             worker_path: self.worker_path.clone(),
         })
@@ -86,7 +91,10 @@ impl PrewarmTicket {
     pub fn abandoned(&self) -> bool {
         !matches!(
             self.shared.state.lock().unwrap().prewarm,
-            Some(Slot::Reserved { abandoned: false })
+            Some(Slot::Reserved {
+                abandoned: false,
+                ..
+            })
         )
     }
 
@@ -109,7 +117,13 @@ impl PrewarmTicket {
         // running one, never a half-started one. Spawning and writing a
         // small frame to an empty pipe don't wait on the worker.
         let mut state = self.shared.state.lock().unwrap();
-        if !matches!(state.prewarm, Some(Slot::Reserved { abandoned: false })) {
+        if !matches!(
+            state.prewarm,
+            Some(Slot::Reserved {
+                abandoned: false,
+                ..
+            })
+        ) {
             return false;
         }
         let Ok(process) = WorkerProcess::spawn(&self.worker_path, model.borrow()) else {
@@ -122,6 +136,7 @@ impl PrewarmTicket {
             return false;
         }
         state.prewarm = Some(Slot::Running {
+            model_id: self.model_id,
             process: process.clone(),
             stdin: Some(stdin),
             handoff: None,

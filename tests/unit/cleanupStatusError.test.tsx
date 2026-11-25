@@ -12,12 +12,11 @@ import type { Settings } from '../../src/domain/types';
 import { CleanupSettings } from '../../src/features/settings/CleanupSettings';
 import { useCleanupModel } from '../../src/features/settings/useCleanupModel';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
-import { CLEANUP_MODEL_ID, CLEANUP_MODEL_SHA256, type CleanupModelStatus } from '../../src/services/cleanup/types';
+import type { CleanupModelStatus } from '../../src/services/cleanup/types';
 import { renderWithApp } from './testUtils';
+import { cleanupStatus } from './cleanupStatusFixture';
 
-const ready: CleanupModelStatus = {
-  available: true, id: CLEANUP_MODEL_ID, runtimeAvailable: true, sha256: CLEANUP_MODEL_SHA256,
-};
+const ready: CleanupModelStatus = cleanupStatus();
 
 function Harness({ modelStore, start }: { modelStore: CleanupModelStore; start?: Partial<Settings> }) {
   const { dispatch } = useApp();

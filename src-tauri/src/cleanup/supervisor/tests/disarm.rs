@@ -16,7 +16,7 @@ const QUICK: Duration = Duration::from_secs(3);
 fn disarming_during_the_hash_stops_it_and_never_spawns() {
     let (path, log) = prewarm_worker("disarm-hash", 0.0, 0.0);
     let supervisor = WorkerSupervisor::new(path);
-    let ticket = supervisor.reserve_prewarm().unwrap();
+    let ticket = supervisor.reserve_prewarm(MODEL_ID).unwrap();
     assert!(!ticket.abandoned());
     assert_eq!(supervisor.disarm_prewarm(), Disarmed::Stopped);
     assert!(ticket.abandoned(), "the hash stops at its next chunk");
@@ -33,7 +33,7 @@ fn disarming_during_the_load_or_the_warm_up_reaps_the_worker() {
         let (path, log) = prewarm_worker(name, load, warm);
         let supervisor = WorkerSupervisor::new(path);
         assert!(supervisor
-            .reserve_prewarm()
+            .reserve_prewarm(MODEL_ID)
             .unwrap()
             .start(model_file(name), never));
         assert!(wait_until(WAIT, || spawns(&log) == 1));
@@ -88,7 +88,7 @@ fn disarming_with_nothing_armed_is_a_no_op_and_does_not_stick() {
     assert!(!supervisor.shared.state.lock().unwrap().prewarm_disarmed);
     // The next prewarm is not born disarmed.
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("disarm-idle"), never));
     assert!(wait_until(WAIT, || spawns(&log) == 1));
@@ -99,7 +99,7 @@ fn disarming_with_nothing_armed_is_a_no_op_and_does_not_stick() {
 fn a_disarm_never_touches_a_dictation_on_its_own_worker() {
     let (path, log) = prewarm_worker("disarm-own", 0.0, 0.0);
     let supervisor = WorkerSupervisor::new(path);
-    let mut reservation = supervisor.reserve("own".into()).unwrap();
+    let mut reservation = supervisor.reserve("own".into(), MODEL_ID).unwrap();
     assert_eq!(supervisor.disarm_prewarm(), Disarmed::Nothing);
     assert!(!reservation.cancelled());
     let model = model_file("disarm-own-run");
@@ -112,7 +112,7 @@ fn a_disarm_leaves_a_handed_over_dictation_its_reply() {
     let (path, log) = prewarm_worker("disarm-kept", 0.8, 5.0);
     let supervisor = Arc::new(WorkerSupervisor::new(path));
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("disarm-kept"), never));
     let running = Arc::clone(&supervisor);
@@ -134,11 +134,11 @@ fn a_disarm_with_a_dictation_claiming_the_load_keeps_it_until_the_claim_ends() {
     let (path, log) = prewarm_worker("disarm-claim", 30.0, 0.0);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("disarm-claim"), never));
     assert!(wait_until(WAIT, || spawns(&log) == 1));
-    let reservation = supervisor.reserve("claim".into()).unwrap();
+    let reservation = supervisor.reserve("claim".into(), MODEL_ID).unwrap();
     assert_eq!(supervisor.disarm_prewarm(), Disarmed::Kept);
     std::thread::sleep(Duration::from_millis(400));
     assert!(!idle(&supervisor), "kept for the claiming dictation");
@@ -167,7 +167,7 @@ fn a_dictation_right_after_a_disarm_gets_its_own_worker() {
     let (path, log) = prewarm_worker("disarm-then-dictate", 30.0, 0.0);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("disarm-then-dictate"), never));
     assert!(wait_until(WAIT, || spawns(&log) == 1));
@@ -187,7 +187,7 @@ fn a_disarm_ends_with_its_prewarm_and_the_next_one_is_re_armed_again() {
     assert_eq!(run.join().unwrap().unwrap(), "reused");
     assert!(wait_until(QUICK, || idle(&supervisor)));
     let again = Arc::clone(&supervisor);
-    let ticket = supervisor.reserve_prewarm().unwrap();
+    let ticket = supervisor.reserve_prewarm(MODEL_ID).unwrap();
     assert!(ticket.start(model_file("disarm-ends-again"), never));
     let run = thread::spawn(move || dictation(&again, "second"));
     assert!(wait_until(WAIT, || spawns(&log) == 2));
@@ -204,12 +204,12 @@ fn a_load_nobody_disarmed_stays_for_the_next_dictation_after_a_claim_ends_unused
     let (path, log) = prewarm_worker("disarm-not-armed", 1.0, 5.0);
     let supervisor = WorkerSupervisor::new(path);
     assert!(supervisor
-        .reserve_prewarm()
+        .reserve_prewarm(MODEL_ID)
         .unwrap()
         .start(model_file("disarm-not-armed"), never));
     assert!(wait_until(WAIT, || spawns(&log) == 1));
     // A dictation claims the load and ends without using it.
-    drop(supervisor.reserve("gave-up".into()).unwrap());
+    drop(supervisor.reserve("gave-up".into(), MODEL_ID).unwrap());
     std::thread::sleep(Duration::from_millis(200));
     assert!(!idle(&supervisor), "still loading");
     assert_eq!(dictation(&supervisor, "next").unwrap(), "reused");

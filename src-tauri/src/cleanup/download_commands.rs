@@ -1,4 +1,5 @@
-//! Tauri commands for the one-click cleanup model download (BUS-181).
+//! Tauri commands for the one-click cleanup model download (BUS-181) and,
+//! since BUS-229, removing a model. Each names the model it acts on.
 //! Progress is emitted on `cleanup:download-progress`; the invoke resolves
 //! with the new status only after the file is verified and in place.
 
@@ -17,12 +18,13 @@ pub async fn cleanup_download_model<R: Runtime>(
     app: AppHandle<R>,
     webview: Webview<R>,
     state: State<'_, CleanupState>,
+    model_id: String,
 ) -> Result<ModelStatus, CleanupCommandError> {
     authorize_model_manager(webview.label(), webview.window().label())?;
     let models = Arc::clone(&state.models);
     let mut status = tauri::async_runtime::spawn_blocking(move || {
         models
-            .download(|progress| {
+            .download(&model_id, |progress| {
                 let _ = app.emit(PROGRESS_EVENT, progress);
             })
             .map_err(download_error)
@@ -40,9 +42,30 @@ pub async fn cleanup_download_model<R: Runtime>(
 pub fn cleanup_cancel_download<R: Runtime>(
     webview: Webview<R>,
     state: State<'_, CleanupState>,
+    model_id: String,
 ) -> Result<bool, CleanupCommandError> {
     authorize_model_manager(webview.label(), webview.window().label())?;
-    Ok(state.models.cancel_download())
+    Ok(state.models.cancel_download(&model_id))
+}
+
+/// Removes an installed model; refused while it is leased (a run or a
+/// prewarm) or while any download runs.
+#[tauri::command]
+pub async fn cleanup_delete_model<R: Runtime>(
+    webview: Webview<R>,
+    state: State<'_, CleanupState>,
+    model_id: String,
+) -> Result<ModelStatus, CleanupCommandError> {
+    authorize_model_manager(webview.label(), webview.window().label())?;
+    let models = Arc::clone(&state.models);
+    let mut status = tauri::async_runtime::spawn_blocking(move || models.delete(&model_id))
+        .await
+        .map_err(|error| {
+            CleanupCommandError::runtime(format!("model delete task failed: {error}"))
+        })?
+        .map_err(CleanupCommandError::runtime)?;
+    status.runtime_available = state.supervisor.available();
+    Ok(status)
 }
 
 /// `cancelled` and `checksum-mismatch` get their own UI lines; anything else

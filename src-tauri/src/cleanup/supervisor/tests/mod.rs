@@ -1,6 +1,7 @@
 //! Shared fake-worker fixtures for supervisor tests (Python stub workers).
 
 use super::*;
+use crate::cleanup::model_store::MODEL_ID;
 use crate::cleanup::test_support::{test_root, write_executable};
 use crate::cleanup::worker_process::WorkerProcess;
 use std::fs;
@@ -28,7 +29,8 @@ impl WorkerSupervisor {
         request_id: String,
         spawn: impl FnOnce() -> Result<WorkerProcess, String>,
     ) -> Result<String, SupervisorError> {
-        self.reserve(request_id)?.run_with_spawn(prompt, spawn)
+        self.reserve(request_id, MODEL_ID)?
+            .run_with_spawn(prompt, spawn)
     }
 }
 
@@ -82,5 +84,6 @@ mod disarm;
 mod lifecycle;
 mod prewarm;
 mod prewarm_claim;
+mod prewarm_model;
 mod recovery;
 mod responses;

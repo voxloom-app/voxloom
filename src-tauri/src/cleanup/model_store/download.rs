@@ -1,4 +1,5 @@
-//! One-click download of the pinned cleanup model (BUS-181).
+//! One-click download of a pinned cleanup model (BUS-181; either offered
+//! model since BUS-229).
 //!
 //! Reuses `crate::model_fetch` (HTTPS-only agent, `<file>.partial`, size and
 //! SHA-256 check before the atomic rename) under the store's write guard, so
@@ -11,8 +12,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use super::pin::MODEL_URL;
-use super::{validate_artifact, ArtifactSpec, CleanupModelStore, ModelStatus, ARTIFACT};
+use super::{validate_artifact, CleanupModelStore, ModelSpec, ModelStatus};
 use crate::model_fetch::{self, FetchError, PinnedArtifact};
 
 /// Payload of `cleanup:download-progress`. `ratio` stays below 1.0 until the
@@ -20,6 +20,7 @@ use crate::model_fetch::{self, FetchError, PinnedArtifact};
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadProgress {
+    pub model_id: &'static str,
     pub bytes_received: u64,
     pub bytes_total: u64,
     pub ratio: f64,
@@ -33,24 +34,25 @@ pub enum DownloadError {
 }
 
 impl CleanupModelStore {
-    /// Blocking: download, verify and install the pinned model.
+    /// Blocking: download, verify and install an offered model.
     pub fn download(
         &self,
+        model_id: &str,
         on_progress: impl FnMut(DownloadProgress),
     ) -> Result<ModelStatus, DownloadError> {
-        self.download_from(
-            model_fetch::shared_agent(),
-            MODEL_URL,
-            ARTIFACT,
-            on_progress,
-            sync_dir,
-        )?;
+        let spec = self.spec(model_id).map_err(DownloadError::Failed)?;
+        self.download_from(spec, model_fetch::shared_agent(), on_progress, sync_dir)?;
         Ok(self.status())
     }
 
-    /// Ask the running download to stop. False when none is running.
-    pub fn cancel_download(&self) -> bool {
-        match &self.inner.lock().unwrap().download {
+    /// Ask the running download of `model_id` to stop. False when that model
+    /// isn't downloading.
+    pub fn cancel_download(&self, model_id: &str) -> bool {
+        let inner = self.inner.lock().unwrap();
+        if inner.writing != Some(model_id) {
+            return false;
+        }
+        match &inner.download {
             Some(flag) => {
                 flag.store(true, Ordering::Release);
                 true
@@ -59,25 +61,27 @@ impl CleanupModelStore {
         }
     }
 
+    /// `download` with the spec (URL and artifact) and agent injected.
     pub(super) fn download_from(
         &self,
+        spec: ModelSpec,
         agent: &ureq::Agent,
-        url: &str,
-        artifact: ArtifactSpec,
         mut on_progress: impl FnMut(DownloadProgress),
         sync_parent: impl FnOnce(&Path) -> Result<(), String>,
     ) -> Result<(), DownloadError> {
-        let _guard = self.begin_write().map_err(DownloadError::Failed)?;
+        let _guard = self.begin_write(spec).map_err(DownloadError::Failed)?;
         let cancel = Arc::new(AtomicBool::new(false));
         self.inner.lock().unwrap().download = Some(Arc::clone(&cancel));
-        let result = self.fetch_into_place(agent, url, artifact, &cancel, &mut on_progress);
+        let result = self.fetch_into_place(spec, agent, &cancel, &mut on_progress);
         self.inner.lock().unwrap().download = None;
         result?;
         sync_parent(&self.root).map_err(DownloadError::Failed)?;
-        self.remember_verified(&self.model_path());
+        self.remember_verified(spec);
+        let size = spec.artifact.size;
         on_progress(DownloadProgress {
-            bytes_received: artifact.size,
-            bytes_total: artifact.size,
+            model_id: spec.id,
+            bytes_received: size,
+            bytes_total: size,
             ratio: 1.0,
         });
         Ok(())
@@ -85,13 +89,13 @@ impl CleanupModelStore {
 
     fn fetch_into_place(
         &self,
+        spec: ModelSpec,
         agent: &ureq::Agent,
-        url: &str,
-        artifact: ArtifactSpec,
         cancel: &AtomicBool,
         on_progress: &mut impl FnMut(DownloadProgress),
     ) -> Result<(), DownloadError> {
-        let destination = self.model_path();
+        let (artifact, url) = (spec.artifact, spec.url);
+        let destination = self.path_of(spec);
         if validate_artifact(&destination, artifact).is_ok() {
             return Ok(());
         }
@@ -108,7 +112,7 @@ impl CleanupModelStore {
         };
         let fetched =
             model_fetch::fetch_verified(agent, url, &destination, &pinned, cancel, |got, total| {
-                on_progress(progress(got, total));
+                on_progress(progress(spec.id, got, total));
             });
         if cancel.load(Ordering::Acquire) {
             // Cancel wins even if the last bytes landed: nothing stays behind.
@@ -131,13 +135,14 @@ impl CleanupModelStore {
     }
 }
 
-fn progress(received: u64, total: u64) -> DownloadProgress {
+fn progress(model_id: &'static str, received: u64, total: u64) -> DownloadProgress {
     let ratio = if total == 0 {
         0.0
     } else {
         (received as f64 / total as f64).clamp(0.0, 0.999)
     };
     DownloadProgress {
+        model_id,
         bytes_received: received,
         bytes_total: total,
         ratio,

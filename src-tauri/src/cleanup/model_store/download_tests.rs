@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use sha2::{Digest, Sha256};
 
 use super::super::pin::MODEL_FILE;
-use super::super::{ArtifactSpec, CleanupModelStore, MODEL_ID};
+use super::super::{ArtifactSpec, CleanupModelStore, ModelSpec, DEFAULT_MODEL, MODEL_ID};
 use super::{DownloadError, DownloadProgress};
 use crate::model_fetch::{loopback_test_agent, partial_path};
 
@@ -71,7 +71,12 @@ fn run(
 ) -> (Result<(), DownloadError>, Vec<DownloadProgress>) {
     let agent = loopback_test_agent(Duration::from_secs(5));
     let mut seen = Vec::new();
-    let result = store.download_from(&agent, url, artifact, |p| seen.push(p), |_| Ok(()));
+    let spec = ModelSpec {
+        artifact,
+        url: Box::leak(url.to_owned().into_boxed_str()),
+        ..DEFAULT_MODEL
+    };
+    let result = store.download_from(spec, &agent, |p| seen.push(p), |_| Ok(()));
     (result, seen)
 }
 
@@ -98,7 +103,10 @@ fn success_installs_a_private_verified_model_and_reports_completion_last() {
     assert_eq!(last.ratio, 1.0);
     assert!(earlier.iter().all(|p| p.ratio < 1.0));
     assert!(store.status_available_for(spec(BODY)));
-    assert!(!store.cancel_download(), "no download is running anymore");
+    assert!(
+        !store.cancel_download(MODEL_ID),
+        "no download is running anymore"
+    );
 }
 
 #[test]
@@ -172,15 +180,15 @@ fn cancel_mid_stream_removes_everything_and_blocks_writes_meanwhile() {
     use std::os::unix::fs::PermissionsExt;
     let mode = fs::metadata(&partial).unwrap().permissions().mode();
     assert_eq!(mode & 0o777, 0o600, "partial is private while bytes land");
-    let write = store.begin_write().err().unwrap();
+    let write = store.begin_write(DEFAULT_MODEL).err().unwrap();
     assert!(write.contains("already running"), "{write}");
     assert!(store.lease(MODEL_ID).is_err(), "no lease while downloading");
-    assert!(store.cancel_download());
+    assert!(store.cancel_download(MODEL_ID));
     assert_eq!(worker.join().unwrap(), Err(DownloadError::Cancelled));
     assert_nothing_left(&store);
-    assert!(!store.cancel_download());
+    assert!(!store.cancel_download(MODEL_ID));
     // A new write works again once the download is gone.
-    assert!(store.begin_write().is_ok());
+    assert!(store.begin_write(DEFAULT_MODEL).is_ok());
 }
 
 #[test]

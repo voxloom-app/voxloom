@@ -22,7 +22,7 @@ write({{"error": None, "errorCode": None, "requestId": request["requestId"],
 
 fn sent_time_left(name: &str, deadline: Option<Instant>) -> String {
     let supervisor = WorkerSupervisor::new(echo_worker(name));
-    let mut reservation = supervisor.reserve("r".into()).unwrap();
+    let mut reservation = supervisor.reserve("r".into(), MODEL_ID).unwrap();
     reservation.set_deadline(deadline);
     reservation
         .run(&model_file(name), "p".into(), || {})
@@ -45,7 +45,7 @@ fn sent_time_left_after_slow_spawn(name: &str, deadline: Instant, delay: Duratio
     let supervisor = WorkerSupervisor::new(echo_worker(name));
     let model = model_file(name);
     let worker = supervisor.worker_path.clone();
-    let mut reservation = supervisor.reserve("r".into()).unwrap();
+    let mut reservation = supervisor.reserve("r".into(), MODEL_ID).unwrap();
     reservation.set_deadline(Some(deadline));
     reservation
         .run_with_spawn("p".into(), || {
@@ -80,7 +80,7 @@ fn a_slow_spawn_with_no_deadline_still_sends_nothing() {
     let model = model_file("budget-slow-none");
     let worker = supervisor.worker_path.clone();
     let sent = supervisor
-        .reserve("r".into())
+        .reserve("r".into(), MODEL_ID)
         .unwrap()
         .run_with_spawn("p".into(), || {
             std::thread::sleep(Duration::from_millis(50));
