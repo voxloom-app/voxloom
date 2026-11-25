@@ -1,0 +1,12 @@
+Label #08080c vs rendered button face: darkest face pixel in the rows directly above and below the label (2x crops, clear of corners and 1px edge).
+  dictionary light rest 14.3; hover 14.3; active 12.0; focus 14.3; focus-hover 14.3; focus-active 14.3
+  dictionary dark  rest 14.3; hover 14.3; active 12.0; focus 14.3; focus-hover 14.3; focus-active 14.3
+  word       light rest 14.4; hover 14.4; active 12.1; focus 14.4; focus-hover 14.4; focus-active 14.4
+  word       dark  rest 14.4; hover 14.4; active 12.1; focus 14.4; focus-hover 14.4; focus-active 14.4
+  done       light rest 14.3; hover 14.3; active 11.5; focus 14.3; focus-hover 14.3; focus-active 14.3
+  done       dark  rest 14.3; hover 14.3; active 11.5; focus 14.3; focus-hover 14.3; focus-active 14.3
+  onboarding light rest 14.3; hover 14.3; active 11.9; focus 14.3; focus-hover 14.3; focus-active 14.3
+  onboarding dark  rest 14.3; hover 14.3; active 11.9; focus 14.3; focus-hover 14.3; focus-active 14.3
+worst 11.55:1 (AA needs 4.5)
+disabled light --mut on --seg 5.19
+disabled dark --mut on --seg 5.65

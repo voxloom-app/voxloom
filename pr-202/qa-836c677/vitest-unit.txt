@@ -1,0 +1,13 @@
+
+ RUN  v5.0.5 /tmp/qa-202
+
+
+ Test Files  206 passed | 2 skipped (208)
+      Tests  2786 passed | 2 skipped (2788)
+   Start at  18:23:14
+   Duration  27.42s (environment 49%, tests 33%, setup 9%, transform 4%, import 4%, worker 1%)
+
+Environment  jsdom was created 208 times · 82.47s total, 49% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

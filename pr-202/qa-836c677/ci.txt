@@ -1,0 +1,3 @@
+CI [('rust', 'success'), ('parakeet-worker', 'success'), ('browser-app', 'success'), ('rust-macos', 'success'), ('cargo-audit', 'success'), ('cleanup-worker (macos-latest)', 'success'), ('rust-whisper', 'success'), ('browser-release', 'success'), ('cleanup-worker (ubuntu-latest)', 'success')]
+CodeQL [('Analyze (rust)', 'success'), ('Analyze (actions)', 'success'), ('Analyze (python)', 'success'), ('Analyze (javascript-typescript)', 'success'), ('Analyze (swift)', 'success')]
+Windows native foundation [('windows-x64', 'success')]

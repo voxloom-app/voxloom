@@ -1,0 +1,148 @@
+
+> voxloom@0.5.0 test:e2e
+> PLAYWRIGHT_BROWSERS_PATH=.playwright-browsers playwright test
+
+
+Running 98 tests using 4 workers
+
+(node:601484) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:601476) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:601477) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:601478) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › tests/e2e/cleanupStatus.spec.ts:10:1 › cleanup: a failed first status check offers Check again, which recovers (1.1s)
+  ✓   2 [chromium] › tests/e2e/focusRingHover.spec.ts:61:3 › Start/Stop keeps its focus ring while hovered and pressed (light) (1.1s)
+  ✓   5 [chromium] › tests/e2e/focusRingHover.spec.ts:65:3 › regular primary keeps its focus ring while hovered and pressed (light) (779ms)
+  ✓   7 [chromium] › tests/e2e/focusRingHover.spec.ts:61:3 › Start/Stop keeps its focus ring while hovered and pressed (dark) (841ms)
+  ✓   3 [chromium] › tests/e2e/app.spec.ts:43:1 › first run cannot fake real practice in a browser and can remain incomplete (2.7s)
+  ✓   8 [chromium] › tests/e2e/focusRingHover.spec.ts:65:3 › regular primary keeps its focus ring while hovered and pressed (dark) (930ms)
+  ✓  10 [chromium] › tests/e2e/focusRingHover.spec.ts:98:3 › disabled primary stays flat and secondary/ghost have no gradient (light) (792ms)
+  ✓  11 [chromium] › tests/e2e/focusRingHover.spec.ts:140:3 › Start/Stop .btn.primary.big computed styles stay the layered big treatment (light) (722ms)
+  ✓   6 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › dark B spine and controls fit 640x620 with reduced motion (4.5s)
+  ✓  12 [chromium] › tests/e2e/focusRingHover.spec.ts:98:3 › disabled primary stays flat and secondary/ghost have no gradient (dark) (775ms)
+  ✓  14 [chromium] › tests/e2e/focusRingHover.spec.ts:140:3 › Start/Stop .btn.primary.big computed styles stay the layered big treatment (dark) (707ms)
+  ✓   4 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 640x620 light (7.0s)
+History small 640: min gap 14.0px, spread 0.0px
+  ✓  15 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at small 640px (987ms)
+History default 640: min gap 14.0px, spread 0.0px
+  ✓  17 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at default 640px (877ms)
+  ✓   9 [chromium] › tests/e2e/app.spec.ts:77:1 › screens, settings, themes, and baselines stay synchronized (6.3s)
+History large 640: min gap 14.0px, spread 0.0px
+  ✓  18 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at large 640px (963ms)
+  ✓  13 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › dark B spine and controls fit 1000x620 with reduced motion (4.1s)
+History small 760: min gap 14.0px, spread 0.0px
+  ✓  20 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at small 760px (918ms)
+History default 760: min gap 14.0px, spread 0.0px
+  ✓  22 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at default 760px (894ms)
+History large 760: min gap 14.0px, spread 0.0px
+  ✓  23 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at large 760px (920ms)
+  ✓  16 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 640x620 dark (6.1s)
+History small 1280: min gap 14.0px, spread 0.0px
+  ✓  24 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at small 1280px (1.0s)
+  ✓  21 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › dark B spine and controls fit 1440x620 with reduced motion (4.2s)
+History default 1280: min gap 14.0px, spread 0.0px
+  ✓  26 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at default 1280px (1.0s)
+  ✓  19 [chromium] › tests/e2e/app.spec.ts:140:1 › every Settings tab passes axe in light and dark (5.8s)
+History large 1280: min gap 14.0px, spread 0.0px
+  ✓  28 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at large 1280px (1.0s)
+  ✓  29 [chromium] › tests/e2e/app.spec.ts:155:1 › settings.html (the native Settings window entry) renders and passes axe (1.3s)
+History small 1440: min gap 14.0px, spread 0.0px
+  ✓  30 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at small 1440px (1.0s)
+  ✓  31 [chromium] › tests/e2e/app.spec.ts:162:1 › the 760×660 Settings window keeps two-column rows and a two-column recovery grid (QA #42) (894ms)
+History default 1440: min gap 14.0px, spread 0.0px
+  ✓  32 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at default 1440px (1.1s)
+  ✓  33 [chromium] › tests/e2e/app.spec.ts:174:1 › records the shortcut by pressing it (BUS-47) (1.3s)
+History large 1440: min gap 14.0px, spread 0.0px
+  ✓  27 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › light B spine and controls fit 640x620 with reduced motion (4.6s)
+  ✓  34 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at large 1440px (1.0s)
+History small 1920: min gap 14.0px, spread 0.0px
+  ✓  37 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at small 1920px (1.1s)
+  ✓  25 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 640x760 light (6.8s)
+History default 1920: min gap 14.0px, spread 0.0px
+  ✓  38 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at default 1920px (1.1s)
+  ✓  35 [chromium] › tests/e2e/app.spec.ts:195:1 › dialogs, reduced motion, narrow and coarse layouts work (3.1s)
+History large 1920: min gap 14.0px, spread 0.0px
+  ✓  40 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › History timestamp gap + alignment at large 1920px (1.1s)
+Home small 640: min gap 14.0px, spread 0.0px
+  ✓  42 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at small 640px (1.0s)
+  ✓  41 [chromium] › tests/e2e/app.spec.ts:250:1 › mock scenarios cover retry cancellation and expiry (1.5s)
+  ✓  36 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › light B spine and controls fit 1000x620 with reduced motion (4.6s)
+Home default 640: min gap 14.0px, spread 0.0px
+  ✓  43 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at default 640px (1.1s)
+  ✓  44 [chromium] › tests/e2e/app.spec.ts:276:1 › History retry cannot interrupt an active listening run (1.2s)
+Home large 640: min gap 14.0px, spread 0.0px
+  ✓  46 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at large 640px (947ms)
+Home small 760: min gap 14.0px, spread 0.0px
+  ✓  48 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at small 760px (944ms)
+  ✓  39 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 640x760 dark (6.5s)
+Home default 760: min gap 14.0px, spread 0.0px
+  ✓  49 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at default 760px (925ms)
+  ✓  47 [chromium] › tests/e2e/app.spec.ts:296:1 › onboarding records the shortcut with the shared recorder (BUS-47, BUS-219 card) (2.8s)
+  ✓  45 [chromium] › tests/e2e/guided-onboarding.spec.ts:7:3 › light B spine and controls fit 1440x620 with reduced motion (4.4s)
+  ✓  52 [chromium] › tests/e2e/hud.spec.ts:12:1 › HUD result pills fit the 248px result window (405ms)
+Home large 760: min gap 14.0px, spread 0.0px
+  ✓  51 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at large 760px (972ms)
+  ✓  53 [chromium] › tests/e2e/guided-onboarding.spec.ts:52:3 › dark welcome shows no voice-pack error before setup starts and no Skip setup (648ms)
+  ✓  54 [chromium] › tests/e2e/hudAurora.spec.ts:62:1 › Aurora is a flowing decorative rim and soft reactive halo around the original capsule (869ms)
+Home small 1280: min gap 14.0px, spread 0.0px
+  ✓  55 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at small 1280px (987ms)
+  ✓  57 [chromium] › tests/e2e/hudAurora.spec.ts:98:1 › Aurora immediately stops new animations and transitions when Reduce Motion changes live (692ms)
+  ✓  56 [chromium] › tests/e2e/guided-onboarding.spec.ts:62:3 › dark finish step with the voice pack missing shows one in-place alert without scrolling at 640x620 (1.1s)
+Home default 1280: min gap 14.0px, spread 0.0px
+  ✓  58 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at default 1280px (956ms)
+  ✓  60 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › dark finish step fits 1120x760 ready (1.0s)
+  ✓  59 [chromium] › tests/e2e/hudAurora.spec.ts:118:3 › Aurora preserves processing continuity and unmounts for every result while the existing live region remains (MacIntel) (1.3s)
+Home large 1280: min gap 14.0px, spread 0.0px
+  ✓  61 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at large 1280px (911ms)
+  ✓  62 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › dark finish step fits 1120x760 not ready (1.1s)
+Home small 1440: min gap 14.0px, spread 0.0px
+  ✓  64 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at small 1440px (925ms)
+  ✓  63 [chromium] › tests/e2e/hudAurora.spec.ts:118:3 › Aurora preserves processing continuity and unmounts for every result while the existing live region remains (Linux x86_64) (1.4s)
+  ✓  67 [chromium] › tests/e2e/hudReducedMotion.spec.ts:11:1 › HUD under prefers-reduced-motion: breathe only on transcribing, none on processing waveform (369ms)
+Home default 1440: min gap 14.0px, spread 0.0px
+  ✓  68 [chromium] › tests/e2e/hudReducedMotion.spec.ts:35:1 › Reduce Motion does not introduce transitions on HUD document style changes (347ms)
+  ✓  66 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at default 1440px (1.0s)
+  ✓  65 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › dark finish step fits 640x620 ready (1.2s)
+  ✓  69 [chromium] › tests/e2e/hudReducedMotion.spec.ts:51:1 › HUD still pulses with motion allowed (320ms)
+  ✓  50 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1120x620 light (6.5s)
+Home large 1440: min gap 14.0px, spread 0.0px
+  ✓  70 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at large 1440px (1.0s)
+  ✓  71 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › dark finish step fits 640x620 not ready (1.1s)
+  ✓  72 [chromium] › tests/e2e/whisperTurbo.spec.ts:4:3 › mock-backed browser offers explicit English-first Turbo at 1120px (1.3s)
+  ✓  75 [chromium] › tests/e2e/guided-onboarding.spec.ts:52:3 › light welcome shows no voice-pack error before setup starts and no Skip setup (639ms)
+Home small 1920: min gap 14.0px, spread 0.0px
+  ✓  74 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at small 1920px (985ms)
+  ✓  76 [chromium] › tests/e2e/whisperTurbo.spec.ts:4:3 › mock-backed browser offers explicit English-first Turbo at 640px (1.3s)
+Home default 1920: min gap 14.0px, spread 0.0px
+  ✓  77 [chromium] › tests/e2e/guided-onboarding.spec.ts:62:3 › light finish step with the voice pack missing shows one in-place alert without scrolling at 640x620 (1.3s)
+  ✓  78 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at default 1920px (1.1s)
+Home large 1920: min gap 14.0px, spread 0.0px
+  ✓  80 [chromium] › tests/e2e/history-timestamp.spec.ts:16:7 › Home timestamp gap + alignment at large 1920px (872ms)
+  ✓  79 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › light finish step fits 1120x760 ready (951ms)
+  ✓  81 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › light finish step fits 1120x760 not ready (926ms)
+  ✓  82 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › light finish step fits 640x620 ready (955ms)
+  ✓  73 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1120x620 dark (6.1s)
+  ✓  83 [chromium] › tests/e2e/guided-onboarding.spec.ts:78:5 › light finish step fits 640x620 not ready (944ms)
+  ✓  84 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1120x760 light (5.6s)
+  ✓  85 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1120x760 dark (5.7s)
+  ✓  86 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1600x900 light (5.5s)
+  ✓  87 [chromium] › tests/e2e/dictionary-list.spec.ts:95:5 › bounded footer with unbounded valid spellings at 1600x900 dark (6.2s)
+  ✓  88 [chromium] › tests/e2e/dictionary-list.spec.ts:146:3 › dense list keeps its range and border on screen at 640px (5.6s)
+  ✓  89 [chromium] › tests/e2e/dictionary-list.spec.ts:146:3 › dense list keeps its range and border on screen at 1120px (5.8s)
+  ✓  90 [chromium] › tests/e2e/dictionary-list.spec.ts:146:3 › dense list keeps its range and border on screen at 1600px (5.4s)
+  ✓  91 [chromium] › tests/e2e/dictionary-list.spec.ts:197:3 › long spellings wrap clear of aligned actions at 640px (885ms)
+  ✓  92 [chromium] › tests/e2e/dictionary-list.spec.ts:197:3 › long spellings wrap clear of aligned actions at 1120px (862ms)
+  ✓  93 [chromium] › tests/e2e/dictionary-list.spec.ts:197:3 › long spellings wrap clear of aligned actions at 1600px (867ms)
+  ✓  94 [chromium] › tests/e2e/dictionary-list.spec.ts:221:3 › coarse pointer › keeps both persistent actions at least 44px (914ms)
+  ✓  95 [chromium] › tests/e2e/dictionary-list.spec.ts:238:1 › row actions are persistent pointer targets and direct keyboard stops (1.4s)
+{"geometry":[{"height":44,"width":418,"word":"JSON","x":203,"y":251.578125},{"height":44,"width":418,"word":"Postgres","x":203,"y":295.578125},{"height":44,"width":418,"word":"TanStack Query","x":203,"y":339.578125},{"height":44,"width":418,"word":"TypeScript","x":203,"y":383.578125}],"viewport":640}
+  ✓  96 [chromium] › tests/e2e/dictionary-list.spec.ts:287:3 › single alphabetical column at 640px (881ms)
+{"geometry":[{"height":44,"width":810,"word":"JSON","x":277,"y":229.828125},{"height":44,"width":810,"word":"Postgres","x":277,"y":273.828125},{"height":44,"width":810,"word":"TanStack Query","x":277,"y":317.828125},{"height":44,"width":810,"word":"TypeScript","x":277,"y":361.828125}],"viewport":1120}
+  ✓  97 [chromium] › tests/e2e/dictionary-list.spec.ts:287:3 › single alphabetical column at 1120px (820ms)
+{"geometry":[{"height":44,"width":1070,"word":"JSON","x":394,"y":236.5625},{"height":44,"width":1070,"word":"Postgres","x":394,"y":280.5625},{"height":44,"width":1070,"word":"TanStack Query","x":394,"y":324.5625},{"height":44,"width":1070,"word":"TypeScript","x":394,"y":368.5625}],"viewport":1600}
+  ✓  98 [chromium] › tests/e2e/dictionary-list.spec.ts:287:3 › single alphabetical column at 1600px (828ms)
+
+  98 passed (1.5m)
