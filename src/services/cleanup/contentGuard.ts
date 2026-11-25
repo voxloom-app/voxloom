@@ -1,6 +1,6 @@
 import { dictionarySpellings, findSpan } from './dictionarySpans';
 import { NEGATION, PRONOUNS } from './guardedWords';
-import { tokenize, type Token } from './tokens';
+import { FILLERS, tokenize, type Token } from './tokens';
 
 // Conservative lexical checks, not a semantic-equivalence guarantee.
 // Require all normalized content, in order, at every length. Discount only
@@ -39,9 +39,10 @@ export function contentWords(
   text: string,
   dictionary: readonly string[],
   repair = false,
+  fillers: ReadonlySet<string> = FILLERS,
 ): SourceWord[] {
   const normalized = text.normalize('NFC');
-  const tokens = tokenize(normalized);
+  const tokens = tokenize(normalized, fillers);
   const spellings = dictionarySpellings(dictionary);
   const canonical: SourceWord[] = [];
   for (let i = 0; i < tokens.length; i++) {
@@ -75,8 +76,9 @@ export function anchorCounts(
   text: string,
   offsets: readonly number[],
   dictionary: readonly string[],
+  fillers: ReadonlySet<string> = FILLERS,
 ): number[] {
-  const ends = contentWords(text, dictionary)
+  const ends = contentWords(text, dictionary, false, fillers)
     .filter(({ skippable }) => !skippable).map(({ end }) => end);
   let count = 0;
   return offsets.map((offset) => {
@@ -89,6 +91,7 @@ export function preservesContent(
   raw: string,
   candidate: string,
   dictionary: readonly string[],
+  fillers: ReadonlySet<string> = FILLERS,
 ): boolean {
   const rawWords = words(raw);
   const candidateWords = words(candidate);
@@ -101,19 +104,21 @@ export function preservesContent(
   // Only an explicit, single-word source correction may remove content.
   // Never discount invented corrections in the candidate. Technical values
   // and negation remain independently protected, even across corrections.
-  const correctedRaw = raw.replace(
-    /\b([\p{L}]+),\s*(?:sorry|correction),\s*([\p{L}]+)\b/giu,
-    '$2',
-  );
+  const correctedRaw = applySourceCorrection(raw);
   // Every candidate word, fillers included, must map onto the source.
   const normalized = candidate.normalize('NFC');
-  const output = contentWords(candidate, dictionary).map(({ end, start, word }) => ({
+  const output = contentWords(candidate, dictionary, false, fillers).map(({ end, start, word }) => ({
     surface: normalized.slice(start, end), word,
   }));
   if (!output.length) return sameMultiset(rawWords, candidateWords);
-  return coveredInOrder(contentWords(raw, dictionary, true), output)
+  return coveredInOrder(contentWords(raw, dictionary, true, fillers), output)
     || (correctedRaw !== raw
-      && coveredInOrder(contentWords(correctedRaw, dictionary, true), output));
+      && coveredInOrder(contentWords(correctedRaw, dictionary, true, fillers), output));
+}
+
+/** The source with one explicit single-word correction applied: `Tuesday, sorry, Wednesday` → `Wednesday`. */
+export function applySourceCorrection(raw: string): string {
+  return raw.replace(/\b([\p{L}]+),\s*(?:sorry|correction),\s*([\p{L}]+)\b/giu, '$2');
 }
 
 interface OutputWord {

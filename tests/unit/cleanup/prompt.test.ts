@@ -24,7 +24,8 @@ describe('cleanup prompt', () => {
     });
     expect(prompt).toContain('Copyedit only the transcript string');
     expect(prompt).toContain('Fix capitalization and punctuation.');
-    expect(prompt).toContain('Remove hesitation fillers');
+    // BUS-229: filler handling is per style, not in the shared base.
+    expect(prompt).not.toContain('Remove hesitation fillers');
     expect(prompt).toContain('canonicalSpellings are words the speaker uses.');
     expect(prompt).toContain('mishear');
     expect(prompt).toContain('two or three adjacent words');

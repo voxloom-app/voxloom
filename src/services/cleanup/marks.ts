@@ -1,5 +1,5 @@
 import { anchorCounts, contentWords, type SourceWord } from './contentGuard';
-import { scanQuotes, utf16Offsets } from './tokens';
+import { FILLERS, scanQuotes, utf16Offsets } from './tokens';
 
 // Sentence punctuation cleanup may add, drop or change; sentence-final `!`
 // and `！` share a budget.
@@ -49,10 +49,11 @@ function attachments(
   characters: readonly string[],
   dictionary: readonly string[],
   repair: boolean,
+  fillers: ReadonlySet<string>,
 ) {
   const ending = new Map<number, SourceWord>();
   const starting = new Map<number, SourceWord>();
-  for (const word of contentWords(normalized, dictionary, repair)) {
+  for (const word of contentWords(normalized, dictionary, repair, fillers)) {
     ending.set(word.end, word);
     if (!starting.has(word.start)) starting.set(word.start, word);
     // A mark inside a repaired run (box-loom) touches the spoken words, which
@@ -91,6 +92,7 @@ function markSequence(
   text: string,
   dictionary: readonly string[],
   repair: boolean,
+  fillers: ReadonlySet<string>,
 ): [Mark[], number] {
   const normalized = text.normalize('NFC');
   const characters = Array.from(normalized);
@@ -113,9 +115,9 @@ function markSequence(
   });
   const offsets = utf16Offsets(characters);
   const anchors = anchorCounts(
-    normalized, indices.map((index) => offsets[index]), dictionary,
+    normalized, indices.map((index) => offsets[index]), dictionary, fillers,
   );
-  const attached = attachments(normalized, characters, dictionary, repair);
+  const attached = attachments(normalized, characters, dictionary, repair, fillers);
   return [symbols.map((symbol, at) => [
     symbol, anchors[at], ...attached(indices[at]),
   ]), bangs];
@@ -133,9 +135,10 @@ export function preservesMarks(
   raw: string,
   candidate: string,
   dictionary: readonly string[],
+  fillers: ReadonlySet<string> = FILLERS,
 ): boolean {
-  const [rawMarks, rawBangs] = markSequence(raw, dictionary, true);
-  const [candidateMarks, candidateBangs] = markSequence(candidate, dictionary, false);
+  const [rawMarks, rawBangs] = markSequence(raw, dictionary, true, fillers);
+  const [candidateMarks, candidateBangs] = markSequence(candidate, dictionary, false, fillers);
   return rawMarks.length === candidateMarks.length
     && rawMarks.every(([symbol, anchor, before, after], at) => {
       const [outSymbol, outAnchor, outBefore, outAfter] = candidateMarks[at];

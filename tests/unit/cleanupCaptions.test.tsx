@@ -50,15 +50,19 @@ async function renderBoth(models: CleanupModelStore, settings?: Partial<Settings
 }
 
 const settingsHelp = () => screen.queryByText('Used by local cleanup');
+const settingsHelpOff = () => screen.queryByText('Styles apply only when local cleanup is on.');
 const styleControl = () => screen.getByRole('radiogroup', { name: /^Style preference/ });
+const homePicker = () => screen.queryByRole('radiogroup', { name: 'Current writing style' });
+const OFF_NOTE = 'Styles need local cleanup, which is off.';
 
 describe('writing-style captions, production build', () => {
   afterEach(() => { vi.unstubAllEnvs(); });
 
-  it('without a worker: old Home caption, no Settings cleanup caption, no block', async () => {
+  it('without a worker: no Home picker (BUS-229), no Settings cleanup caption, no block', async () => {
     vi.stubEnv('DEV', false);
     await renderBoth(store(status(false)));
-    expect(screen.getByText('Style preference · cleanup not available yet')).toBeInTheDocument();
+    expect(homePicker()).not.toBeInTheDocument();
+    expect(screen.queryByText(/Writing style ·/)).not.toBeInTheDocument();
     expect(screen.queryByText(/local cleanup/)).not.toBeInTheDocument();
     expect(settingsHelp()).not.toBeInTheDocument();
     expect(styleControl()).toHaveAccessibleName('Style preference');
@@ -69,16 +73,22 @@ describe('writing-style captions, production build', () => {
     vi.stubEnv('DEV', false);
     const failing: CleanupModelStore = { status: vi.fn().mockRejectedValue(new Error('denied')) };
     await renderBoth(failing);
-    expect(screen.getByText('Style preference · cleanup not available yet')).toBeInTheDocument();
+    expect(homePicker()).not.toBeInTheDocument();
     expect(settingsHelp()).not.toBeInTheDocument();
+    expect(settingsHelpOff()).not.toBeInTheDocument();
   });
 
-  it('with a worker: new wording on both, and the block', async () => {
+  it('with a worker, cleanup off: disabled Home picker with its note; Settings stays live', async () => {
     vi.stubEnv('DEV', false);
     await renderBoth(store(status(true)));
-    expect(screen.getByText('Style preference · local cleanup is off')).toBeInTheDocument();
-    expect(settingsHelp()).toBeInTheDocument();
-    expect(styleControl()).toHaveAccessibleName('Style preference · used by local cleanup');
+    // Home caption (the Capture row has its own "Writing style" label).
+    expect(screen.getByText('Writing style', { selector: '.fine' })).toBeInTheDocument();
+    expect(screen.getByText(OFF_NOTE)).toBeInTheDocument();
+    expect(homePicker()).toHaveAttribute('aria-disabled', 'true');
+    expect(settingsHelpOff()).toBeInTheDocument();
+    expect(settingsHelp()).not.toBeInTheDocument();
+    expect(styleControl()).toHaveAccessibleName('Style preference · applies only when local cleanup is on');
+    expect(styleControl()).not.toHaveAttribute('aria-disabled');
     expect(screen.getByText('Local cleanup')).toBeInTheDocument();
   });
 
@@ -86,7 +96,9 @@ describe('writing-style captions, production build', () => {
     vi.stubEnv('DEV', false);
     await renderBoth(store(status(false)), activeSettings);
     expect(screen.getByText('Writing style · local cleanup on')).toBeInTheDocument();
+    expect(homePicker()).not.toHaveAttribute('aria-disabled');
     expect(settingsHelp()).toBeInTheDocument();
+    expect(styleControl()).toHaveAccessibleName('Style preference · used by local cleanup');
     expect(screen.getByText('Local cleanup')).toBeInTheDocument();
   });
 });
@@ -95,8 +107,10 @@ describe('writing-style captions, dev build', () => {
   it('without a worker: new wording on both, and the block with its note', async () => {
     expect(import.meta.env.DEV).toBe(true);
     await renderBoth(store(status(false)));
-    expect(screen.getByText('Style preference · local cleanup is off')).toBeInTheDocument();
-    expect(settingsHelp()).toBeInTheDocument();
+    expect(screen.getByText(OFF_NOTE)).toBeInTheDocument();
+    expect(homePicker()).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('button', { name: 'Turn on local cleanup' })).not.toBeInTheDocument();
+    expect(settingsHelpOff()).toBeInTheDocument();
     expect(screen.getByText(/doesn't include the cleanup worker yet/)).toBeInTheDocument();
   });
 });
@@ -112,7 +126,7 @@ describe('one cleanup model status read per window', () => {
   it('Home and Capture share one result; remounting Home reads nothing new', async () => {
     const models = store(status(true));
     const first = renderWithApp(<HomeHero cleanupModelStore={models} isNative />);
-    await waitFor(() => expect(screen.getByText('Style preference · local cleanup is off')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(OFF_NOTE)).toBeInTheDocument());
     first.unmount();
     // Back to Home (as after History or Dictionary), then Settings → Capture.
     renderWithApp(<>
@@ -134,7 +148,7 @@ describe('one cleanup model status read per window', () => {
       <CaptureTab cleanupModelStore={models} onSetup={vi.fn()} />
     </>);
     await user.click(await screen.findByRole('button', { name: 'Check again' }));
-    await waitFor(() => expect(screen.getByText('Style preference · cleanup not available yet')).toBeInTheDocument());
+    await waitFor(() => expect(homePicker()).not.toBeInTheDocument());
     expect(models.status).toHaveBeenCalledTimes(2);
     expect(screen.queryByText('Local cleanup')).not.toBeInTheDocument();
   });

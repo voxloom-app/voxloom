@@ -18,7 +18,7 @@ the app you're using, without sending your audio to a cloud transcription servic
 - Transcribe on your Mac with Whisper, or optional Parakeet models on supported Macs.
 - Insert text into other apps, with clipboard recovery when safe insertion isn't available.
 - Keep names and specialist terms in a personal word dictionary.
-- Optionally clean up punctuation and filler words with an on-device model.
+- Optionally clean up capitalization and punctuation with an on-device model. Formal also drops filler words; other styles can keep them.
 - Review past transcripts in History and choose how long to keep them.
 
 Voxloom is in active development. macOS is the supported release platform;

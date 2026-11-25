@@ -5,14 +5,14 @@ import type { CleanupProvenance, Settings } from './types';
  * cleanup service and skipped dogfood rows share it so one build never
  * writes two versions for the same prompt.
  */
-export const CLEANUP_PROMPT_VERSION = 'cleanup-v3';
+export const CLEANUP_PROMPT_VERSION = 'cleanup-v5';
 
 /**
- * With no dictionary words the prompt text is byte-identical to cleanup-v2's
- * (BUS-188), so a row for such a run records that version. Only the prompt
- * sent for a non-empty dictionary is cleanup-v3.
+ * The prompt built with no dictionary words. BUS-188 kept it byte-identical
+ * to cleanup-v2 (and cleanup-v3 for some words); BUS-229's per-style rules
+ * changed both, so they are cleanup-v4 (no words) and cleanup-v5 (some).
  */
-export const CLEANUP_PROMPT_VERSION_NO_DICTIONARY = 'cleanup-v2';
+export const CLEANUP_PROMPT_VERSION_NO_DICTIONARY = 'cleanup-v4';
 
 /** The version of the prompt text built for these (already snapshotted) words. */
 export function cleanupPromptVersion(dictionary: readonly string[]): string {

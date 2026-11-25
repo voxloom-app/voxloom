@@ -143,3 +143,16 @@ describe('validateCleanupOutput', () => {
     )).toBeNull();
   });
 });
+
+describe('inline code spans (BUS-188 keep-25)', () => {
+  const styles = [undefined, 'very-casual', 'casual', 'formal'] as const;
+
+  it.each(styles)('rejects a repair inside backticks (style %s)', (style) => {
+    expect(validateCleanupOutput('Run `vox loom` now.', 'Run `Voxloom` now.', ['Voxloom'], style)).toBeNull();
+  });
+
+  it.each(styles)('accepts the span byte for byte (style %s)', (style) => {
+    expect(validateCleanupOutput('Run `vox loom` now.', 'Run `vox loom` now.', ['Voxloom'], style))
+      .toBe('Run `vox loom` now.');
+  });
+});

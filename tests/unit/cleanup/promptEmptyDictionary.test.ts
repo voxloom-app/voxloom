@@ -1,7 +1,9 @@
 // @vitest-environment node
 // BUS-188 (Sophie's ruling): with no dictionary words the cleanup prompt is
-// byte-identical to main's (d2d4ee9, cleanup-v2), so people who do not use the
-// dictionary get no new text, and the version row says so.
+// main's (d2d4ee9, cleanup-v2), so the dictionary adds no text for people who
+// do not use it, and the version row says so. BUS-229 then changed exactly
+// three lines for every user (per-style rules, filler removal out of the
+// shared base): the prompt must equal main's with only those lines replaced.
 import { webcrypto } from 'node:crypto';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -10,7 +12,7 @@ import {
   CLEANUP_PROMPT_VERSION_NO_DICTIONARY,
   cleanupPromptVersion,
 } from '../../../src/domain/cleanup';
-import { buildCleanupPrompt } from '../../../src/services/cleanup/prompt';
+import { buildCleanupPrompt, styleInstruction } from '../../../src/services/cleanup/prompt';
 import { createCleanupProvenance } from '../../../src/services/cleanup/provenance';
 import { runCleanup } from '../../../src/services/cleanup/runCleanup';
 import type { WritingStyle } from '../../../src/domain/types';
@@ -21,20 +23,39 @@ import mainPrompts from '../../fixtures/cleanup-prompt-main-d2d4ee9-empty-dictio
 const PARAGRAPH = 'canonicalSpellings are words the speaker uses.';
 const MAIN_LINE = 'Use canonicalSpellings only to correct the spelling of existing words.';
 
+/** main's prompt with BUS-229's three lines swapped in, and nothing else. */
+function withStyleRules(prompt: string, style: WritingStyle): string {
+  const swaps: Record<string, string> = {
+    'Fix capitalization and punctuation. Remove hesitation fillers such as um and uh.':
+      'Fix capitalization and punctuation.',
+    'quotes, corrections, intent, and voice.': 'quotes, corrections, and core meaning.',
+    'Use polished, professional presentation.': styleInstruction(style),
+    'Use natural, conversational presentation.': styleInstruction(style),
+    'Preserve contractions and the speaker\'s informal voice.': styleInstruction(style),
+  };
+  let swapped = 0;
+  const lines = prompt.split('\n').map((line) => {
+    if (!(line in swaps)) return line;
+    swapped++;
+    return swaps[line];
+  });
+  expect(swapped).toBe(3);
+  return lines.join('\n');
+}
+
 beforeAll(() => {
   vi.stubGlobal('crypto', webcrypto);
 });
 
-describe('an empty dictionary gives main\'s prompt', () => {
+describe('an empty dictionary gives main\'s prompt plus BUS-229\'s style lines', () => {
   it('has the fixture from main', () => {
     expect(mainPrompts).toHaveLength(15);
   });
 
-  it.each(mainPrompts)('is byte-identical for $style: $rawText', (row) => {
-    const prompt = buildCleanupPrompt({
-      dictionary: [], rawText: row.rawText, style: row.style as WritingStyle,
-    });
-    expect(prompt).toBe(row.prompt);
+  it.each(mainPrompts)('is main\'s with only the style lines changed for $style: $rawText', (row) => {
+    const style = row.style as WritingStyle;
+    const prompt = buildCleanupPrompt({ dictionary: [], rawText: row.rawText, style });
+    expect(prompt).toBe(withStyleRules(row.prompt, style));
     expect(prompt).toContain(MAIN_LINE);
     expect(prompt).not.toContain(PARAGRAPH);
   });
@@ -68,22 +89,23 @@ describe('an empty dictionary gives main\'s prompt', () => {
         },
       });
     }
-    expect(sent).toEqual([row.prompt, row.prompt]);
+    const expected = withStyleRules(row.prompt, row.style as WritingStyle);
+    expect(sent).toEqual([expected, expected]);
   });
 });
 
 describe('the version names the prompt that was built', () => {
-  it('is main\'s for no words and v3 for some', () => {
-    expect(CLEANUP_PROMPT_VERSION_NO_DICTIONARY).toBe('cleanup-v2');
-    expect(CLEANUP_PROMPT_VERSION).toBe('cleanup-v3');
-    expect(cleanupPromptVersion([])).toBe('cleanup-v2');
-    expect(cleanupPromptVersion(['Voxloom'])).toBe('cleanup-v3');
+  it('is v4 for no words and v5 for some (BUS-229 bumped both)', () => {
+    expect(CLEANUP_PROMPT_VERSION_NO_DICTIONARY).toBe('cleanup-v4');
+    expect(CLEANUP_PROMPT_VERSION).toBe('cleanup-v5');
+    expect(cleanupPromptVersion([])).toBe('cleanup-v4');
+    expect(cleanupPromptVersion(['Voxloom'])).toBe('cleanup-v5');
   });
 
   it.each([
-    [[], 'cleanup-v2'],
-    [['', '  '], 'cleanup-v2'],
-    [['Voxloom'], 'cleanup-v3'],
+    [[], 'cleanup-v4'],
+    [['', '  '], 'cleanup-v4'],
+    [['Voxloom'], 'cleanup-v5'],
   ])('is recorded for dictionary %j as %s', async (dictionary, version) => {
     const provenance = await createCleanupProvenance({
       dictionary, enabled: true, modelId: 'qwen3-0.6b-q4-k-m', style: 'casual',
