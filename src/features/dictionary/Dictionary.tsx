@@ -51,42 +51,44 @@ export function Dictionary() {
         </div>
         <SpellingProof sample={sample} words={state.words} />
       </header>
-      <div className="history-tools">
-        <SearchField label="Search dictionary" onChange={setQuery} placeholder="Search words" value={query} />
-        <span aria-live="polite" className="fine">
-          {query ? `${words.length} of ${count(state.words.length)}` : count(state.words.length)}
-        </span>
-      </div>
-      <div className="dictionary-list-head">
-        <span>
-          Canonical spelling
-          <span className="dictionary-list-sort">A–Z <span aria-hidden="true">↓</span></span>
-        </span>
-        <span className="dictionary-list-from">Restored from</span>
-      </div>
-      <div aria-label={words.length ? 'Dictionary words, alphabetical' : undefined} className="term-grid" role={words.length ? 'list' : undefined}>
-        {words.map((word) => (
-          <div className="term-row" key={word} role="listitem">
-            <strong>{word}</strong>
-            <TermForms forms={forms.get(word) ?? []} />
-            <div className="action-group term-row__actions">
-              <IconButton icon="edit" label={`Edit ${word}`} onClick={(event) => edit(word, event.currentTarget)} />
-              <IconButton icon="trash" label={`Delete ${word}`} onClick={() => dictionary.delete(word)} tone="danger" />
+      <div className="cloth">
+        <div className="history-tools">
+          <SearchField label="Search dictionary" onChange={setQuery} placeholder="Search words" value={query} />
+          <span aria-live="polite" className="fine">
+            {query ? `${words.length} of ${count(state.words.length)}` : count(state.words.length)}
+          </span>
+        </div>
+        <div className="dictionary-list-head">
+          <span>
+            Canonical spelling
+            <span className="dictionary-list-sort">A–Z <span aria-hidden="true">↓</span></span>
+          </span>
+          <span className="dictionary-list-from">Restored from</span>
+        </div>
+        <div aria-label={words.length ? 'Dictionary words, alphabetical' : undefined} className="term-grid" role={words.length ? 'list' : undefined}>
+          {words.map((word) => (
+            <div className="term-row" key={word} role="listitem">
+              <strong>{word}</strong>
+              <TermForms forms={forms.get(word) ?? []} />
+              <div className="action-group term-row__actions">
+                <IconButton icon="edit" label={`Edit ${word}`} onClick={(event) => edit(word, event.currentTarget)} />
+                <IconButton icon="trash" label={`Delete ${word}`} onClick={() => dictionary.delete(word)} tone="danger" />
+              </div>
             </div>
+          ))}
+          {!words.length && (
+            <EmptyState icon="book" title={query ? 'No words found.' : 'No words yet'}>
+              {query ? 'Try another search.' : 'Add names and terms you use often.'}
+            </EmptyState>
+          )}
+        </div>
+        {words.length > 0 && (
+          <div className="dictionary-list-foot">
+            <span>{words[0]} — {words[words.length - 1]}</span>
+            <span>Alphabetical order</span>
           </div>
-        ))}
-        {!words.length && (
-          <EmptyState icon="book" title={query ? 'No words found.' : 'No words yet'}>
-            {query ? 'Try another search.' : 'Add names and terms you use often.'}
-          </EmptyState>
         )}
       </div>
-      {words.length > 0 && (
-        <div className="dictionary-list-foot">
-          <span>{words[0]} — {words[words.length - 1]}</span>
-          <span>Alphabetical order</span>
-        </div>
-      )}
       {open && (
         <WordDialog
           editing={editing}

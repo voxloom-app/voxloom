@@ -43,7 +43,10 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
         <HomeHero cleanupModelStore={cleanupModelStore} isNative={isNative} />
         <DictateCard dogfood={dogfood} isNative={isNative} onCopy={(t) => { void copy(t); }} />
       </div>
-      <RecentCard onCopy={(t) => { void copy(t); }} />
+      {/* The cloth: what the loom has woven, on the window's one light sheet (frame.css). */}
+      <div className="cloth">
+        <RecentCard onCopy={(t) => { void copy(t); }} />
+      </div>
     </div>
   );
 }

@@ -149,54 +149,56 @@ export function History({ onToast }: HistoryProps) {
           </div>
         )}
       </header>
-      <div className="history-tools">
-        <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
-        <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />
-      </div>
-      <div
-        className="history-timeline"
-        onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActive(null);
-        }}
-        onFocus={(event) => track(event.target)}
-        onMouseLeave={() => setActive(null)}
-        onMouseOver={(event) => track(event.target)}
-      >
-        {groups.map((group) => {
-          const sum = tally(group.records);
-          return (
-            <div className="history-day" key={group.key}>
-              <div className="history-day__head">
-                <h2>{group.label}</h2>
-                <span>{plural(sum.dictations, 'dictation')} · {formatSpoken(sum.seconds)} spoken</span>
+      <div className="cloth">
+        <div className="history-tools">
+          <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
+          <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />
+        </div>
+        <div
+          className="history-timeline"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActive(null);
+          }}
+          onFocus={(event) => track(event.target)}
+          onMouseLeave={() => setActive(null)}
+          onMouseOver={(event) => track(event.target)}
+        >
+          {groups.map((group) => {
+            const sum = tally(group.records);
+            return (
+              <div className="history-day" key={group.key}>
+                <div className="history-day__head">
+                  <h2>{group.label}</h2>
+                  <span>{plural(sum.dictations, 'dictation')} · {formatSpoken(sum.seconds)} spoken</span>
+                </div>
+                <div className="history-list">
+                  {group.records.map((record) => (
+                    <HistoryRow
+                      canStart={canStartDictation(state.dictation)}
+                      currentTime={currentTime}
+                      isNative={isNative}
+                      key={record.id}
+                      onCopy={(text) => { void copy(text); }}
+                      onDelete={(id) => history.delete(id)}
+                      onRetry={retry}
+                      record={record}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="history-list">
-                {group.records.map((record) => (
-                  <HistoryRow
-                    canStart={canStartDictation(state.dictation)}
-                    currentTime={currentTime}
-                    isNative={isNative}
-                    key={record.id}
-                    onCopy={(text) => { void copy(text); }}
-                    onDelete={(id) => history.delete(id)}
-                    onRetry={retry}
-                    record={record}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-        {!state.records.length && (
-          <EmptyState icon="clock" title="No dictations yet">
-            Hold the shortcut in any app to dictate. Transcripts appear here.
-          </EmptyState>
-        )}
-        {state.records.length > 0 && !records.length && (
-          <EmptyState icon="search" title="No history matches these filters">
-            Clear the search or choose All.
-          </EmptyState>
-        )}
+            );
+          })}
+          {!state.records.length && (
+            <EmptyState icon="clock" title="No dictations yet">
+              Hold the shortcut in any app to dictate. Transcripts appear here.
+            </EmptyState>
+          )}
+          {state.records.length > 0 && !records.length && (
+            <EmptyState icon="search" title="No history matches these filters">
+              Clear the search or choose All.
+            </EmptyState>
+          )}
+        </div>
       </div>
     </section>
   );
