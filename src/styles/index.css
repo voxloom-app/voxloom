@@ -6,7 +6,9 @@
 @import "./ui-controls.css";
 @import "./ui-display.css";
 @import "./shell.css";
+@import "./primary-layered.css";
 @import "./home.css";
+@import "./home-actions.css";
 @import "./history.css";
 @import "./dictionary.css";
 @import "./settings.css";

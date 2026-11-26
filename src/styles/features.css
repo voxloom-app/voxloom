@@ -61,8 +61,8 @@
 
 .appearance-swatch[data-preview="light"] {
   --preview-accent: #376b00; /* light --accfg */
-  --preview-bg: #fbfbf8;
-  --preview-border: #b9bdb2; /* visible on the white card (designer) */
+  --preview-bg: #f7f9fb;
+  --preview-border: #b5bcc6; /* visible on the white card (designer) */
   --preview-surface: #ffffff;
 }
 
@@ -71,7 +71,7 @@
   --preview-accent: #b6ff3c;
   --preview-border: #8b8b99;
   --preview-surface: transparent; /* let the split background show */
-  background: linear-gradient(90deg, #fbfbf8 50%, #0b0b10 50%);
+  background: linear-gradient(90deg, #f7f9fb 50%, #0b0b10 50%);
 }
 
 .onboarding-actions {

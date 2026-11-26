@@ -28,7 +28,7 @@ describe('Console design tokens (UI PR 1)', () => {
   it('defines dark defaults and light overrides (Sodium Rain removed) on the theme attribute', () => {
     const tokens = css('tokens.css');
     expect(tokens).toMatch(/:root \{[^}]*--bg: #0b0b10;[^}]*--accfg: #b6ff3c;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--bg: #fbfbf8;[^}]*--accfg: #376b00;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--bg: #f7f9fb;[^}]*--accfg: #376b00;/);
     expect(tokens).not.toContain('sodium-rain');
   });
 
@@ -58,7 +58,7 @@ describe('Switch styling (UI PR 2)', () => {
     const tokens = css('tokens.css');
     // Per-theme literal values so each theme resolves its own track (no :root-only var() mixing).
     expect(tokens).toMatch(/:root \{[^}]*--switch-off: #66667a;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-off: #808389;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-off: #7a828e;/);
     // Designer: solid ON track in light only; dark keeps the brand gradient.
     expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--switch-on: #4c8a00;/);
     expect(tokens).not.toMatch(/:root \{[^}]*--switch-on:/);
@@ -83,7 +83,7 @@ describe('light --ok on its 10% badge tint (review #43)', () => {
     const light = readFileSync('src/styles/tokens.css', 'utf8').split('[data-appearance-resolved="light"]')[1];
     const ok = hex(/--ok: (#[0-9a-f]{6})/.exec(light)![1]);
     // field, bg, panel, seg, navon (selected row)
-    for (const surface of ['#f3f4ef', '#fbfbf8', '#ffffff', '#e7e9e1', '#e7eadf']) {
+    for (const surface of ['#f1f4f7', '#f7f9fb', '#ffffff', '#e4e8ee', '#e0efe5']) {
       const s = hex(surface);
       const tint = s.map((c, i) => Math.round(0.1 * ok[i] + 0.9 * c));
       expect(ratio(ok, tint)).toBeGreaterThanOrEqual(4.5);
@@ -101,7 +101,7 @@ describe('designer #37: focus ring, tag pill, disabled ON switch', () => {
     const { readFileSync } = await import('node:fs');
     const light = readFileSync('src/styles/tokens.css', 'utf8').split('[data-appearance-resolved="light"]')[1];
     const focus = /--focus: (#[0-9a-f]{6});/.exec(light)![1];
-    for (const surface of ['#fbfbf8', '#ffffff', '#f3f4ef', '#f2f3ee', '#e7e9e1']) {
+    for (const surface of ['#f7f9fb', '#ffffff', '#f1f4f7', '#eef1f5', '#e4e8ee']) {
       expect(ratio(focus, surface)).toBeGreaterThanOrEqual(3);
     }
     expect(readFileSync('src/styles/base.css', 'utf8')).toMatch(/outline: 3px solid var\(--focus\)/);
@@ -124,9 +124,11 @@ describe('Appearance swatches use Console tokens (designer #46)', () => {
     for (const sodium of ['#5f8fff', '#2f62a6', '#79b8c9', '#0b111b', '#162130', '#182127']) expect(css).not.toContain(sodium);
     const system = /\[data-preview="system"\] \{([^}]*)\}/.exec(css)![1];
     expect(system).toMatch(/--preview-accent: #b6ff3c/);
-    expect(system).toMatch(/background: linear-gradient\(90deg, #fbfbf8 50%, #0b0b10 50%\)/);
+    expect(system).toMatch(/background: linear-gradient\(90deg, #f7f9fb 50%, #0b0b10 50%\)/);
     expect(/\[data-preview="dark"\] \{([^}]*)\}/.exec(css)![1]).toMatch(/--preview-bg: #0b0b10/);
     expect(/\[data-preview="light"\] \{([^}]*)\}/.exec(css)![1]).toMatch(/--preview-accent: #376b00/);
+    expect(/\[data-preview="light"\] \{([^}]*)\}/.exec(css)![1]).toMatch(/--preview-bg: #f7f9fb;/);
+    expect(/\[data-preview="light"\] \{([^}]*)\}/.exec(css)![1]).toMatch(/--preview-border: #b5bcc6;/);
   });
 });
 
@@ -182,12 +184,12 @@ describe('BUS-48 contrast tokens', () => {
   const tokens = css('tokens.css');
   it('raises dark --mut and keeps light --mut', () => {
     expect(tokens).toMatch(/:root \{[^}]*--mut: #9494a3;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mut: #5d6068;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mut: #57606b;/);
   });
 
   it('defines per-theme --ctl-line and --sel-edge', () => {
     expect(tokens).toMatch(/:root \{[^}]*--ctl-line: #6a6a80;[^}]*--sel-edge: #70943a;/);
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--ctl-line: #808389;[^}]*--sel-edge: #376b00;/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--ctl-line: #7a828e;[^}]*--sel-edge: #376b00;/);
   });
 
   it('borders form controls and .btn with --ctl-line', () => {
