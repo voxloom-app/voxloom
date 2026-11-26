@@ -7,7 +7,7 @@ type Props = {
   onCopy: (text: string) => void;
 };
 
-/** The stage's deck: Start / Stop / Cancel, Transcribing…, status, last transcript (H2–H8). */
+/** Capture controls, status and manual recovery. */
 export function DictateCard({ dogfood, isNative, onCopy }: Props) {
   const recording = dogfood.phase === 'recording' || dogfood.captureState.kind === 'active';
   const busy = dogfood.phase === 'transcribing' || dogfood.phase === 'cleaning';
@@ -15,39 +15,36 @@ export function DictateCard({ dogfood, isNative, onCopy }: Props) {
   const transcript = dogfood.transcript?.text;
 
   return (
-    <section aria-labelledby="capture-title" className="card home-card home-card--dictate">
-      <div className="capline">
-        <div className="capline__lead">
-          <h2 id="capture-title">Dictate</h2>
-          <div className="action-group dogfood-capture-actions">
-            {!recording && !busy && (
-              <button className="btn primary big" disabled={!isNative} onClick={() => { void dogfood.start(); }} type="button">
-                <Icon name="mic" /> Start capture
-              </button>
-            )}
-            {recording && (
-              <>
-                <button className="btn primary big" onClick={() => { void dogfood.stop(); }} type="button">
-                  <span aria-hidden="true" className="rec-dot" /> Stop
-                </button>
-                <button className="quiet-button" onClick={() => dogfood.cancel()} type="button">Cancel</button>
-              </>
-            )}
-            {busy && (
-              <span className="empty-note" role="status">
-                {dogfood.phase === 'cleaning' ? 'Cleaning up…' : 'Transcribing…'}
-              </span>
-            )}
-          </div>
-        </div>
-        <p className="note">
-          Tip: hold the shortcut while another app is focused. Starting here
-          focuses Voxloom, so the result may be <b>Copied</b> instead of inserted.
-          Stop transcribes; Cancel discards without transcribing.
-        </p>
+    <section aria-labelledby="capture-title" className="home-capture">
+      <h2 className="sr-only" id="capture-title">Dictate</h2>
+      <div className="action-group dogfood-capture-actions">
+        {!recording && !busy && (
+          <button className="btn primary big" disabled={!isNative} onClick={() => { void dogfood.start(); }} type="button">
+            <Icon name="mic" /> Start capture
+          </button>
+        )}
+        {recording && (
+          <>
+            <button className="btn primary big" onClick={() => { void dogfood.stop(); }} type="button">
+              <span aria-hidden="true" className="rec-dot" /> Stop
+            </button>
+            <button className="quiet-button" onClick={() => dogfood.cancel()} type="button">Cancel</button>
+          </>
+        )}
+        {busy && (
+          <span className="empty-note" role="status">
+            {dogfood.phase === 'cleaning' ? 'Cleaning up…' : 'Transcribing…'}
+          </span>
+        )}
       </div>
+      {isNative && !recording && !busy && (
+        <p className="note">Starting here may copy your words. To type in another app, hold the shortcut there.</p>
+      )}
+      {recording && (
+        <p className="note">Stop transcribes. Cancel discards without transcribing.</p>
+      )}
       {!isNative && (
-        <p className="form-error" role="status">Native capture requires the Tauri shell (Mac smoke).</p>
+        <p className="note" role="status">Microphone capture is available in the desktop app.</p>
       )}
       {transcript && (
         <div aria-live="polite" className="dogfood-transcript">

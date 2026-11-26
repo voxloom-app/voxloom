@@ -23,7 +23,8 @@ describe('no active shortcut in the main window', () => {
 
   it('Home shows the shortcut while it is active', () => {
     renderWithApp(<HomeHero isNative />);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Hold .* to dictate$/);
+    expect(screen.getByRole('heading', { level: 1, name: 'Hold to dictate' })).toBeInTheDocument();
+    expect(screen.getByText('Control Shift Space')).toBeInTheDocument();
   });
 
   it('the sidebar says so too', () => {

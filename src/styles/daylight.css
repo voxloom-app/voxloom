@@ -91,7 +91,7 @@
 [data-appearance-resolved="light"] .sidebar[data-phase="processing"] .rail-key::before { background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, #3cf0ff 45%, transparent), transparent); }
 
 /* ---- Key caps by daylight: white caps on a warm shadow, like the keyboard under your hands ---- */
-[data-appearance-resolved="light"] :is(.stage .home-hero h1, .rail-key, .voice-path__value, .loom-line, .guided-shortcut, .guided-content > .key-combo, .shortcut-card__keys) .kbd {
+[data-appearance-resolved="light"] :is(.stage .home-hero__shortcut, .rail-key, .voice-path__value, .loom-line, .guided-shortcut, .guided-content > .key-combo, .shortcut-card__keys) .kbd {
   --cap-edge: #cbc3b3;
   background: linear-gradient(180deg, #ffffff, #f3f0ea);
   border-color: rgba(70, 56, 30, .16);
@@ -102,7 +102,7 @@
 [data-appearance-resolved="light"] .voice-path__value .kbd { box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 var(--cap-edge); }
 [data-appearance-resolved="light"] .voice-path__value[data-inactive] .kbd { color: var(--mut); }
 /* Pressed while you speak: the cap sinks and the lime light spills out around it. */
-[data-appearance-resolved="light"] .stage:is([data-phase="listening"], [data-phase="speaking"]) .home-hero h1 .kbd,
+[data-appearance-resolved="light"] .stage:is([data-phase="listening"], [data-phase="speaking"]) .home-hero__shortcut .kbd,
 [data-appearance-resolved="light"] .sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
   border-color: color-mix(in srgb, var(--brand-a) 70%, transparent);
   box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 var(--cap-edge), 0 0 24px -2px color-mix(in srgb, #b6ff3c 85%, transparent);

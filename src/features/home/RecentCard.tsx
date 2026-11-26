@@ -8,7 +8,7 @@ import { formatTime } from '../history/HistoryRow';
 type Props = {
   /** Up to five dictations before the last pick, newest first. */
   earlier: DictationRecord[];
-  /** Whether the stage shows a last pick (so an empty list is "nothing earlier", not "nothing"). */
+  /** Whether the sheet shows a latest dictation above the list. */
   hasWords: boolean;
   onCopy: (text: string) => void;
 };

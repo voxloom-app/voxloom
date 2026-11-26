@@ -1,0 +1,88 @@
+/* The voice controls work beside one continuous sheet of dictations. */
+.app .main > .home {
+  gap: var(--s-11);
+  padding: var(--s-9) calc(var(--gutter) - var(--frame)) var(--s-6);
+}
+
+.home > .home-voice.stage {
+  --voice-deck: #111218;
+  --voice-pad: var(--s-9);
+  background: var(--voice-deck);
+  border: 1px solid var(--line);
+  border-radius: var(--r-tile);
+  margin: 0;
+  min-width: 0;
+  padding: var(--voice-pad);
+}
+
+.home-voice .stage__mic {
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-label);
+  padding: 3px 9px;
+}
+
+.home-hero h1 {
+  font-size: calc(var(--fs-hero) * .72);
+  font-weight: 780;
+  letter-spacing: -.035em;
+  line-height: 1.15;
+  margin: var(--s-7) 0 var(--s-5);
+}
+
+.home-hero p {
+  color: var(--mut);
+  font-size: var(--fs-secondary);
+  margin: 0 0 var(--s-6);
+}
+
+.home-hero__shortcut {
+  align-items: center;
+  display: flex;
+  isolation: isolate;
+  justify-content: center;
+  margin: 0 calc(var(--voice-pad) * -1) var(--s-7);
+  min-height: 66px;
+  padding: var(--s-4) var(--voice-pad);
+  position: relative;
+}
+.home-hero__shortcut .key-combo__caps { flex-wrap: wrap; gap: 6px; justify-content: center; }
+.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: 6px var(--s-5); }
+.home-hero__style .seg { flex-wrap: wrap; }
+.home-hero__style .seg__item { padding-inline: 8px; }
+
+.home-capture { border-top: 1px solid var(--line); margin-top: var(--s-8); padding-top: var(--s-7); }
+.home-capture .dogfood-capture-actions { margin-top: 0; min-height: 42px; }
+.home-capture .form-error { margin: var(--s-5) 0 0; }
+.home-capture .status > svg { flex: none; }
+
+.stage__meta {
+  border-top: 1px solid var(--line);
+  color: var(--mut);
+  display: grid;
+  font-size: var(--fs-label);
+  gap: var(--s-3);
+  margin: var(--s-7) 0 0;
+  padding-top: var(--s-6);
+}
+.stage__meta > div { align-items: baseline; display: flex; flex-wrap: wrap; gap: 0 var(--s-5); justify-content: space-between; }
+.stage__meta dd { color: var(--fg); font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+
+.home > .home-paper.cloth {
+  --bg: #1c232a;
+  --sheet-pad: min(32px, max(14px, 2.4vw));
+  --focus: var(--accfg);
+  border-radius: 3px 3px 14px 14px;
+  margin: 0;
+  min-width: 0;
+  padding: var(--s-10) var(--sheet-pad) var(--s-10);
+}
+
+@media (min-width: 960px) {
+  .app .main > .home {
+    align-items: start;
+    align-content: start;
+    display: grid;
+    grid-template-columns: minmax(256px, 34%) minmax(0, 1fr);
+  }
+}

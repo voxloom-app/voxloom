@@ -6,15 +6,11 @@
 [data-appearance-resolved="light"] .stage::before { background: radial-gradient(42% 85% at 0% 45%, color-mix(in srgb, #b6ff3c 30%, transparent), transparent 70%); }
 [data-appearance-resolved="light"] .stage::after { background: radial-gradient(42% 85% at 100% 45%, color-mix(in srgb, #3cf0ff 26%, transparent), transparent 70%); }
 
-/* ---- Home: the voice stage and the last pick ---- */
-[data-appearance-resolved="light"] .stage .home-hero h1 { color: var(--fg); text-shadow: 0 0 10px var(--linen), 0 0 22px var(--linen), 0 0 34px var(--linen); }
+/* ---- Home: the voice panel and the transcript sheet ---- */
+[data-appearance-resolved="light"] .home > .home-voice.stage { --voice-deck: #f6f3eb; }
+[data-appearance-resolved="light"] .home > .home-paper.cloth { --bg: #fffdf6; }
 [data-appearance-resolved="light"] .loom__warp { opacity: .42; }
 [data-appearance-resolved="light"] .loom__pulse { opacity: .7; }
-[data-appearance-resolved="light"] .stage .home-card--dictate { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
-[data-appearance-resolved="light"] .stage .pick__words p { color: #121419; text-shadow: 0 0 18px var(--linen); }
-[data-appearance-resolved="light"] .pick__weft::before { opacity: .8; }
-[data-appearance-resolved="light"] .stage .pick__copy { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: 0 1px 2px rgba(70, 56, 30, .1); }
-[data-appearance-resolved="light"] .stage .pick__copy:hover { border-color: var(--sel-edge); color: var(--accfg); }
 
 /* ---- History: the woven day ---- */
 [data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1, .history-stage__tally dd) { color: var(--fg); }

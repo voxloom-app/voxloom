@@ -55,7 +55,10 @@ describe('Home voice stage', () => {
     expect(stage().querySelector('#home-title')).not.toBeNull();
     expect(stage().querySelector('#capture-title')).toHaveTextContent('Dictate');
     expect(stage().querySelector('.stage__mic')).toHaveTextContent('Mic off');
-    expect(stage().querySelector('.stage__meta')).toHaveTextContent('Model whisper-base.enOutput Insert, fall back to Copy');
+    const readout = stage().querySelector('.stage__meta')!;
+    expect([...readout.querySelectorAll('dt')].map((term) => term.textContent)).toEqual(['Model', 'Output']);
+    expect([...readout.querySelectorAll('dd')].map((detail) => detail.textContent))
+      .toEqual(['whisper-base.en', 'Insert, fall back to Copy']);
     // The recent list stays outside the stage.
     expect(stage().querySelector('.recent-list')).toBeNull();
   });
@@ -68,7 +71,8 @@ describe('Home voice stage', () => {
     expect(loom.querySelectorAll('.loom__side--in .loom__pulse')).toHaveLength(7);
     expect(loom.querySelectorAll('.loom__side--out .loom__pulse')).toHaveLength(7);
     expect(loom.querySelectorAll('.loom__warp')).toHaveLength(14);
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Hold .* to dictate$/);
+    expect(screen.getByRole('heading', { level: 1, name: 'Hold to dictate' })).toBeInTheDocument();
+    expect(screen.getByText('Control Shift Space')).toBeInTheDocument();
   });
 
   it('lights up while capturing and transcribing', () => {
@@ -93,7 +97,7 @@ describe('Home voice stage', () => {
 
   it('marks each earlier row with its delivery status for the spool knot', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
-    // The newest dictation is the stage's last pick; the spool holds the four before it.
+    // The spool holds the four before the latest dictation.
     const rows = [...document.querySelectorAll('.home .recent-row')];
     expect(rows).toHaveLength(4);
     for (const row of rows) {

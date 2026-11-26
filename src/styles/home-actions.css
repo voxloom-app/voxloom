@@ -1,5 +1,4 @@
-/* V3 "Layered" Home actions (Start capture / Stop, Copy, chips, links). They all sit on the
-   dark voice stage (stage.css) in both themes, so they use the tight, attached dark shadows. */
+/* V3 "Layered" Home actions on the voice panel. Daylight provides warm shadows. */
 
 /* Start capture / Stop (.btn.primary.big, DictateCard only) */
 .btn.primary.big {

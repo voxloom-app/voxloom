@@ -1,22 +1,4 @@
-/* Home (UI PR 3): hero, dictate card, recent dictations. The hero and the
-   Dictate card live inside the voice stage (stage.css), which sets their surface. */
-.home-hero { text-align: center; }
-
-.home-hero h1 {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  font-size: calc(var(--fs-hero) * 1.2);
-  font-weight: 850;
-  gap: 8px 14px;
-  justify-content: center;
-  letter-spacing: -.035em;
-  margin: 0;
-}
-
-.home-hero h1 .kbd { font-size: var(--fs-emph); min-width: 30px; padding: 7px 8px; }
-.home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 auto var(--s-8); }
-.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: center; }
+/* Home's controls and earlier dictations. */
 
 .fine { color: var(--mut); font-size: var(--fs-secondary); }
 
@@ -24,11 +6,6 @@
 .home-card h2 { font-size: var(--fs-section); font-weight: 650; margin-bottom: var(--s-5); }
 .home-card .card__head { margin-bottom: var(--s-5); }
 .home-card .card__head h2 { margin: 0; }
-
-.capline { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-6) var(--s-10); }
-.capline__lead { align-items: center; display: flex; gap: var(--s-8); }
-.capline .dogfood-capture-actions { margin-top: 0; }
-.capline .note { flex: 1 1 22em; margin: 0; }
 
 .btn.primary {
   background: var(--brand);
@@ -46,24 +23,22 @@
 
 .note { color: var(--mut); font-size: var(--fs-secondary); margin: var(--s-6) 0 0; }
 
-.home-card .dogfood-transcript {
-  align-items: center;
+.home-capture .dogfood-transcript {
   background: var(--field);
   border: 0;
   border-radius: var(--r-tile);
-  display: flex;
-  gap: var(--s-6);
-  justify-content: space-between;
+  justify-items: start;
+  overflow-wrap: anywhere;
 }
 
-.home-card .dogfood-transcript p { margin: 2px 0; }
-.home-card .dogfood-transcript__label + p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); }
+.home-capture .dogfood-transcript p { margin: 2px 0; }
+.home-capture .dogfood-transcript__label + p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); }
 .status { align-items: center; display: flex; font-weight: 500; gap: 6px; margin: var(--s-5) 0 0; }
 .status:not(.form-error) { color: var(--ok); }
 
 .link-button { border: 0; color: var(--accfg); font-size: var(--fs-secondary); min-height: 0; padding: 2px 4px; }
 
-/* Earlier dictations: knots on one thread that runs down from the last pick on the stage.
+/* Earlier dictations: knots on one thread that runs down the transcript sheet.
    Each knot takes its delivery status colour; the badge still names it. */
 .home .recent-list { --spool-time: calc(var(--fs-mono) * 5.6); --knot-x: calc(var(--spool-time) + 19px); --knot-y: 50%; gap: 0; }
 /* Each row draws its piece of the thread, so it ends exactly at the first and last knots. */
@@ -106,7 +81,7 @@
 
 /* Narrow: time and words keep sharing a line (QA #59 gap and alignment); the status badge
    drops beneath the words, and the knot sits on their first line. */
-@media (max-width: 780px) {
+@media (max-width: 1199px) {
   .home .recent-list { --knot-y: 22px; }
   .home .recent-row {
     align-items: start;

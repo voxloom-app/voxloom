@@ -43,17 +43,9 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*color: var\(--seg-on-fg, var\(--fg\)\);/);
   });
 
-  it('marks the Dictate card with home-card--dictate', () => {
-    const src = readFileSync(join(root, 'features/home/DictateCard.tsx'), 'utf8');
-    expect(src).toContain('className="card home-card home-card--dictate"');
-    expect(src).not.toContain(':has(#capture-title)');
-  });
-
   it('scopes V3 Layered rules to Home actions, keeps ghost links, and stills motion', () => {
-    // ui-iter-01: Home actions sit on the dark stage in both themes: no light-only washes,
-    // one set of attached shadows, and the Dictate card is the stage's deck.
     expect(actions).not.toContain('[data-appearance-resolved=');
-    expect(css('stage.css')).toMatch(/\.stage \.home-card--dictate \{[^}]*border-top: 1px solid/);
+    expect(css('home-desk.css')).toMatch(/\.home-capture \{[^}]*border-top: 1px solid/);
     expect(actions).toMatch(/\.btn\.primary\.big:not\(:disabled\) \{[^}]*box-shadow:/);
     expect(actions).toContain('.btn.primary.big');
     expect(actions).toContain('.home .btn:not(.primary):not(.ghost)');
