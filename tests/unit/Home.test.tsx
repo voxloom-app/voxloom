@@ -31,7 +31,7 @@ describe('Home', () => {
     const user = userEvent.setup();
     const toast = vi.fn();
     renderWithApp(<Home dogfood={stubDogfood()} onToast={toast} />);
-    // The latest dictation and earlier entries have separate regions on the sheet.
+    // The newest dictation leads the stage; the cloth lists the ones before it.
     const earlier = screen.getByRole('region', { name: 'Earlier dictations' });
     expect(within(earlier).getAllByRole('button', { name: 'Copy dictation' }))
       .toHaveLength(4);
@@ -60,7 +60,7 @@ describe('Home', () => {
     renderWithApp(<Home dogfood={stubDogfood()} onToast={vi.fn()} />);
     expect(screen.getByRole('heading', { name: 'Dictate' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start capture' })).toBeDisabled();
-    expect(screen.getByText('Microphone capture is available in the desktop app.'))
+    expect(screen.getByText(/Native capture requires the Tauri shell/i))
       .toBeInTheDocument();
   });
 });

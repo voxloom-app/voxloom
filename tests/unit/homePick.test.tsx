@@ -35,22 +35,21 @@ function renderHome(toast = vi.fn()) {
 const pick = () => screen.getByRole('region', { name: 'Last dictation' });
 const earlier = () => screen.getByRole('region', { name: 'Earlier dictations' });
 
-describe('The transcript sheet', () => {
-  it('starts with the newest dictation and continues into earlier dictations', () => {
+describe('The last pick (ui-iter-09): your words take the stage', () => {
+  it('leads the voice stage with the newest dictation, after the shortcut heading', () => {
     renderHome();
     const stage = document.querySelector('.home .stage')!;
-    const sheet = document.querySelector('.home .cloth')!;
-    expect(stage).not.toContainElement(pick());
-    expect(sheet).toContainElement(pick());
-    expect(sheet).toContainElement(earlier());
+    expect(stage).toContainElement(pick());
     expect(within(pick()).getByRole('blockquote')).toHaveTextContent(NEWEST);
     expect(pick().querySelector('.badge')).toHaveAttribute('data-status', 'inserted');
     expect(pick()).toHaveAttribute('data-status', 'inserted');
     expect(pick().querySelector('.pick__meta')).toHaveTextContent(/· 9 words · 7s Copy$/);
     expect(pick().querySelector('time')).toHaveAttribute('dateTime', new Date(NOW - 3 * 60_000).toISOString());
-    expect(within(sheet as HTMLElement).getAllByRole('heading').map((h) => h.textContent))
-      .toEqual(['Last dictation', 'Earlier dictations']);
+    // The heading still opens the page; the pick follows it, and the lede steps aside.
+    const headings = screen.getAllByRole('heading').map((h) => h.textContent);
+    expect(headings.slice(0, 2)).toEqual([expect.stringMatching(/^Hold .* to dictate$/), 'Last dictation']);
     expect(document.querySelector('.home-hero__lede')).toBeNull();
+    expect(document.querySelector('.home-hero')).toHaveAttribute('data-words');
     // The weft and knot are decoration only.
     expect(pick().querySelector('.pick__weft')).toHaveAttribute('aria-hidden', 'true');
   });
@@ -62,7 +61,7 @@ describe('The transcript sheet', () => {
     expect(screen.getAllByText(NEWEST)).toHaveLength(1);
   });
 
-  it('copies the last dictation from the sheet', async () => {
+  it('copies the last dictation from the stage', async () => {
     const user = userEvent.setup();
     const toast = vi.fn();
     renderHome(toast);
@@ -129,15 +128,19 @@ describe('last pick and words-face styles', () => {
   const pickCss = css('home-pick.css');
   const reduced = pickCss.slice(pickCss.indexOf('@media (prefers-reduced-motion: reduce)'));
 
+  it('loads after the stage it sits on', () => {
+    expect(css('index.css')).toMatch(/@import "\.\/stage\.css";\n@import "\.\/home-pick\.css";/);
+  });
+
   it('drops the weave, the travelling light and the mask under reduced motion', () => {
-    expect(reduced).toContain('.pick__words[data-fresh] p { animation: none; -webkit-mask: none; mask: none; }');
+    expect(reduced).toContain('.stage .pick__words[data-fresh] p { animation: none; -webkit-mask: none; mask: none; }');
     expect(reduced).toMatch(/\.pick__weft\[data-fresh\]::before,\s*\.pick__weft\[data-fresh\] i \{ animation: none; \}/);
-    expect(reduced).toContain('.home-voice[data-phase] + .home-paper .pick__weft::after { animation: none; opacity: 0; }');
+    expect(reduced).toContain('.stage[data-phase] .pick__weft::after { animation: none; opacity: 0; }');
   });
 
   it('sets your words in a local system serif, with no bundled font files', () => {
     expect(css('tokens.css')).toContain('--font-words: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, ui-serif, serif;');
-    expect(pickCss).toMatch(/\.pick__words p \{[^}]*font-family: var\(--font-words\);/);
+    expect(pickCss).toMatch(/\.stage \.pick__words p \{[^}]*font-family: var\(--font-words\);/);
     expect(css('home.css')).toMatch(/\.home \.recent-row > p \{[^}]*font-family: var\(--font-words\);/);
     expect(css('history.css')).toMatch(/\.history-row \.history-row__text \{[^}]*font-family: var\(--font-words\);/);
     expect(css('dictionary.css')).toMatch(/\.dictionary \.term-row strong \{[^}]*font-family: var\(--font-words\);/);
@@ -146,7 +149,7 @@ describe('last pick and words-face styles', () => {
     expect(css('history.css')).toMatch(/\.history-row__original p \{[^}]*font-family: var\(--mono\);/);
   });
 
-  it('keeps text, outcome badges and the Copy border at AA on both transcript sheets', () => {
+  it('keeps the outcome badge at AA on the stage, even under the brightest glow', () => {
     const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
     const hex = (s: string) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
     const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
@@ -155,22 +158,16 @@ describe('last pick and words-face styles', () => {
       return (x + 0.05) / (y + 0.05);
     };
     const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
-    const tokens = css('tokens.css');
-    const light = tokens.indexOf('[data-appearance-resolved="light"]');
-    const token = (block: string, name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(block)![1];
-    for (const [sheet, palette] of [
-      ['home-desk.css', tokens.slice(0, light)],
-      ['daylight-pages.css', tokens.slice(light)],
-    ]) {
-      const surface = token(css(sheet).split('.home > .home-paper.cloth {')[1].split('}')[0], 'bg');
+    const stageCss = css('stage.css');
+    const block = stageCss.slice(stageCss.indexOf('.stage {'), stageCss.indexOf('}', stageCss.indexOf('.stage {')));
+    const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(block)![1];
+    const top = '#17171f';
+    for (const surface of [top, mix('#b6ff3c', top, 0.18), mix('#3cf0ff', top, 0.16)]) {
       for (const name of ['ok', 'info', 'warn']) {
-        const ink = token(palette, name);
-        expect(ratio(ink, mix(ink, surface, 0.1)), `${name} badge on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        const tint = mix(token(name), surface, 0.1);
+        expect(ratio(token(name), tint), `${name} badge on ${surface}`).toBeGreaterThanOrEqual(4.5);
       }
-      for (const name of ['fg', 'mut', 'accfg']) {
-        expect(ratio(token(palette, name), surface), `${name} on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      }
-      expect(ratio(token(palette, 'ctl-line'), surface)).toBeGreaterThanOrEqual(3);
+      expect(ratio('#f6f6f9', surface)).toBeGreaterThanOrEqual(7);
     }
   });
 });

@@ -1,127 +1,118 @@
-/* The newest words lead the transcript sheet. The perforated rule carries its
-   delivery knot and divides the latest dictation from the spool beneath it. */
-.pick { --pick-tone: var(--ok); margin-bottom: var(--s-8); }
+/* The last pick (ui-iter-09): one pass of the weft is one dictation. Home's voice stage leads
+   with your last dictation, set in the words face (--font-words) under the shortcut band, laid on a
+   weft thread and tied off with a knot in its delivery colour. Your words are set in that
+   serif across the app; everything Voxloom says stays in the interface sans. */
+
+/* With a pick to show, the shortcut band steps back to one compact line above them. */
+.stage .home-hero[data-words] .home-hero__title { padding-block: 26px 18px; }
+.stage .home-hero[data-words] h1 { font-size: calc(var(--fs-hero) * .74); font-weight: 780; gap: 6px 10px; letter-spacing: -.025em; }
+.stage .home-hero[data-words] h1 .key-combo__caps { gap: 6px; }
+.stage .home-hero[data-words] h1 .kbd { border-radius: 9px; font-size: calc(var(--fs-bigkey) * .8); height: calc(var(--bigkey) * .76); min-width: calc(var(--bigkey) * .76); padding: 0 11px; }
+
+.pick { --pick-tone: var(--ok); margin-bottom: var(--s-10); }
 .pick[data-status="copied"] { --pick-tone: var(--info); }
 .pick[data-status="unverified"] { --pick-tone: var(--warn); }
 
-.pick__label {
-  color: var(--mut);
-  font-family: var(--mono);
-  font-size: var(--fs-label);
-  font-weight: 650;
-  letter-spacing: .09em;
-  margin: 0 0 var(--s-8);
-  text-transform: uppercase;
-}
+.pick__label { color: var(--mut); font-size: var(--fs-label); font-weight: 600; letter-spacing: .04em; margin: 0 0 var(--s-5); }
 
 .pick__words { margin: 0; }
-.pick__words p {
-  color: var(--fg);
+.stage .pick__words p {
+  color: #f6f6f9;
   font-family: var(--font-words);
   font-size: calc(var(--fs-hero) * 1.12);
   font-weight: 400;
-  letter-spacing: -.025em;
-  line-height: 1.16;
-  margin: 0;
+  letter-spacing: -.012em;
+  line-height: 1.22;
+  margin: 0 auto;
+  max-width: 28em;
   overflow-wrap: anywhere;
-  padding-inline-start: .7em;
-  position: relative;
+  text-shadow: 0 0 18px #121219;
+  text-wrap: balance;
+  transition: opacity .45s ease;
 }
-.pick__words p::before {
-  color: var(--accfg);
-  content: "\201C";
-  content: "\201C" / "";
-  inset-inline-start: 0;
-  position: absolute;
-}
-.pick__words p::after { color: var(--info); content: "\201D"; content: "\201D" / ""; }
-.pick__words[data-measure="medium"] p { font-size: calc(var(--fs-hero) * .85); line-height: 1.28; }
-.pick__words[data-measure="long"] p {
+/* Curly quotes in the brand's voice-in and text-out colours; screen readers skip them. */
+.stage .pick__words p::before { color: var(--brand-a); content: "\201C"; content: "\201C" / ""; }
+.stage .pick__words p::after { color: var(--brand-b); content: "\201D"; content: "\201D" / ""; }
+.stage .pick__words[data-measure="medium"] p { font-size: calc(var(--fs-hero) * .8); line-height: 1.3; }
+.stage .pick__words[data-measure="long"] p {
   -webkit-box-orient: vertical;
   display: -webkit-box;
-  font-size: calc(var(--fs-hero) * .69);
+  font-size: calc(var(--fs-hero) * .62);
   -webkit-line-clamp: 4;
   line-clamp: 4;
   line-height: 1.36;
   overflow: hidden;
 }
 
-.pick__meta {
-  align-items: center;
-  color: var(--mut);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: var(--fs-secondary);
-  gap: 6px 12px;
-  margin: var(--s-8) 0 var(--s-9);
-}
-.pick__meta time { color: var(--fg); font-family: var(--mono); font-size: var(--fs-mono); }
-.home .pick__meta .btn.pick__copy {
-  background: var(--panel);
-  border-color: var(--ctl-line);
-  box-shadow: none;
-  color: var(--fg);
-  font-size: var(--fs-secondary);
-  font-weight: 600;
-  margin-inline-start: auto;
-  min-height: 32px;
-  padding: 4px 12px;
-}
-.home .pick__meta .btn.pick__copy:hover { background: color-mix(in srgb, var(--panel) 94%, var(--fg)); box-shadow: none; }
-
-.pick__weft {
-  display: block;
-  height: 12px;
-  margin-inline: calc(var(--sheet-pad) * -1);
-  overflow: hidden;
-  position: relative;
-}
+/* The weft: one lime-to-cyan pick across the stage, knotted where the words sit. */
+.pick__weft { display: block; height: 14px; margin: var(--s-8) calc(var(--stage-pad) * -1) var(--s-6); position: relative; }
 .pick__weft::before,
-.pick__weft::after { content: ""; height: 1px; inset-inline-start: 0; position: absolute; top: 6px; }
+.pick__weft::after { content: ""; height: 2px; left: 0; position: absolute; top: 6px; }
 .pick__weft::before {
-  background: repeating-linear-gradient(90deg, var(--ctl-line) 0 4px, transparent 4px 8px);
-  inset-inline-end: 0;
-  opacity: .63;
+  background: linear-gradient(90deg, transparent 4%, var(--brand-a) 30%, var(--brand-b) 70%, transparent 96%);
+  opacity: .6;
+  right: 0;
   transform-origin: left center;
+  transition: opacity .4s ease;
 }
 .pick__weft i {
   background: var(--pick-tone);
   border-radius: 50%;
-  box-shadow: 0 0 0 3px var(--bg);
-  height: 9px;
-  inset-inline-start: var(--sheet-pad);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--pick-tone) 22%, transparent), 0 0 18px color-mix(in srgb, var(--pick-tone) 45%, transparent);
+  height: 12px;
+  left: calc(50% - 6px);
   position: absolute;
-  top: 2px;
-  width: 9px;
+  top: 1px;
+  width: 12px;
 }
 
-/* The bright thread moves through the perforation while recording or processing.
-   The previous transcript stays legible while the next one is in flight. */
-.pick__weft::after { background: linear-gradient(90deg, transparent, var(--brand-a), transparent); opacity: 0; width: 28%; }
-.home-voice:is([data-phase="listening"], [data-phase="speaking"]) + .home-paper .pick__weft::after { animation: pick-travel 1.6s linear infinite; opacity: 1; }
-.home-voice[data-phase="processing"] + .home-paper .pick__weft::after { animation: pick-travel .9s linear infinite; background: linear-gradient(90deg, transparent, var(--brand-b), transparent); opacity: 1; }
-@keyframes pick-travel { from { transform: translateX(-100%); } to { transform: translateX(360%); } }
-
-/* Keep the weave-in from the voice stage when a new result reaches the sheet. */
-.pick__words[data-fresh] p {
-  animation: pick-weave .75s cubic-bezier(.3, .6, .2, 1) both;
-  -webkit-mask: linear-gradient(90deg, #000 45%, transparent 55%) 0 0 / 230% 100% no-repeat;
-  mask: linear-gradient(90deg, #000 45%, transparent 55%) 0 0 / 230% 100% no-repeat;
+.pick__meta { align-items: center; color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 6px 12px; justify-content: center; }
+.pick__meta time { color: var(--fg); font-family: var(--mono); font-size: var(--fs-mono); }
+.stage .pick__copy {
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r-pill);
+  color: var(--fg);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  min-height: 32px;
+  padding: 4px 14px;
 }
-.pick__weft[data-fresh]::before { animation: pick-lay .75s cubic-bezier(.3, .6, .2, 1) both; }
-.pick__weft[data-fresh] i { animation: pick-tie .35s .6s cubic-bezier(.3, 1.6, .5, 1) both; }
+.stage .pick__copy:hover { border-color: color-mix(in srgb, var(--brand-a) 60%, transparent); color: var(--brand-a); }
+
+/* While you dictate, the last words step back and a light travels the weft toward them:
+   lime while you speak, faster cyan while Voxloom transcribes. */
+.stage:is([data-phase="listening"], [data-phase="speaking"], [data-phase="processing"]) .pick__words p { opacity: .34; }
+.stage:is([data-phase="listening"], [data-phase="speaking"], [data-phase="processing"]) .pick__weft::before { opacity: 1; }
+.pick__weft::after { background: linear-gradient(90deg, transparent, var(--brand-a), transparent); opacity: 0; width: 18%; }
+.stage:is([data-phase="listening"], [data-phase="speaking"]) .pick__weft::after { animation: pick-travel 1.6s linear infinite; opacity: 1; }
+.stage[data-phase="processing"] .pick__weft::after { animation: pick-travel .9s linear infinite; background: linear-gradient(90deg, transparent, var(--brand-b), transparent); opacity: 1; }
+@keyframes pick-travel { from { transform: translateX(-100%); } to { transform: translateX(556%); } }
+
+/* A dictation that lands while Home is open is woven in: the words appear behind a sweep,
+   the weft is laid left to right, and the knot ties once the line is down. */
+.stage .pick__words[data-fresh] p {
+  animation: pick-weave 1.2s cubic-bezier(.3, .6, .2, 1) both;
+  -webkit-mask: linear-gradient(90deg, #000 45%, transparent 55%) 0 0 / 220% 100% no-repeat;
+  mask: linear-gradient(90deg, #000 45%, transparent 55%) 0 0 / 220% 100% no-repeat;
+}
+.pick__weft[data-fresh]::before { animation: pick-lay 1.2s cubic-bezier(.3, .6, .2, 1) both; }
+.pick__weft[data-fresh] i { animation: pick-tie .45s 1s cubic-bezier(.3, 1.6, .5, 1) both; }
 @keyframes pick-weave { from { -webkit-mask-position: 100% 0; mask-position: 100% 0; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
 @keyframes pick-lay { from { transform: scaleX(0); } }
 @keyframes pick-tie { from { transform: scale(0); } }
 
 @media (max-width: 780px) {
-  .pick__words p { font-size: calc(var(--fs-hero) * .92); }
-  .pick__words[data-measure="medium"] p { font-size: calc(var(--fs-hero) * .76); }
+  .stage .home-hero[data-words] .home-hero__title { padding-block: 22px 14px; }
+  .stage .pick__words p { font-size: calc(var(--fs-hero) * .84); }
+  .stage .pick__words[data-measure="medium"] p { font-size: calc(var(--fs-hero) * .66); }
+  .stage .pick__words[data-measure="long"] p { font-size: calc(var(--fs-hero) * .56); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pick__words[data-fresh] p { animation: none; -webkit-mask: none; mask: none; }
+  /* The words are simply there, and the weft only brightens while you dictate. */
+  .stage .pick__words[data-fresh] p { animation: none; -webkit-mask: none; mask: none; }
   .pick__weft[data-fresh]::before,
   .pick__weft[data-fresh] i { animation: none; }
-  .home-voice[data-phase] + .home-paper .pick__weft::after { animation: none; opacity: 0; }
+  .stage[data-phase] .pick__weft::after { animation: none; opacity: 0; }
 }

@@ -1,4 +1,6 @@
-/* Shared stage material and Home's phase-driven voice loom. */
+/* Home voice stage (ui-iter-01): the hero and the Dictate card become one dark instrument,
+   the same material as the app tile and the HUD, in both themes. VoiceLoom threads converge
+   on the shortcut keys (voice in, left) and fan out (text out, right); data-phase drives them. */
 .stage {
   /* Dark instrument tokens. The legacy aliases resolve where they are declared, so they are
      re-declared here too; otherwise children would inherit the light theme's values. */
@@ -70,15 +72,30 @@
 .stage[data-phase="processing"]::after { opacity: 1; }
 .stage[data-phase="processing"]::before { opacity: .3; }
 
+/* Readout: mic state on the left, model and output on the right. */
+.stage__readout { align-items: center; color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-label); gap: 6px 18px; justify-content: space-between; }
 .stage__mic { align-items: center; color: var(--fg); display: inline-flex; font-weight: 600; gap: 8px; }
 .stage__mic i { background: var(--ctl-line); border-radius: 50%; box-shadow: 0 0 0 3px rgba(255, 255, 255, .06); height: 8px; width: 8px; }
 .stage[data-phase="listening"] .stage__mic i,
 .stage[data-phase="speaking"] .stage__mic i { animation: rec-pulse 1s ease-in-out infinite alternate; background: #ff453a; box-shadow: 0 0 0 3px rgba(255, 69, 58, .25); }
 .stage[data-phase="processing"] .stage__mic i { animation: rec-pulse .5s ease-in-out infinite alternate; background: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent); }
+.stage__meta { display: inline-flex; flex-wrap: wrap; gap: 2px 16px; }
+.stage__meta b { color: var(--fg); font-weight: 600; }
+
+/* Title band: full stage width so the threads reach both edges. */
+.stage .home-hero__title { margin-inline: calc(var(--stage-pad) * -1); padding: 44px var(--stage-pad) 40px; position: relative; }
+.stage .home-hero__lede { margin-top: 0; }
+.stage .home-hero .hs-note { justify-content: center; }
+/* A halo the stage's colour carves the threads away from the letters. */
+.stage .home-hero h1 { color: #f6f6f9; text-shadow: 0 0 10px #121219, 0 0 22px #121219, 0 0 34px #121219; }
+.banner + .home { margin-top: var(--s-6); }
 
 .loom {
   height: 100%;
   inset: 0;
+  /* Dim (not hide) the threads where they pass behind the heading. */
+  -webkit-mask-image: linear-gradient(90deg, #000 12%, rgba(0, 0, 0, .35) 34%, rgba(0, 0, 0, .35) 66%, #000 88%);
+  mask-image: linear-gradient(90deg, #000 12%, rgba(0, 0, 0, .35) 34%, rgba(0, 0, 0, .35) 66%, #000 88%);
   pointer-events: none;
   position: absolute;
   width: 100%;
@@ -105,7 +122,8 @@
 .stage[data-phase="processing"] .loom__side--in path { opacity: .12; }
 
 /* The shortcut as real key caps; they press down while you hold it. */
-.stage .home-hero__shortcut .kbd {
+.stage .home-hero h1 .key-combo__caps { gap: 8px; }
+.stage .home-hero h1 .kbd {
   background: linear-gradient(180deg, #32323f, #1b1b24);
   border: 1px solid rgba(255, 255, 255, .13);
   border-bottom-color: rgba(255, 255, 255, .04);
@@ -113,26 +131,39 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 4px 0 #050508, 0 12px 20px -6px rgba(0, 0, 0, .8);
   color: #f6f6f9;
   display: inline-grid;
-  font-size: calc(var(--fs-bigkey) * .85);
-  height: calc(var(--bigkey) * .85);
+  font-size: var(--fs-bigkey);
+  height: var(--bigkey);
   letter-spacing: 0;
   margin-bottom: 4px;
-  min-width: calc(var(--bigkey) * .85);
-  padding: 0 10px;
+  min-width: var(--bigkey);
+  padding: 0 14px;
   place-items: center;
   text-shadow: none;
   transition: transform .12s ease, box-shadow .12s ease, color .12s ease, border-color .12s ease;
 }
-.stage[data-phase="listening"] .home-hero__shortcut .kbd,
-.stage[data-phase="speaking"] .home-hero__shortcut .kbd {
+.stage[data-phase="listening"] .home-hero h1 .kbd,
+.stage[data-phase="speaking"] .home-hero h1 .kbd {
   border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 #050508, 0 0 26px -4px color-mix(in srgb, var(--brand-a) 55%, transparent);
   color: var(--brand-a);
   transform: translateY(3px);
 }
 
+/* Deck: the Dictate card is the instrument's base, set off by a hairline. */
+.stage .home-card--dictate {
+  background: rgba(255, 255, 255, .025);
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  margin: var(--s-10) calc(var(--stage-pad) * -1) 0;
+  padding: var(--s-9) var(--stage-pad) var(--s-10);
+}
+.stage .home-card--dictate h2 { font-size: var(--fs-secondary); font-weight: 650; margin: 0; }
+.stage .home-card--dictate .form-error { margin-top: var(--s-6); }
+
 @media (max-width: 780px) {
   .stage { --stage-pad: var(--s-9); }
+  .stage .home-hero__title { padding-block: 34px 30px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

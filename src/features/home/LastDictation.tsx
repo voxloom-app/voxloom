@@ -11,7 +11,12 @@ type Props = {
   onCopy: (text: string) => void;
 };
 
-/** The newest dictation at the top of the transcript sheet. */
+/**
+ * The last pick: one pass of the weft is one dictation. The voice stage
+ * leads with the last thing you said, set in the words face under the shortcut
+ * band, tied off with a knot in its delivery colour, one click from Copy.
+ * Keys restart the weave (mask sweep, thread, knot) for each new dictation.
+ */
 export function LastDictation({ fresh, onCopy, record }: Props) {
   const words = wordCount(record.text);
   const wovenIn = fresh || undefined;
@@ -21,6 +26,7 @@ export function LastDictation({ fresh, onCopy, record }: Props) {
       <blockquote className="pick__words" data-fresh={wovenIn} data-measure={pickMeasure(record.text)} key={record.id}>
         <p>{record.text}</p>
       </blockquote>
+      <span aria-hidden="true" className="pick__weft" data-fresh={wovenIn} key={`weft-${record.id}`}><i /></span>
       <div className="pick__meta">
         <Badge status={record.status} />
         <span>
@@ -31,7 +37,6 @@ export function LastDictation({ fresh, onCopy, record }: Props) {
           <Icon name="copy" size={14} /> Copy
         </button>
       </div>
-      <span aria-hidden="true" className="pick__weft" data-fresh={wovenIn} key={`weft-${record.id}`}><i /></span>
     </section>
   );
 }

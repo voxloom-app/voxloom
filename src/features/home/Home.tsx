@@ -4,9 +4,8 @@ import { isTauriEnv } from '../../services/capture/captureService';
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCapture';
 import { DictateCard } from './DictateCard';
-import { HomeHero } from './HomeHero';
-import { LastDictation } from './LastDictation';
 import { wovenRecords } from './pickWords';
+import { HomeHero } from './HomeHero';
 import { RecentCard } from './RecentCard';
 import { stageLabel, stagePhase } from './stagePhase';
 
@@ -24,7 +23,7 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
   const phase = stagePhase(dogfood.phase, dogfood.captureState.kind === 'active', state.dictation);
   const woven = wovenRecords(state.records);
   const last = woven[0] ?? null;
-  // The newest dictation when Home opened; anything newer weaves into the sheet.
+  // The newest dictation when Home opened; anything newer weaves in on the stage.
   const [openedOn] = useState(() => last?.id ?? null);
 
   async function copy(text: string) {
@@ -38,17 +37,24 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
 
   return (
     <div className="home">
-      <div className="stage home-voice" data-phase={phase}>
-        <span className="stage__mic"><i aria-hidden="true" />{stageLabel(phase, dogfood.phase)}</span>
-        <HomeHero cleanupModelStore={cleanupModelStore} hasWords={last !== null} isNative={isNative} />
+      {/* The voice stage: one dark instrument in both themes, alive while you dictate. */}
+      <div className="stage" data-phase={phase}>
+        <div className="stage__readout">
+          <span className="stage__mic"><i aria-hidden="true" />{stageLabel(phase, dogfood.phase)}</span>
+          <span className="stage__meta">
+            <span>Model <b>{state.settings.transcriptionModel}</b></span>
+            <span>Output <b>{state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only'}</b></span>
+          </span>
+        </div>
+        <HomeHero
+          cleanupModelStore={cleanupModelStore}
+          isNative={isNative}
+          pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }}
+        />
         <DictateCard dogfood={dogfood} isNative={isNative} onCopy={(t) => { void copy(t); }} />
-        <dl className="stage__meta">
-          <div><dt>Model</dt><dd>{state.settings.transcriptionModel}</dd></div>
-          <div><dt>Output</dt><dd>{state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only'}</dd></div>
-        </dl>
       </div>
-      <div className="cloth home-paper">
-        {last && <LastDictation fresh={last.id !== openedOn} onCopy={(t) => { void copy(t); }} record={last} />}
+      {/* The cloth: what the loom wove before the last pick, on the window's one sheet (frame.css). */}
+      <div className="cloth">
         <RecentCard earlier={woven.slice(1, 6)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} />
       </div>
     </div>
