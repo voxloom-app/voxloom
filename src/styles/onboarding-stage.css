@@ -137,6 +137,11 @@
 @media (max-width: 760px), (max-height: 680px) {
   .guided-hero:has(> .loom-line) { margin-bottom: 12px; }
 }
+/* Short windows below 1200 wide: the loom line drops its keycaps (step 2 still shows the
+   shortcut) so the heading keeps its two lines with wider fallback fonts (Linux CI). */
+@media (max-height: 680px) and (max-width: 1199px) {
+  .loom-line__keys { display: none; }
+}
 @media (min-width: 900px) and (min-height: 700px) {
   .guided-hero:has(> .loom-line) { margin-bottom: 26px; padding-block: 10px; }
   .guided-hero:has(> .loom-line) h2 { font-size: calc(var(--fs-hero) * 1.45); }

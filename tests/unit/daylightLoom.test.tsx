@@ -6,6 +6,7 @@ const css = (name: string) => readFileSync(join(__dirname, '../../src/styles', n
 const daylight = css('daylight.css');
 const pages = css('daylight-pages.css');
 const LIGHT = '[data-appearance-resolved="light"]';
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Top-level rules as [selector list, body], with comments and @keyframes blocks removed. */
 const rules = (source: string) => {
@@ -59,7 +60,7 @@ describe('The loom by daylight (ui-iter-10): Light gets its own material; dark k
     // Pseudo-elements are invalid inside :is() and would silently drop the whole selector.
     expect(`${daylight}\n${pages}`).not.toMatch(/:is\([^)]*::/);
     // The one keyframe is only reached through a light-scoped rule (onboarding.css's reduced-motion guard stops it).
-    expect(pages).toMatch(new RegExp(`${LIGHT.replace(/[[\]]/g, '\\$&')} \\.loom-line \\.kbd \\{ animation-name: loom-press-day; \\}`));
+    expect(pages).toMatch(new RegExp(`${escapeRegExp(LIGHT)} \\.loom-line \\.kbd \\{ animation-name: loom-press-day; \\}`));
   });
 
   it('the frame is woven linen, and the dark frame still carries the night material', () => {
