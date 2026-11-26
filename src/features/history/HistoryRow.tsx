@@ -23,7 +23,11 @@ type Props = {
   onDelete: (id: string) => void;
 };
 
-/** One History row: time · text · badge + meta · amber note · Copy / Retry (browser) / Delete. */
+/**
+ * One History row: time · knot · text · badge + meta · amber note · Copy / Retry
+ * (browser) / Delete. The knot is drawn in CSS on the day's thread; the text is
+ * an h3 under its day heading.
+ */
 export function HistoryRow({ record, isNative, currentTime, canStart, onCopy, onRetry, onDelete }: Props) {
   const textId = `history-text-${record.id}`;
   const retryable = !isNative && canRetry(record, currentTime);
@@ -46,10 +50,10 @@ export function HistoryRow({ record, isNative, currentTime, canStart, onCopy, on
   const original = record.cleanup?.status === 'cleaned' && record.rawText
     && record.rawText !== record.text ? record.rawText : null;
   return (
-    <article className="recent-row history-row" data-status={record.status} tabIndex={0}>
+    <article className="recent-row history-row" data-record={record.id} data-status={record.status} tabIndex={0}>
       <span className="timestamp">{formatTime(record.createdAt)}</span>
       <div className="history-row__body">
-        <h2 className="history-row__text" id={textId}>{record.text}</h2>
+        <h3 className="history-row__text" id={textId}>{record.text}</h3>
         <p className="history-row__meta">
           <Badge status={record.status} />
           <span>{record.durationSeconds}s · {record.model ?? 'Local STT'} · {styleLabel(record.style)}</span>

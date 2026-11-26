@@ -72,10 +72,15 @@ describe('History segmented filter (UI PR 4)', () => {
 });
 
 describe('History heading order', () => {
-  it('uses h2 for row text directly under the h1 (axe heading-order)', () => {
+  it('nests row text (h3) under its day (h2) under the h1, never skipping a level (axe heading-order)', () => {
     renderWithApp(<History onToast={() => {}} />);
-    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
-    expect(screen.getAllByRole('heading', { level: 2 }).length).toBeGreaterThan(0);
+    const levels = screen.getAllByRole('heading').map((h) => Number(h.tagName.slice(1)));
+    expect(levels[0]).toBe(1);
+    levels.slice(1).forEach((level, i) => expect(level - levels[i]).toBeLessThanOrEqual(1));
+    // The fixed test clock can fall just after midnight in some time zones.
+    for (const day of screen.getAllByRole('heading', { level: 2 })) expect(day).toHaveTextContent(/^(Today|Yesterday)$/);
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(initialRecords.length);
+    for (const row of rows()) expect(within(row).queryByRole('heading', { level: 2 })).toBeNull();
   });
 });
 
@@ -84,7 +89,7 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     const user = userEvent.setup();
     renderWithApp(<History onToast={() => {}} />);
     const row = screen.getAllByRole('article')[0];
-    const text = within(row).getByRole('heading', { level: 2 }).textContent ?? '';
+    const text = within(row).getByRole('heading', { level: 3 }).textContent ?? '';
     // No aria-labelledby on the row: VoiceOver would read the transcript twice.
     expect(row).not.toHaveAttribute('aria-labelledby');
     row.focus();
@@ -113,7 +118,7 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     renderWithApp(<History onToast={() => {}} />);
     for (const row of screen.getAllByRole('article')) {
       expect(row).toHaveAttribute('data-status');
-      expect(within(row).queryByRole('heading', { level: 3 })).toBeNull();
+      expect(within(row).getAllByRole('heading')).toHaveLength(1);
     }
   });
 });

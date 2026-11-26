@@ -1,0 +1,110 @@
+/* History (ui-iter-02): a woven day. The masthead is the Home voice stage's dark
+   material (.stage in stage.css supplies its tokens): it tallies the latest day,
+   ties each dictation as a knot on the day loom and calls out loose threads.
+   The timeline below runs one status-knotted thread through each day. */
+.history-stage { margin-bottom: var(--s-10); padding: var(--s-10) var(--stage-pad) var(--s-9); }
+.history-stage__top { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--s-8) var(--s-11); justify-content: space-between; }
+.history-stage__title { flex: 1 1 20em; min-width: 0; }
+.history-stage h1 { color: #f6f6f9; font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; margin: 0 0 6px; }
+.history-stage__lede { color: var(--mut); font-size: var(--fs-secondary); margin: 0; max-width: 58ch; }
+
+.history-stage__day { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .12em; margin: 0 0 8px; text-transform: uppercase; }
+.history-stage__tally dl { display: flex; margin: 0; }
+.history-stage__tally dl > div { display: flex; flex-direction: column-reverse; gap: 4px; padding: 0 var(--s-10); }
+.history-stage__tally dl > div:first-child { padding-left: 0; }
+.history-stage__tally dl > div + div { border-left: 1px solid rgba(255, 255, 255, .09); }
+.history-stage__tally dl > div:last-child { padding-right: 0; }
+.history-stage__tally dt { color: var(--mut); font-size: var(--fs-label); }
+.history-stage__tally dd { color: #f6f6f9; font-size: var(--fs-hero); font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 0; }
+
+/* The day loom: two weft threads twist through the day and knot at each dictation. */
+.day-loom { isolation: isolate; margin-top: var(--s-11); position: relative; }
+.day-loom__track { height: 48px; position: relative; }
+.day-loom__weave { display: block; height: 48px; overflow: visible; width: 100%; }
+.day-loom path { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.day-loom__warp { stroke: rgba(255, 255, 255, .16); stroke-width: 1; }
+.day-loom__weft { opacity: .85; stroke-width: 2; }
+.day-loom g + g .day-loom__weft { opacity: .5; }
+/* The static offset staggers the pulses when animation is off or paused. */
+.day-loom__pulse { animation: day-loom-flow 7s linear infinite; animation-delay: calc(var(--i) * -3.5s); opacity: .75; stroke-dasharray: 4 96; stroke-dashoffset: calc(var(--i) * 50); stroke-width: 3.5; }
+.day-loom__loose { stroke: rgba(255, 255, 255, .26); stroke-dasharray: 2 7; stroke-width: 1.5; }
+@keyframes day-loom-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+
+.day-loom__knot {
+  --tone: var(--ok);
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--tone), 0 0 0 3px var(--panel);
+  height: var(--knot);
+  position: absolute;
+  top: 24px;
+  transform: translate(-50%, -50%);
+  transition: opacity .25s ease, transform .2s ease, box-shadow .2s ease;
+  width: var(--knot);
+}
+.day-loom__knot[data-status="copied"] { --tone: var(--info); }
+.day-loom__knot[data-status="unverified"] { --tone: var(--warn); }
+/* A failed dictation frays: a broken ring instead of a tied knot. */
+.day-loom__knot[data-status="failed"] { --tone: var(--err); border: 2px dashed var(--tone); box-shadow: 0 0 0 3px var(--panel); }
+.day-loom__knot[data-newest] { background: var(--tone); box-shadow: 0 0 0 3px var(--panel), 0 0 16px 2px color-mix(in srgb, var(--tone) 55%, transparent); }
+.day-loom__knot[data-match="false"] { opacity: .22; }
+/* The row you're on, found in your day. */
+.day-loom__knot[data-active] { box-shadow: inset 0 0 0 2px var(--tone), 0 0 0 3px var(--panel), 0 0 18px 4px color-mix(in srgb, var(--tone) 65%, transparent); opacity: 1; transform: translate(-50%, -50%) scale(1.5); z-index: 1; }
+.day-loom__knot[data-status="failed"][data-active] { box-shadow: 0 0 0 3px var(--panel), 0 0 18px 4px color-mix(in srgb, var(--tone) 65%, transparent); }
+
+.day-loom__now { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em; line-height: 1; position: absolute; text-transform: uppercase; top: -4px; transform: translateX(-50%); }
+.day-loom__now::after {
+  animation: day-loom-now 2.4s ease-in-out infinite;
+  background: var(--accfg);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-a) 25%, transparent);
+  content: "";
+  height: 6px;
+  left: 50%;
+  position: absolute;
+  top: 28px;
+  transform: translate(-50%, -50%);
+  width: 6px;
+}
+@keyframes day-loom-now { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-a) 0%, transparent); } }
+
+.day-loom__waiting { background: #15151c; border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-pill); color: var(--mut); font-size: var(--fs-secondary); left: 50%; padding: 3px 12px; position: absolute; top: 24px; transform: translate(-50%, -50%); white-space: nowrap; }
+
+.day-loom__ticks { height: 16px; list-style: none; margin: 4px 0 0; padding: 0; position: relative; }
+.day-loom__ticks li { color: var(--mut); font-family: var(--mono); font-size: var(--fs-micro); line-height: 16px; position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
+/* Faint heddles behind the threads, one per labelled hour. */
+.day-loom__ticks li::before { background: rgba(255, 255, 255, .07); bottom: calc(100% + 4px); content: ""; height: 48px; left: 50%; position: absolute; width: 1px; z-index: -1; }
+/* The end labels sit inside the stage, flush with their hour. */
+.day-loom__ticks li:first-child { transform: none; }
+.day-loom__ticks li:first-child::before { left: 0; }
+.day-loom__ticks li:last-child:not(:first-child) { transform: translateX(-100%); }
+.day-loom__ticks li:last-child:not(:first-child)::before { left: auto; right: 0; }
+
+/* Loose threads: the stage's base deck, only while something didn't land cleanly. */
+.history-stage__deck {
+  align-items: center;
+  background: rgba(255, 255, 255, .025);
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5) var(--s-8);
+  margin: var(--s-10) calc(var(--stage-pad) * -1) calc(var(--s-9) * -1);
+  padding: var(--s-7) var(--stage-pad);
+}
+.history-stage__deck > .icon { color: var(--warn); flex: none; }
+.history-stage__deck p { color: var(--mut); flex: 1 1 18em; font-size: var(--fs-secondary); margin: 0; }
+.history-stage__deck strong { color: var(--fg); font-weight: 650; }
+.history-stage__jump { display: flex; flex-wrap: wrap; gap: var(--s-4); }
+.history-stage__jump .btn { background: rgba(255, 255, 255, .04); color: var(--fg); font-size: var(--fs-secondary); font-weight: 600; }
+.history-stage__jump .btn:hover { background: rgba(255, 255, 255, .09); }
+.history-stage__jump .btn[aria-pressed="true"] { background: var(--segon); border-color: var(--sel-edge); box-shadow: inset 0 0 0 1px var(--sel-edge); }
+
+@media (max-width: 780px) {
+  .history-stage__tally dl > div { padding: 0 var(--s-8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The loom holds still; knots, threads and "now" stay put. */
+  .day-loom__pulse { display: none; }
+  .day-loom__now::after { animation: none; }
+}
