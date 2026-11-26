@@ -1,36 +1,22 @@
-/* Home (UI PR 3): hero, dictate card, recent dictations. */
-.home-hero {
-  align-items: center;
-  background: radial-gradient(500px 200px at 0% 50%, color-mix(in srgb, var(--accfg) 14%, transparent), transparent), var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-hero);
-  display: flex;
-  gap: 24px;
-  margin-bottom: var(--s-7);
-  padding: var(--s-10);
-}
-
-.home-hero__orb .app-tile {
-  border-radius: 24px;
-  box-shadow: var(--tile-shadow), 0 0 40px var(--tile-glow);
-  height: 92px;
-  width: 92px;
-}
+/* Home (UI PR 3): hero, dictate card, recent dictations. The hero and the
+   Dictate card live inside the voice stage (stage.css), which sets their surface. */
+.home-hero { text-align: center; }
 
 .home-hero h1 {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  font-size: var(--fs-hero);
+  font-size: calc(var(--fs-hero) * 1.2);
   font-weight: 850;
-  gap: 8px;
-  letter-spacing: -.03em;
-  margin-bottom: 6px;
+  gap: 8px 14px;
+  justify-content: center;
+  letter-spacing: -.035em;
+  margin: 0;
 }
 
 .home-hero h1 .kbd { font-size: var(--fs-emph); min-width: 30px; padding: 7px 8px; }
-.home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 0 var(--s-6); }
-.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); }
+.home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 auto var(--s-8); }
+.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: center; }
 
 .fine { color: var(--mut); font-size: var(--fs-secondary); }
 
@@ -39,10 +25,10 @@
 .home-card .card__head { margin-bottom: var(--s-5); }
 .home-card .card__head h2 { margin: 0; }
 
-.capline { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-8); justify-content: space-between; }
+.capline { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-6) var(--s-10); }
+.capline__lead { align-items: center; display: flex; gap: var(--s-8); }
 .capline .dogfood-capture-actions { margin-top: 0; }
-.cap-meta { color: var(--mut); display: grid; font-size: var(--fs-secondary); gap: 2px; text-align: right; }
-.cap-meta b { color: var(--fg); font-weight: 600; }
+.capline .note { flex: 1 1 22em; margin: 0; }
 
 .btn.primary {
   background: var(--brand);
@@ -76,19 +62,63 @@
 
 .link-button { border: 0; color: var(--accfg); font-size: var(--fs-secondary); min-height: 0; padding: 2px 4px; }
 
-.home .recent-row {
-  border-top: 1px solid var(--line);
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  padding: 9px 4px;
+/* Recent dictations: knots on one thread, newest first and largest. Each knot takes its
+   delivery status colour; the badge still names it. */
+.home .recent-list { --spool-time: calc(var(--fs-mono) * 5.6); --knot-x: calc(var(--spool-time) + 19px); --knot-y: 50%; gap: 0; }
+/* Each row draws its piece of the thread, so it ends exactly at the first and last knots. */
+.home .recent-row::after {
+  background: color-mix(in srgb, var(--accfg) 40%, var(--line));
+  bottom: 0;
+  content: "";
+  left: var(--knot-x);
+  position: absolute;
+  top: 0;
+  width: 2px;
 }
+.home .recent-row:first-child::after { top: var(--knot-y); }
+.home .recent-row:last-child::after { bottom: auto; height: var(--knot-y); }
+.home .recent-row:only-child::after { display: none; }
+.home .recent-row {
+  border-top: 0;
+  gap: 4px 14px;
+  grid-template-areas: "time knot text badge copy";
+  grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto auto;
+  padding: 10px 0;
+  position: relative;
+}
+.home .recent-row::before {
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--ok);
+  content: "";
+  grid-area: knot;
+  height: 12px;
+  position: relative;
+  width: 12px;
+  z-index: 1;
+}
+.home .recent-row[data-status="copied"]::before { box-shadow: inset 0 0 0 2px var(--info); }
+.home .recent-row:first-child::before { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
+.home .recent-row[data-status="copied"]:first-child::before { background: var(--info); box-shadow: 0 0 0 4px color-mix(in srgb, var(--info) 20%, transparent); }
+.home .recent-row > .timestamp { grid-area: time; text-align: right; }
+.home .recent-row > p { grid-area: text; }
+.home .recent-row > .badge { grid-area: badge; }
+.home .recent-row > .ib { grid-area: copy; }
+.home .recent-row:first-child > p { font-size: var(--fs-emph); font-weight: 600; }
 
-.home .recent-row:first-child { border-top: 0; }
-.home .recent-list { gap: 0; }
-
+/* Narrow: time and words keep sharing a line (QA #59 gap and alignment); the status badge
+   drops beneath the words, and the knot sits on their first line. */
 @media (max-width: 780px) {
-  .home-hero { flex-direction: column; align-items: flex-start; }
-  .home .recent-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .home .recent-row > .badge { display: none; }
+  .home .recent-list { --knot-y: 22px; }
+  .home .recent-row {
+    align-items: start;
+    grid-template-areas: "time knot text copy" ". knot badge .";
+    grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto;
+  }
+  .home .recent-row::before { margin-top: 6px; }
+  .home .recent-row > .timestamp,
+  .home .recent-row > p { align-self: baseline; }
+  .home .recent-row > .badge { justify-self: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {

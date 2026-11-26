@@ -1,4 +1,3 @@
-import { useApp } from '../../app/AppContext';
 import { Icon } from '../../components/Icon';
 import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCapture';
 
@@ -8,9 +7,8 @@ type Props = {
   onCopy: (text: string) => void;
 };
 
-/** Dictate card: Start / Stop / Cancel, Transcribing…, status, last transcript, meta (H2–H8). */
+/** The stage's deck: Start / Stop / Cancel, Transcribing…, status, last transcript (H2–H8). */
 export function DictateCard({ dogfood, isNative, onCopy }: Props) {
-  const { state } = useApp();
   const recording = dogfood.phase === 'recording' || dogfood.captureState.kind === 'active';
   const busy = dogfood.phase === 'transcribing' || dogfood.phase === 'cleaning';
   const failed = dogfood.phase === 'error' || dogfood.phase === 'cancelled';
@@ -18,41 +16,39 @@ export function DictateCard({ dogfood, isNative, onCopy }: Props) {
 
   return (
     <section aria-labelledby="capture-title" className="card home-card home-card--dictate">
-      <h2 id="capture-title">Dictate</h2>
       <div className="capline">
-        <div className="action-group dogfood-capture-actions">
-          {!recording && !busy && (
-            <button className="btn primary big" disabled={!isNative} onClick={() => { void dogfood.start(); }} type="button">
-              <Icon name="mic" /> Start capture
-            </button>
-          )}
-          {recording && (
-            <>
-              <button className="btn primary big" onClick={() => { void dogfood.stop(); }} type="button">
-                <span aria-hidden="true" className="rec-dot" /> Stop
+        <div className="capline__lead">
+          <h2 id="capture-title">Dictate</h2>
+          <div className="action-group dogfood-capture-actions">
+            {!recording && !busy && (
+              <button className="btn primary big" disabled={!isNative} onClick={() => { void dogfood.start(); }} type="button">
+                <Icon name="mic" /> Start capture
               </button>
-              <button className="quiet-button" onClick={() => dogfood.cancel()} type="button">Cancel</button>
-            </>
-          )}
-          {busy && (
-            <span className="empty-note" role="status">
-              {dogfood.phase === 'cleaning' ? 'Cleaning up…' : 'Transcribing…'}
-            </span>
-          )}
+            )}
+            {recording && (
+              <>
+                <button className="btn primary big" onClick={() => { void dogfood.stop(); }} type="button">
+                  <span aria-hidden="true" className="rec-dot" /> Stop
+                </button>
+                <button className="quiet-button" onClick={() => dogfood.cancel()} type="button">Cancel</button>
+              </>
+            )}
+            {busy && (
+              <span className="empty-note" role="status">
+                {dogfood.phase === 'cleaning' ? 'Cleaning up…' : 'Transcribing…'}
+              </span>
+            )}
+          </div>
         </div>
-        <div className="cap-meta">
-          <span>Model: <b>{state.settings.transcriptionModel}</b></span>
-          <span>Output <b>{state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only'}</b></span>
-        </div>
+        <p className="note">
+          Tip: hold the shortcut while another app is focused. Starting here
+          focuses Voxloom, so the result may be <b>Copied</b> instead of inserted.
+          Stop transcribes; Cancel discards without transcribing.
+        </p>
       </div>
       {!isNative && (
         <p className="form-error" role="status">Native capture requires the Tauri shell (Mac smoke).</p>
       )}
-      <p className="note">
-        Tip: hold the shortcut while another app is focused. Starting here
-        focuses Voxloom, so the result may be <b>Copied</b> instead of inserted.
-        Stop transcribes; Cancel discards without transcribing.
-      </p>
       {transcript && (
         <div aria-live="polite" className="dogfood-transcript">
           <div>

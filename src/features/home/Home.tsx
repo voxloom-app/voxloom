@@ -5,6 +5,7 @@ import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCaptu
 import { DictateCard } from './DictateCard';
 import { HomeHero } from './HomeHero';
 import { RecentCard } from './RecentCard';
+import { stageLabel, stagePhase } from './stagePhase';
 
 interface HomeProps {
   /** Shared App-level dogfood capture (also driven by global gesture). */
@@ -15,8 +16,9 @@ interface HomeProps {
 }
 
 export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
-  const { clipboard } = useApp();
+  const { clipboard, state } = useApp();
   const isNative = isTauriEnv();
+  const phase = stagePhase(dogfood.phase, dogfood.captureState.kind === 'active', state.dictation);
 
   async function copy(text: string) {
     try {
@@ -29,8 +31,18 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
 
   return (
     <div className="home">
-      <HomeHero cleanupModelStore={cleanupModelStore} isNative={isNative} />
-      <DictateCard dogfood={dogfood} isNative={isNative} onCopy={(t) => { void copy(t); }} />
+      {/* The voice stage: one dark instrument in both themes, alive while you dictate. */}
+      <div className="stage" data-phase={phase}>
+        <div className="stage__readout">
+          <span className="stage__mic"><i aria-hidden="true" />{stageLabel(phase, dogfood.phase)}</span>
+          <span className="stage__meta">
+            <span>Model <b>{state.settings.transcriptionModel}</b></span>
+            <span>Output <b>{state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only'}</b></span>
+          </span>
+        </div>
+        <HomeHero cleanupModelStore={cleanupModelStore} isNative={isNative} />
+        <DictateCard dogfood={dogfood} isNative={isNative} onCopy={(t) => { void copy(t); }} />
+      </div>
       <RecentCard onCopy={(t) => { void copy(t); }} />
     </div>
   );

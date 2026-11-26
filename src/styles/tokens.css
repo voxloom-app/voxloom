@@ -25,7 +25,6 @@
   --brand-a: #b6ff3c; /* BUS-51 brand lime, both themes */
   --brand-b: #3cf0ff; /* BUS-51 brand cyan, both themes */
   --brand: linear-gradient(90deg, var(--brand-a), var(--brand-b));
-  --tile-glow: color-mix(in srgb, var(--brand-a) 25%, transparent);
   --on-brand: #08080c;
   --knob: #ffffff; /* switch knob, both themes */
   --focus: color-mix(in srgb, #b6ff3c 42%, transparent); /* dark focus ring */
@@ -110,8 +109,6 @@
   --mint: #e8f6ee;
   --mint-line: #c4e3cf;
   --seg-on-fg: #0f3d1c; /* selected chip label: 10.82 on segon */
-  --hero-wash: linear-gradient(120deg, var(--mint), var(--panel) 78%);
-  --dictate-wash: linear-gradient(180deg, var(--mint), var(--panel) 85%);
 }
 
 /* Legacy names used by existing component rules, mapped onto the tokens.

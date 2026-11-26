@@ -156,11 +156,19 @@ describe('Dictionary rows take the app focus ring (QA)', () => {
 
 describe('BUS-51 brand tokens', () => {
   const tokens = css('tokens.css');
-  it('defines --brand-a/--brand-b and builds --brand, --tile-glow and --hud-shadow from them', () => {
+  it('defines --brand-a/--brand-b and builds --brand, --hud-shadow and the Home stage from them', () => {
     expect(tokens).toMatch(/:root \{[^}]*--brand-a: #b6ff3c;[^}]*--brand-b: #3cf0ff;[^}]*--brand: linear-gradient\(90deg, var\(--brand-a\), var\(--brand-b\)\);/);
-    expect(tokens).toContain('--tile-glow: color-mix(in srgb, var(--brand-a) 25%, transparent);');
     expect(tokens).toMatch(/--hud-shadow:[^;]*color-mix\(in srgb, var\(--brand-a\) 35%, transparent\)[^;]*color-mix\(in srgb, var\(--brand-b\) 18%, transparent\);/);
-    expect(css('home.css')).toContain('0 0 40px var(--tile-glow)');
+    // ui-iter-01: the voice stage replaced the hero orb (and its --tile-glow); its rim,
+    // glows and accent come from the brand tokens, never raw brand hex.
+    const stage = css('stage.css');
+    expect(tokens).not.toContain('--tile-glow');
+    expect(stage).toMatch(/linear-gradient\(90deg, transparent 8%, var\(--brand-a\) 35%, var\(--brand-b\) 65%, transparent 92%\) top \/ 100% 1px no-repeat/);
+    expect(stage).toContain('color-mix(in srgb, var(--brand-a) 18%, transparent)');
+    expect(stage).toContain('color-mix(in srgb, var(--brand-b) 16%, transparent)');
+    expect(stage).toMatch(/\.stage \{[^}]*--accfg: var\(--brand-a\);[^}]*--focus: var\(--brand-a\);/);
+    // Past the token block (where --info happens to equal the cyan stop), no raw brand hex.
+    expect(stage.slice(stage.indexOf('}', stage.indexOf('.stage {')))).not.toMatch(/#(b6ff3c|3cf0ff)\b/i);
   });
 
   it('keeps raw brand hex and rgba out of the HUD stylesheets', () => {

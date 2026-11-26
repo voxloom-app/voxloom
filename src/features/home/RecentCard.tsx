@@ -7,7 +7,7 @@ function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(timestamp);
 }
 
-/** Five most recent non-failed dictations with status badge + copy (H9–H11). */
+/** Five most recent non-failed dictations on the spool, with status badge + copy (H9–H11). */
 export function RecentCard({ onCopy }: { onCopy: (text: string) => void }) {
   const { dispatch, state } = useApp();
   const recent = [...state.records]
@@ -25,7 +25,7 @@ export function RecentCard({ onCopy }: { onCopy: (text: string) => void }) {
       </div>
       <div className="recent-list">
         {recent.map((record) => (
-          <div className="recent-row" key={record.id}>
+          <div className="recent-row" data-status={record.status} key={record.id}>
             <span className="timestamp">{formatTime(record.createdAt)}</span>
             <p>{record.text}</p>
             <Badge status={record.status} />

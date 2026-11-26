@@ -31,7 +31,9 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
   const actions = css('home-actions.css');
 
   it('adds light-only mint tokens and leaves :root (dark) colors unchanged', () => {
-    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mint: #e8f6ee;[^}]*--mint-line: #c4e3cf;[^}]*--seg-on-fg: #0f3d1c;[^}]*--hero-wash: linear-gradient\(120deg, var\(--mint\), var\(--panel\) 78%\);[^}]*--dictate-wash: linear-gradient\(180deg, var\(--mint\), var\(--panel\) 85%\);/);
+    expect(tokens).toMatch(/\[data-appearance-resolved="light"\] \{[^}]*--mint: #e8f6ee;[^}]*--mint-line: #c4e3cf;[^}]*--seg-on-fg: #0f3d1c;/);
+    // ui-iter-01: the Home hero and Dictate card moved onto the dark voice stage, so their washes are gone.
+    expect(tokens).not.toMatch(/--(hero|dictate)-wash/);
     expect(tokens).not.toMatch(/:root \{[^}]*--mint:/);
     const rootBlock = tokens.split('[data-appearance-resolved="light"]')[0];
     expect(rootBlock).toMatch(/:root \{[^}]*--bg: #0b0b10;[^}]*--side: #0e0e14;[^}]*--panel: #121219;[^}]*--field: #1a1a23;[^}]*--seg: #1c1c26;[^}]*--segon: #2c2c3a;[^}]*--line: #23232e;[^}]*--fg: #ececf1;[^}]*--mut: #9494a3;[^}]*--ctl-line: #6a6a80;[^}]*--navon: #2a2a38;[^}]*--accfg: #b6ff3c;/);
@@ -48,9 +50,11 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
   });
 
   it('scopes V3 Layered rules to Home actions, keeps ghost links, and stills motion', () => {
-    expect(actions).toContain('.home-card--dictate');
-    expect(actions).toContain('var(--hero-wash)');
-    expect(actions).toContain('var(--dictate-wash)');
+    // ui-iter-01: Home actions sit on the dark stage in both themes: no light-only washes,
+    // one set of attached shadows, and the Dictate card is the stage's deck.
+    expect(actions).not.toContain('[data-appearance-resolved=');
+    expect(css('stage.css')).toMatch(/\.stage \.home-card--dictate \{[^}]*border-top: 1px solid/);
+    expect(actions).toMatch(/\.btn\.primary\.big:not\(:disabled\) \{[^}]*box-shadow:/);
     expect(actions).toContain('.btn.primary.big');
     expect(actions).toContain('.home .btn:not(.primary):not(.ghost)');
     expect(actions).toMatch(/\.btn\.primary\.big:disabled \{[^}]*box-shadow: none;[^}]*transform: none;/);
@@ -61,7 +65,7 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
   });
 
   it('imports home-actions.css immediately after home.css', () => {
-    expect(css('index.css')).toMatch(/@import "\.\/home\.css";\n@import "\.\/home-actions\.css";/);
+    expect(css('index.css')).toMatch(/@import "\.\/home\.css";\n@import "\.\/home-actions\.css";\n@import "\.\/stage\.css";/);
   });
 });
 
