@@ -8,10 +8,15 @@ type Options = {
   blocked: boolean;
   onHelp: (opener: HTMLElement) => void;
   onNavigate: (screen: Screen) => void;
+  /** Cmd/Ctrl+K anywhere, or "/" when not typing: focus Recall in the toolbar. */
+  onRecall?: () => void;
 };
 
-/** "?" opens shortcuts; Alt+1–3 navigate; Alt+4 and Cmd/Ctrl+, open Settings. Suppressed under modals. */
-export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
+/**
+ * "?" opens shortcuts; Alt+1–3 navigate; Alt+4 and Cmd/Ctrl+, open Settings; Cmd/Ctrl+K and
+ * "/" open Recall. Suppressed under modals.
+ */
+export function useAppKeys({ blocked, onHelp, onNavigate, onRecall }: Options) {
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (blocked || hasOpenModal()) return;
@@ -28,6 +33,14 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
         onNavigate('settings');
         return;
       }
+      const plain = !event.altKey && !event.shiftKey && !event.isComposing;
+      const recallKey = (settingsModifier && plain && isLetterKey(event, 'k'))
+        || (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey && !event.altKey);
+      if (onRecall && recallKey) {
+        event.preventDefault();
+        onRecall();
+        return;
+      }
       // ⌥ alone, never while typing (Option+digit types characters on macOS).
       if (typing || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
       // event.code: on macOS, Option+1 reports key "¡", so match the physical digit.
@@ -39,7 +52,7 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [blocked, onHelp, onNavigate]);
+  }, [blocked, onHelp, onNavigate, onRecall]);
 }
 
 /**
@@ -51,6 +64,12 @@ export function useAppKeys({ blocked, onHelp, onNavigate }: Options) {
  */
 function isCommaKey(event: KeyboardEvent): boolean {
   return event.key === ',' || (event.code === 'Comma' && event.key.length === 1 && event.key.charCodeAt(0) > 0x7f);
+}
+
+/** A letter key, matched by its physical key when the layout types a non-ASCII letter there. */
+function isLetterKey(event: KeyboardEvent, letter: string): boolean {
+  if (event.key.toLowerCase() === letter) return true;
+  return event.code === `Key${letter.toUpperCase()}` && event.key.length === 1 && event.key.charCodeAt(0) > 0x7f;
 }
 
 // Inputs that don't take typed text: ⌥-digit and ? still work while these are focused.

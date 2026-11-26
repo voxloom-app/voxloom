@@ -13,6 +13,7 @@ export function ShortcutsDialog({ shortcut, opener, onClose }: ShortcutsProps) {
         <span>Go to Home · History · Dictionary</span>
         <span><KeyCombo combo="Alt+1" /> … <KeyCombo combo="Alt+3" /></span>
       </div>
+      <div className="kv"><span>Recall anything you said</span><span><KeyCombo combo="CommandOrControl+K" /> or <KeyCombo combo="/" /></span></div>
       <div className="kv"><span>Settings</span><span><KeyCombo combo="CommandOrControl+," /> or <KeyCombo combo="Alt+4" /></span></div>
       <div className="kv"><span>Show this sheet</span><KeyCombo combo="?" /></div>
       <div className="sheet-acts">

@@ -16,6 +16,7 @@ import { useDogfoodCapture } from '../services/stt/useDogfoodCapture';
 import { ResetSessionDialog, ShortcutsDialog } from './AppDialogs';
 import { useApp } from './AppContext';
 import { BootHydratePlaceholder } from './shell/BootHydratePlaceholder';
+import { Recall } from './shell/Recall';
 import { Sidebar } from './shell/Sidebar';
 import { TitleBar } from './shell/TitleBar';
 import { useAppKeys } from './useAppKeys';
@@ -97,7 +98,29 @@ export function App() {
     modalOpener.current = opener;
     setShortcutOpen(true);
   }, []);
-  useAppKeys({ blocked: onboardingOpen || shortcutOpen, onHelp: openHelp, onNavigate: navigate });
+
+  // Recall (ui-iter-11): ⌘K or / from any screen picks up any thread you've said.
+  const recallInput = useRef<HTMLInputElement | null>(null);
+  const openRecall = useCallback(() => {
+    recallInput.current?.focus();
+    recallInput.current?.select();
+  }, []);
+  const copyRecalled = useCallback((text: string) => {
+    clipboard.copy(text).then(() => announce('Copied to clipboard'), () => announce('Copy failed'));
+  }, [announce, clipboard]);
+  // History renders in the same commit as the screen change, so its row exists once this task runs.
+  const showRecalled = useCallback((id: string) => {
+    navigate('history');
+    window.setTimeout(() => {
+      const row = [...document.querySelectorAll<HTMLElement>('.history .history-row[data-record]')].find((el) => el.dataset.record === id);
+      if (!row) return;
+      row.focus({ preventScroll: true });
+      row.scrollIntoView?.({ block: 'center' });
+      row.dataset.recalled = '';
+      window.setTimeout(() => { delete row.dataset.recalled; }, 2_400);
+    }, 0);
+  }, [navigate]);
+  useAppKeys({ blocked: onboardingOpen || shortcutOpen, onHelp: openHelp, onNavigate: navigate, onRecall: openRecall });
 
   // A dev session reset is a first run: the guided tutorial starts over too.
   const dev = useDevSession(
@@ -138,7 +161,16 @@ export function App() {
         onHelp={openHelp}
         onSettings={() => navigate('settings')}
         settingsOpen={!native && state.screen === 'settings'}
-      />
+      >
+        <Recall
+          inputRef={recallInput}
+          now={now}
+          onCopy={copyRecalled}
+          onNavigate={navigate}
+          onShow={showRecalled}
+          records={state.records}
+        />
+      </TitleBar>
       <Sidebar
         onNavigate={navigate}
         onReset={dev.requestReset}

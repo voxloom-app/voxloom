@@ -34,10 +34,10 @@ describe('toastTone (toasts board strings)', () => {
 });
 
 describe('ShortcutsDialog', () => {
-  it('lists gesture, navigation, Settings and this sheet, and Done closes it', async () => {
+  it('lists gesture, navigation, Recall, Settings and this sheet, and Done closes it', async () => {
     const onClose = vi.fn();
     render(<ShortcutsDialog onClose={onClose} opener={null} shortcut="Control+Shift+Space" />);
-    for (const label of ['Dictate (hold / double-tap to latch)', 'Go to Home · History · Dictionary', 'Settings', 'Show this sheet']) {
+    for (const label of ['Dictate (hold / double-tap to latch)', 'Go to Home · History · Dictionary', 'Recall anything you said', 'Settings', 'Show this sheet']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     await userEvent.setup().click(screen.getByRole('button', { name: 'Done' }));
