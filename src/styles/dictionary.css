@@ -1,4 +1,5 @@
-/* Dictionary: one compact alphabetical list, dialog errors; boot-loading spinner. */
+/* Dictionary: one compact alphabetical list, dialog errors; boot-loading spinner.
+   The stage masthead and its spelling proof live in dictionary-stage.css (ui-iter-05). */
 .dictionary {
   display: flex;
   flex-direction: column;
@@ -7,18 +8,9 @@
 }
 
 .dictionary > :not(.term-grid) { flex-shrink: 0; }
-.dictionary .page-head { margin-bottom: 24px; }
-.dictionary .page-head h1 { margin-bottom: var(--s-4); }
 .dictionary .history-tools { flex-wrap: nowrap; margin-bottom: var(--s-8); }
 .dictionary .search { height: 34px; min-width: 0; }
 .dictionary .history-tools .fine { white-space: nowrap; }
-
-.page-head--action {
-  align-items: flex-start;
-  display: flex;
-  gap: var(--s-8);
-  justify-content: space-between;
-}
 
 .dictionary-list-head,
 .dictionary-list-foot {
@@ -29,8 +21,10 @@
   justify-content: space-between;
 }
 
-.dictionary-list-head { font-size: var(--fs-label); padding: 0 var(--s-7) var(--s-5); }
-.dictionary-list-sort { flex: none; }
+/* "Restored from" sits over the forms, which end where the row's actions begin. */
+.dictionary-list-head { --actions-w: 68px; font-size: var(--fs-label); padding: 0 calc(var(--s-4) + var(--actions-w) + var(--s-5)) var(--s-5) var(--term-x); }
+.dictionary-list-sort { flex: none; margin-left: var(--s-5); }
+.dictionary-list-from { flex: none; }
 .dictionary-list-foot { align-items: flex-start; font-size: var(--fs-micro); padding-top: var(--s-5); }
 /* Keep the non-shrinking range bounded so long valid terms cannot consume the list. */
 .dictionary-list-foot > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -50,14 +44,41 @@
   scrollbar-width: thin;
 }
 
+.dictionary { --term-x: calc(var(--s-7) + 17px); }
+
+/* Each spelling is a knot; the forms it restores hang on a thread toward its actions. */
 .dictionary .term-row {
   border: 0;
   border-bottom: 1px solid var(--line);
   flex: none;
   gap: var(--s-5);
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr) auto;
   min-height: 44px;
-  padding: var(--s-2) var(--s-4) var(--s-2) var(--s-7);
+  padding: var(--s-2) var(--s-4) var(--s-2) var(--term-x);
+  position: relative;
 }
+.dictionary .term-row::before {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--accfg);
+  content: "";
+  height: 7px;
+  left: var(--s-7);
+  position: absolute;
+  top: 22px;
+  transform: translateY(-50%);
+  width: 7px;
+}
+.term-row__forms { align-items: center; color: var(--mut); display: flex; font-family: var(--mono); font-size: var(--fs-micro); min-width: 0; }
+.term-row__forms::before { border-top: 1px dashed var(--line); content: ""; flex: 1 1 0; margin-right: var(--s-5); min-width: var(--s-8); }
+.term-row__forms[data-empty]::before { content: none; }
+.term-row__list { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.term-row__form + .term-row__form::before { color: var(--ctl-line); content: "·"; content: "·" / ""; margin: 0 7px; }
+.dictionary .term-row:hover::before,
+.dictionary .term-row:focus-within::before { background: var(--accfg); }
+.dictionary .term-row:hover .term-row__forms,
+.dictionary .term-row:focus-within .term-row__forms { color: var(--fg); }
+.dictionary .term-row:hover .term-row__forms::before,
+.dictionary .term-row:focus-within .term-row__forms::before { border-top-color: var(--accfg); border-top-style: solid; }
 
 .dictionary .term-row:last-child { border-bottom: 0; }
 .dictionary .term-row strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
@@ -75,6 +96,7 @@
 
 @media (pointer: coarse) {
   .dictionary .term-row__actions .ib { height: 44px; width: 44px; }
+  .dictionary-list-head { --actions-w: 92px; }
 }
 
 .editor-form input[aria-invalid="true"] {
@@ -98,6 +120,3 @@
 @media (prefers-reduced-motion: reduce) {
   .spin { animation: none; }
 }
-
-/* Keep "Add term" on one line; never squeezed by the heading (BUS-47 nit). */
-.page-head--action > .btn { flex-shrink: 0; white-space: nowrap; }

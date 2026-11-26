@@ -1,0 +1,150 @@
+/* Dictionary (ui-iter-05): a spelling loom. The masthead is the Home voice stage's dark
+   material (.stage in stage.css supplies its tokens). Its proof runs a sentence through
+   the real spelling match: what was heard on an editable tape (lime knot), what Voxloom
+   types beneath it (cyan knot), one thread between, and every restored stretch knotted
+   with what was heard hanging under it. The list rows hang their forms in dictionary.css. */
+.dictionary-stage { flex-shrink: 0; margin-bottom: var(--s-9); padding: var(--s-10) var(--stage-pad) 0; }
+.dictionary-stage__top { align-items: flex-start; display: flex; gap: var(--s-8) var(--s-11); justify-content: space-between; }
+.dictionary-stage__title { min-width: 0; }
+.dictionary-stage h1 { color: #f6f6f9; font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; line-height: 1.05; margin: 0 0 6px; }
+.dictionary-stage__lede { color: var(--mut); font-size: var(--fs-secondary); margin: 0; max-width: 64ch; }
+.dictionary-stage__top > .btn { flex-shrink: 0; white-space: nowrap; }
+
+.proof {
+  --heard-h: 40px;
+  --proof-gap: 14px;
+  --knot: 9px;
+  --typed-fs: calc(var(--fs-sheet) * 1.15);
+  --typed-lh: calc(var(--typed-fs) * 1.45);
+  align-items: start;
+  display: grid;
+  gap: var(--proof-gap) var(--s-8);
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-top: var(--s-10);
+}
+
+.proof__label {
+  color: var(--mut);
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  letter-spacing: .12em;
+  padding-left: calc(var(--knot) + 9px);
+  position: relative;
+  text-transform: uppercase;
+}
+.proof__label--heard { align-self: center; }
+.proof__label--typed { line-height: var(--typed-lh); }
+
+/* Knots on the warp: a lime ring where it's heard, a filled cyan knot where it's typed. */
+.proof__label::before {
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--brand-a), 0 0 0 3px var(--panel);
+  content: "";
+  height: var(--knot);
+  left: 0;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--knot);
+}
+.proof__label--typed::before { background: var(--brand-b); box-shadow: 0 0 0 3px var(--panel), 0 0 12px color-mix(in srgb, var(--brand-b) 55%, transparent); }
+/* The thread climbs from the typed knot to the underside of the heard knot. */
+.proof__label--typed::after {
+  background: linear-gradient(var(--brand-a), var(--brand-b));
+  bottom: 50%;
+  content: "";
+  height: calc(50% + var(--proof-gap) + var(--heard-h) / 2 - var(--knot) / 2);
+  left: calc(var(--knot) / 2 - .5px);
+  position: absolute;
+  width: 1px;
+}
+
+.proof__heard {
+  background: rgba(255, 255, 255, .04);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-radius: 10px;
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: var(--fs-mono);
+  height: var(--heard-h);
+  min-height: 0;
+  min-width: 0;
+  padding: 0 14px;
+  width: 100%;
+}
+.proof__heard::placeholder { color: var(--mut); opacity: 1; }
+.proof__heard:hover { border-color: rgba(255, 255, 255, .22); }
+.proof__heard:focus { background: rgba(255, 255, 255, .06); border-color: color-mix(in srgb, var(--brand-a) 45%, transparent); }
+
+.proof__typed {
+  color: #f6f6f9;
+  font-size: var(--typed-fs);
+  font-weight: 650;
+  letter-spacing: -.01em;
+  line-height: var(--typed-lh);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.proof__typed[data-empty] { color: var(--mut); font-weight: 500; }
+
+/* A restored stretch: the knot sits on the line, what was heard hangs from it. */
+.proof__catch { align-items: center; display: inline-flex; flex-direction: column; margin: 0 1px; vertical-align: baseline; }
+.proof__knot {
+  animation: proof-tie .5s ease-out both;
+  background: color-mix(in srgb, var(--brand-a) 9%, transparent);
+  border-radius: 6px;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--brand-a) 70%, transparent);
+  color: var(--accfg);
+  line-height: var(--typed-lh);
+  padding: 0 4px;
+}
+.proof__was {
+  border-top: 1px dashed color-mix(in srgb, var(--brand-a) 50%, transparent);
+  color: var(--mut);
+  font-family: var(--mono);
+  font-size: var(--fs-micro);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.6;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+@keyframes proof-tie {
+  from { box-shadow: inset 0 -2px 0 transparent, 0 0 0 5px color-mix(in srgb, var(--brand-a) 30%, transparent); }
+}
+
+/* The stage's base deck: what this sentence restored, and where the same match runs. */
+.proof__note {
+  align-items: baseline;
+  background: rgba(255, 255, 255, .025);
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  color: var(--mut);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--fs-secondary);
+  gap: 2px var(--s-6);
+  grid-column: 1 / -1;
+  margin: var(--s-4) calc(var(--stage-pad) * -1) 0;
+  padding: var(--s-6) var(--stage-pad);
+}
+.proof__count { color: var(--accfg); font-weight: 700; }
+.proof[data-restored="0"] .proof__count { color: var(--fg); }
+
+@media (max-width: 780px) {
+  .dictionary-stage { --stage-pad: var(--s-9); }
+  .dictionary-stage__lede { display: none; }
+}
+
+/* Short windows keep the list usable: the proof stays, the lede and deck copy step back. */
+@media (max-height: 700px) {
+  .dictionary-stage { padding-top: var(--s-8); }
+  .dictionary-stage__lede { display: none; }
+  .proof { margin-top: var(--s-8); }
+  .proof__note > span { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proof__knot { animation: none; }
+}

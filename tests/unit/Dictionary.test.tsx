@@ -1,8 +1,10 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { Dictionary } from '../../src/features/dictionary/Dictionary';
 import { renderWithApp } from './testUtils';
+
+const terms = () => screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
 
 describe('Dictionary', () => {
   it('supports Word CRUD, filtering, and accessible errors', async () => {
@@ -17,14 +19,15 @@ describe('Dictionary', () => {
     await user.clear(screen.getByLabelText('Word'));
     await user.type(screen.getByLabelText('Word'), ' Vite ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByText('Vite')).toBeInTheDocument();
+    // Scoped to the list: the stage's spelling proof also shows the newest words.
+    expect(within(terms()).getByText('Vite')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit Vite' }));
     await user.clear(screen.getByLabelText('Word'));
     await user.type(screen.getByLabelText('Word'), 'Vitest');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByText('Vitest')).toBeInTheDocument();
+    expect(within(terms()).getByText('Vitest')).toBeInTheDocument();
     await user.type(screen.getByRole('searchbox'), 'vite');
-    expect(screen.queryByText('Postgres')).not.toBeInTheDocument();
+    expect(within(terms()).queryByText('Postgres')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete Vitest' }));
     expect(screen.getByText('No words found.')).toBeInTheDocument();
   });

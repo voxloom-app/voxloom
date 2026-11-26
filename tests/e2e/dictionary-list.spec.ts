@@ -48,7 +48,7 @@ async function expectUsableRange(page: Page, testInfo: TestInfo, state: string) 
       dictionary: box(element),
       footer: box(footer),
       list: { ...box(list), clientHeight: list.clientHeight, scrollHeight: list.scrollHeight, scrollTop: list.scrollTop },
-      controls: [...element.querySelectorAll('.page-head .btn, .search, .history-tools .fine')].map(box),
+      controls: [...element.querySelectorAll('.dictionary-stage .btn, .proof__heard, .search, .history-tools .fine')].map(box),
       rows: [...list.children].map((row) => ({
         name: box(row.querySelector('strong')!),
         actions: box(row.querySelector('.term-row__actions')!),
@@ -307,3 +307,34 @@ for (const width of [640, 1120, 1600]) {
     }
   });
 }
+
+// ui-iter-05: the stage's spelling proof runs the real deterministic match.
+test('spelling proof restores what you type, live, and saves nothing', async ({ page }) => {
+  await page.setViewportSize({ height: 760, width: 1120 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openDictionary(page);
+  const proof = page.getByRole('textbox', { name: 'Heard: try a sentence', exact: true });
+  const typed = page.locator('#dictionary-proof-typed');
+  await expect(proof).toHaveValue('Follow up on type script, tan stack query and postgres.');
+  await expect(typed.locator('mark')).toHaveText(['TypeScript', 'TanStack Query', 'Postgres']);
+  await expect(typed.locator('mark').first()).toHaveCSS('animation-name', 'none');
+  await expect(page.getByText('3 restored', { exact: true })).toBeVisible();
+  await proof.focus();
+  await expect(proof).toHaveCSS('outline-width', '3px');
+  await proof.fill('we keep json in postgres');
+  await expect(typed.locator('mark')).toHaveText(['JSON', 'Postgres']);
+  await expect(typed.locator('.proof__was')).toHaveText(['json', 'postgres']);
+  await expect(page.getByText('2 restored', { exact: true })).toBeVisible();
+  await proof.fill('ship it with vox loom');
+  await expect(page.getByText('Nothing to restore', { exact: true })).toBeVisible();
+  await addWord(page, 'Voxloom');
+  await expect(proof).toHaveValue('ship it with vox loom');
+  await expect(typed.locator('mark')).toHaveText(['Voxloom']);
+  await expect(page.getByText('5 words', { exact: true })).toBeVisible();
+  const row = page.getByRole('listitem').filter({ has: page.getByText('Voxloom', { exact: true }) });
+  await expect(row.locator('.term-row__form')).toHaveText(['voxloom']);
+  // Typing in the proof never changed the saved list.
+  await expect(page.getByRole('list', { name: 'Dictionary words, alphabetical' }).getByRole('listitem')).toHaveCount(5);
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations.filter(({ impact }) => impact === 'critical' || impact === 'serious')).toEqual([]);
+});

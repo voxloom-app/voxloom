@@ -105,7 +105,8 @@ describe('App integration', () => {
       );
       await user.type(screen.getByLabelText('Word'), 'Vite');
       await user.click(screen.getByRole('button', { name: 'Save' }));
-      expect(screen.getByText('Vite')).toBeInTheDocument();
+      // The list, not the stage's spelling proof, which also shows the newest words.
+      expect(within(screen.getByRole('list', { name: 'Dictionary words, alphabetical' })).getByText('Vite')).toBeInTheDocument();
     });
 
   it('opens help with question mark and closes with Escape', async () => {

@@ -155,7 +155,8 @@ describe('boot hydrate polish', () => {
     expect(within(retention).getByRole('radio', { name: 'Until deleted' })).toHaveAttribute('aria-checked', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    expect(await screen.findByText('PersistedWord')).toBeInTheDocument();
+    const terms = await screen.findByRole('list', { name: 'Dictionary words, alphabetical' });
+    expect(await within(terms).findByText('PersistedWord')).toBeInTheDocument();
     expect(screen.queryByText('JSON')).not.toBeInTheDocument();
   });
 
