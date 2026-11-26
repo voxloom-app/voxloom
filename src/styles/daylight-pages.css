@@ -1,0 +1,70 @@
+/* The loom by daylight, page by page (ui-iter-10; tokens and frame in daylight.css). Each
+   page's beam keeps its threads, knots and words; ink replaces the night's white type, a linen
+   halo replaces the night halo, and the voice glows become sunlight through dyed thread. */
+
+/* ---- Voice glows: vivid brand light, spilling over linen like sun through thread ---- */
+[data-appearance-resolved="light"] .stage::before { background: radial-gradient(42% 85% at 0% 45%, color-mix(in srgb, #b6ff3c 30%, transparent), transparent 70%); }
+[data-appearance-resolved="light"] .stage::after { background: radial-gradient(42% 85% at 100% 45%, color-mix(in srgb, #3cf0ff 26%, transparent), transparent 70%); }
+
+/* ---- Home: the voice stage and the last pick ---- */
+[data-appearance-resolved="light"] .stage .home-hero h1 { color: var(--fg); text-shadow: 0 0 10px var(--linen), 0 0 22px var(--linen), 0 0 34px var(--linen); }
+[data-appearance-resolved="light"] .loom__warp { opacity: .42; }
+[data-appearance-resolved="light"] .loom__pulse { opacity: .7; }
+[data-appearance-resolved="light"] .stage .home-card--dictate { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .stage .pick__words p { color: #121419; text-shadow: 0 0 18px var(--linen); }
+[data-appearance-resolved="light"] .pick__weft::before { opacity: .8; }
+[data-appearance-resolved="light"] .stage .pick__copy { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: 0 1px 2px rgba(70, 56, 30, .1); }
+[data-appearance-resolved="light"] .stage .pick__copy:hover { border-color: var(--sel-edge); color: var(--accfg); }
+
+/* ---- History: the woven day ---- */
+[data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1, .history-stage__tally dd) { color: var(--fg); }
+[data-appearance-resolved="light"] .history-stage__tally dl > div + div { border-left-color: rgba(70, 56, 30, .16); }
+[data-appearance-resolved="light"] .day-loom__warp { stroke: rgba(70, 56, 30, .2); }
+[data-appearance-resolved="light"] .day-loom__weft { opacity: 1; }
+[data-appearance-resolved="light"] .day-loom g + g .day-loom__weft { opacity: .62; }
+[data-appearance-resolved="light"] .day-loom__loose { stroke: rgba(70, 56, 30, .38); }
+[data-appearance-resolved="light"] .day-loom__ticks li::before { background: rgba(70, 56, 30, .09); }
+[data-appearance-resolved="light"] .day-loom__waiting { background: #ffffff; border-color: rgba(70, 56, 30, .14); }
+[data-appearance-resolved="light"] :is(.day-loom__knot, .voice-path__thread i) { background-color: var(--linen); }
+[data-appearance-resolved="light"] .day-loom__knot:is([data-newest], [data-active][data-newest]) { background-color: var(--tone); }
+[data-appearance-resolved="light"] :is(.history-stage__deck, .proof__note) { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .history-stage__jump .btn { background: #ffffff; border-color: rgba(70, 56, 30, .26); }
+[data-appearance-resolved="light"] .history-stage__jump .btn:hover { background: #ffffff; border-color: var(--ctl-line); }
+[data-appearance-resolved="light"] .history-stage__jump .btn[aria-pressed="true"] { background: var(--navon); border-color: var(--sel-edge); }
+
+/* ---- Dictionary: the spelling proof. Restored words wear a highlighter's lime. ---- */
+[data-appearance-resolved="light"] .proof__heard { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: inset 0 1px 2px rgba(70, 56, 30, .06); }
+[data-appearance-resolved="light"] .proof__heard:hover { border-color: rgba(70, 56, 30, .34); }
+[data-appearance-resolved="light"] .proof__heard:focus { background: #ffffff; border-color: var(--sel-edge); }
+[data-appearance-resolved="light"] .proof__typed { color: #121419; }
+[data-appearance-resolved="light"] .proof__typed[data-empty] { color: var(--mut); }
+[data-appearance-resolved="light"] .proof__knot { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
+[data-appearance-resolved="light"] .proof__label--typed::before { background-color: var(--brand-b); }
+
+/* ---- Settings: the voice path ---- */
+[data-appearance-resolved="light"] .voice-path__stop:hover { background: rgba(255, 255, 255, .5); }
+[data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__thread i { background-color: var(--knot); }
+[data-appearance-resolved="light"] .voice-path__thread::before { opacity: .8; }
+[data-appearance-resolved="light"] .settings-window__bar.stage .settings-tabs { border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .settings-window__bar.stage .settings-tab:hover:not([aria-selected="true"]) { background: rgba(255, 255, 255, .55); }
+
+/* ---- Setup: the welcome, the thread and the steps ---- */
+[data-appearance-resolved="light"] .guided-main.stage { --sheet: transparent; --bg: var(--linen); }
+[data-appearance-resolved="light"] .guided-main.stage :is(.guided-disclosure, .guided-footer) { background: rgba(255, 255, 255, .42); }
+[data-appearance-resolved="light"] .guided-main.stage .guided-footer { border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] :is(.setup-thread li > b, .guided-steps-badge) { background-color: var(--linen); }
+[data-appearance-resolved="light"] .guided-modes span::before { background-color: var(--linen); }
+/* Step numbers are text: the dyed lime is a 3:1 thread, so the current one is set in deep lime ink. */
+[data-appearance-resolved="light"] :is(.setup-thread li[data-state="current"] > b, .guided-steps li:first-child .guided-steps-badge) { color: var(--accfg); }
+[data-appearance-resolved="light"] .guided-hero:has(> .loom-line) h2 { text-shadow: 0 0 8px var(--linen); }
+[data-appearance-resolved="light"] .guided-content h2:focus-visible::before { box-shadow: 0 0 10px color-mix(in srgb, #b6ff3c 80%, transparent); }
+/* The same one-shot press; onboarding.css's reduced-motion guard still stops it. */
+[data-appearance-resolved="light"] .loom-line .kbd { animation-name: loom-press-day; }
+@keyframes loom-press-day {
+  14%, 78% {
+    border-color: color-mix(in srgb, #548a00 70%, transparent);
+    box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 #cbc3b3, 0 0 24px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+    color: #376b00;
+    transform: translateY(2px);
+  }
+}
