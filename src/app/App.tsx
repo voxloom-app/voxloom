@@ -5,6 +5,7 @@ import type { Screen } from '../domain/types';
 import { Dictionary } from '../features/dictionary/Dictionary';
 import { History } from '../features/history/History';
 import { Home } from '../features/home/Home';
+import { stagePhase } from '../features/home/stagePhase';
 import { clearGuidedProgress, Onboarding } from '../features/onboarding/Onboarding';
 import { Settings } from '../features/settings/Settings';
 import { isTauriEnv } from '../services/capture/captureService';
@@ -118,9 +119,13 @@ export function App() {
 
   // Completion is unknown until durable settings hydrate: a finished user must
   // not see "Setup incomplete" flash first.
+  // The warp rail follows the same phase as the Home stage, on every screen.
+  const phase = stagePhase(dogfood.phase, dogfood.captureState.kind === 'active', state.dictation);
   const status = dogfood.phase === 'recording' ? 'Listening'
     : dogfood.phase === 'transcribing' ? 'Transcribing'
     : dogfood.phase === 'cleaning' ? 'Cleaning up'
+    : phase === 'listening' || phase === 'speaking' ? 'Listening'
+    : phase === 'processing' ? 'Transcribing'
     : !bootReady ? 'Loading…' : state.onboarding.complete ? 'Ready' : 'Setup incomplete';
   const gated = (title: string, screen: ReactNode) =>
     bootReady ? screen : <BootHydratePlaceholder title={title} />;
@@ -137,6 +142,7 @@ export function App() {
       <Sidebar
         onNavigate={navigate}
         onReset={dev.requestReset}
+        phase={phase}
         screen={state.screen}
         shortcut={state.settings.shortcut}
         status={status}

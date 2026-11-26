@@ -209,7 +209,7 @@ describe('BUS-48 contrast tokens', () => {
   });
 
   it('marks selected nav, settings tab and segment with --sel-edge', () => {
-    expect(css('shell.css')).toMatch(/\.nav-button\[aria-current="page"\] \{[^}]*box-shadow: inset 3px 0 0 var\(--sel-edge\)/);
+    expect(css('rail.css')).toMatch(/\.nav-button\[aria-current="page"\] \{[^}]*box-shadow: inset 3px 0 0 var\(--sel-edge\)/);
     expect(css('settings.css')).toMatch(/\.settings-tab\[aria-selected="true"\] \{[^}]*box-shadow: inset 0 -2px 0 var\(--sel-edge\)/);
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*box-shadow: inset 0 0 0 1px var\(--sel-edge\)/);
   });

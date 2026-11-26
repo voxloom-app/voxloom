@@ -1,0 +1,134 @@
+/* Warp rail, part two (ui-iter-03): today's weave, the warp threads and the shortcut dock.
+   The threads fill the rail's free space and run into the shortcut keys. At rest they hold
+   still; while you speak, lime pulses run down into the keys and the keys press in; while
+   Voxloom writes, cyan pulses run back up. */
+
+/* Today's weave: a knot per dictation so far today, coloured by delivery status. */
+.rail-today {
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: var(--r-tile);
+  color: var(--fg);
+  display: grid;
+  gap: 7px;
+  padding: var(--s-5) var(--s-6) var(--s-6);
+  text-align: left;
+  width: 100%;
+}
+.rail-today:hover { background: rgba(255, 255, 255, .055); border-color: rgba(255, 255, 255, .14); }
+.rail-today__head {
+  align-items: baseline;
+  color: var(--accfg);
+  display: flex;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  justify-content: space-between;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.rail-today__head b { color: #f6f6f9; font-size: var(--fs-emph); letter-spacing: -.02em; }
+.rail-today__weave { display: block; height: 14px; position: relative; }
+/* The thread runs to now, then hangs loose. */
+.rail-today__weave::before,
+.rail-today__weave::after { content: ""; position: absolute; top: 50%; }
+.rail-today__weave::before { background: linear-gradient(90deg, var(--brand-a), var(--brand-b)); height: 1px; left: 0; opacity: .7; width: var(--now); }
+.rail-today__weave::after { border-top: 1px dashed var(--ctl-line); left: var(--now); right: 0; }
+.rail-today__weave[data-empty]::before { display: none; }
+.rail-today__knot {
+  --tone: var(--ok);
+  background: var(--panel);
+  border: 1.5px solid var(--tone);
+  border-radius: 50%;
+  height: 8px;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+}
+.rail-today__knot[data-status="copied"] { --tone: var(--info); }
+.rail-today__knot[data-status="unverified"] { --tone: var(--warn); }
+/* A failed dictation frays: a broken ring instead of a tied knot. */
+.rail-today__knot[data-status="failed"] { --tone: var(--err); border-style: dashed; }
+.rail-today__knot[data-newest] { background: var(--tone); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--tone) 60%, transparent); height: 10px; width: 10px; }
+.rail-today__sum { color: var(--mut); font-size: var(--fs-label); }
+.rail-today__loose { align-items: center; color: var(--warn); display: inline-flex; font-size: var(--fs-label); font-weight: 600; gap: 5px; }
+
+/* The warp: grows into the free space and collapses first in short windows. */
+.rail-warp {
+  flex: 1 1 0;
+  margin: 0 calc(var(--s-5) * -1) calc(var(--s-7) * -1);
+  min-height: 36px;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 55%);
+  mask-image: linear-gradient(180deg, transparent, #000 55%);
+  pointer-events: none;
+  position: relative;
+}
+.rail-warp svg { display: block; height: 100%; inset: 0; position: absolute; width: 100%; }
+.rail-warp path { fill: none; stroke-linecap: round; transition: opacity .4s ease; vector-effect: non-scaling-stroke; }
+.rail-warp__thread { opacity: .24; stroke-width: 1; }
+/* Pulses only run while the voice is moving; the static offset staggers them otherwise. */
+.rail-warp__pulse { opacity: 0; stroke-dasharray: 14 86; stroke-dashoffset: calc(var(--i) * 13); stroke-width: 2; }
+@keyframes warp-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+.sidebar[data-phase="listening"] .rail-warp__thread,
+.sidebar[data-phase="speaking"] .rail-warp__thread,
+.sidebar[data-phase="processing"] .rail-warp__thread { opacity: .5; }
+.sidebar[data-phase="listening"] .rail-warp__pulse,
+.sidebar[data-phase="speaking"] .rail-warp__pulse { animation: warp-flow 1.6s linear infinite; animation-delay: calc(var(--i) * -.23s); opacity: 1; stroke: var(--brand-a); }
+.sidebar[data-phase="speaking"] .rail-warp__pulse { animation-duration: 1s; }
+.sidebar[data-phase="processing"] .rail-warp__pulse { animation: warp-flow 1.3s linear infinite reverse; animation-delay: calc(var(--i) * -.19s); opacity: 1; stroke: var(--brand-b); }
+
+/* The shortcut dock: the warp's threads end in the shortcut's key caps. */
+.rail-key { isolation: isolate; padding: 0 var(--s-4); position: relative; text-align: center; }
+.rail-key::before {
+  background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--brand-a) 16%, transparent), transparent);
+  content: "";
+  height: 72px;
+  inset: -20px 0 auto;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity .4s ease;
+  z-index: -1;
+}
+.sidebar[data-phase="listening"] .rail-key::before,
+.sidebar[data-phase="speaking"] .rail-key::before { opacity: 1; }
+.sidebar[data-phase="processing"] .rail-key::before { background: radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--brand-b) 18%, transparent), transparent); opacity: 1; }
+.rail-key__caps { display: block; }
+.rail-key__caps .key-combo__caps { flex-wrap: wrap; gap: 6px; justify-content: center; }
+.rail-key .kbd {
+  background: linear-gradient(180deg, #32323f, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-bottom-color: rgba(255, 255, 255, .04);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 3px 0 #050508, 0 8px 14px -6px rgba(0, 0, 0, .8);
+  color: #f6f6f9;
+  display: inline-grid;
+  font-size: var(--fs-secondary);
+  margin-bottom: 3px;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 0 9px;
+  place-items: center;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease, border-color .12s ease;
+}
+.sidebar[data-phase="listening"] .rail-key .kbd,
+.sidebar[data-phase="speaking"] .rail-key .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 #050508, 0 0 18px -3px color-mix(in srgb, var(--brand-a) 55%, transparent);
+  color: var(--brand-a);
+  transform: translateY(2px);
+}
+.sidebar[data-phase="processing"] .rail-key .kbd {
+  border-color: color-mix(in srgb, var(--brand-b) 55%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 3px 0 #050508, 0 0 18px -3px color-mix(in srgb, var(--brand-b) 50%, transparent);
+}
+.sidebar__hint { color: var(--mut); font-size: var(--fs-label); line-height: 1.45; margin: var(--s-6) 0 0; }
+
+.dev-panel summary { color: var(--mut); cursor: pointer; font-size: var(--fs-label); padding: 0 var(--s-4); }
+.dev-panel .state-lab { border-top: 0; margin-top: var(--s-3); padding-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* No travelling pulses or pulsing dot: the threads and keys only brighten. */
+  .rail-warp__pulse { display: none; }
+  .sidebar[data-phase] .brand__dot { animation: none; }
+}

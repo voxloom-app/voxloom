@@ -36,10 +36,12 @@ describe('App shell (UI PR 3)', () => {
     expect(within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label')))
       .toEqual(['Home', 'History', 'Dictionary']);
     const status = document.querySelector('.brand__status')!;
-    expect(status).toHaveTextContent('Setup incomplete · ⌃⇧Space');
+    expect(status).toHaveTextContent('Setup incomplete');
     expect(status).not.toHaveAttribute('aria-label');
-    // <=909px: the shortcut moves to its own line as key caps (BUS-41 PR 2).
-    expect([...document.querySelectorAll('.brand__caps .kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
+    // ui-iter-03: the shortcut lives in the rail's dock as key caps, spoken for screen readers.
+    const dock = document.querySelector('.rail-key')!;
+    expect([...dock.querySelectorAll('.kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
+    expect(dock).toHaveTextContent('Control Shift Space');
     expect(screen.getByText(/Hold the shortcut in any app to dictate/)).toBeInTheDocument();
     expect(screen.queryByText(/Global hold\/latch snapshots/)).not.toBeInTheDocument();
   });
@@ -189,7 +191,8 @@ describe('off-Mac shell labels (QA #45)', () => {
       renderWithApp(
         <Sidebar onNavigate={() => {}} onReset={() => {}} screen="home" shortcut="Control+Shift+Space" status="Ready" />,
       );
-      expect(document.querySelector('.brand__status')).toHaveTextContent('Ready · Ctrl+Shift+Space');
+      expect(document.querySelector('.brand__status')).toHaveTextContent('Ready');
+      expect([...document.querySelectorAll('.rail-key .kbd')].map((k) => k.textContent)).toEqual(['Ctrl', 'Shift', 'Space']);
       expect(document.body.textContent).toContain('Alt+1');
       expect(document.body.textContent).not.toMatch(/[⌥⌘⌃⇧]/);
     } finally {

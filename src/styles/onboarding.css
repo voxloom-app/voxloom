@@ -3,7 +3,7 @@
 .setup-window { height: 100vh; height: 100dvh; overflow: hidden; background: var(--panel); }
 .setup-window__loading { display: grid; place-content: center; justify-items: center; gap: 12px; height: 100%; color: var(--mut); }
 .guided-setup { display: grid; grid-template-columns: 205px minmax(0, 1fr); height: 100%; }
-.guided-rail { background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 30px 24px; }
+.guided-rail { display: flex; flex-direction: column; padding: 30px 24px; }
 .guided-brand { display: flex; align-items: center; gap: 10px; font-size: var(--fs-emph); font-weight: 650; letter-spacing: -.025em; margin-bottom: 46px; }
 .guided-mark { width: 31px; height: 31px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; border: 1px solid #5c6652; border-radius: 9px; background: #101115; flex: none; }
 .guided-mark i { display: block; width: 4px; background: var(--brand); border-radius: 4px; height: 12px; }
@@ -104,7 +104,6 @@
 /* In a large window, the column keeps the approved frame's reading width. */
 .guided-content, .guided-disclosure, .guided-footer { padding-inline-end: max(36px, calc(100% - 640px)); }
 .guided-content :focus-visible, .guided-footer :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-[data-appearance-resolved="light"] .guided-rail li[aria-current] b { color: white; }
 @media (max-width: 760px) {
   .guided-setup { grid-template-columns: 155px minmax(0, 1fr); }
   .guided-rail { padding: 26px 16px; }
