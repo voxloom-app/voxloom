@@ -13,9 +13,11 @@ import { listenModelsChanged } from '../../services/stt/modelsChanged';
 import { createOverlayBridge } from '../../services/shortcut';
 import { createGuidedSetup, permissionClear, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
 import { registerPracticeHandler, resetPracticeGestures } from './practiceBridge';
+import { LoomLine } from './LoomLine';
 import { createSetupBoundary } from './setupBoundary';
+import { SetupThread } from './SetupThread';
 import { SetupWindow } from './SetupWindow';
-import { SETUP_STEP_TITLES, WelcomeSteps } from './WelcomeSteps';
+import { WelcomeSteps } from './WelcomeSteps';
 
 interface OnboardingProps {
   onClose: () => void;
@@ -215,16 +217,18 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
   });
 
   return <SetupWindow onEscape={() => { if (pending.current || ['starting', 'recording', 'transcribing', 'cleaning'].includes(live.current.phase)) cancel(); else close(); }} opener={opener}>
-    <div className="guided-setup">
+    <div className="guided-setup" data-step={guided.step}>
       <aside className="guided-rail" aria-label="Setup progress">
         <div className="guided-brand"><span className="guided-mark" aria-hidden="true"><i /><i /><i /></span>Voxloom</div>
-        <ol>{SETUP_STEP_TITLES.map((label, index) => <li aria-current={guided.step === index + 1 ? 'step' : undefined} className={guided.step > index + 1 ? 'done' : ''} key={label}><b>{guided.step > index + 1 ? '✓' : index + 1}</b><span>{label}</span></li>)}</ol>
+        <SetupThread guided={guided} shortcut={state.settings.shortcut} />
         <div className="guided-private">PRIVATE BY DESIGN<br /><span>On-device dictation.<br />No account. No cloud model.</span></div>
       </aside>
-      <div className="guided-main">
+      {/* ui-iter-07: the content column is the loom's stage, in both themes. */}
+      <div className="guided-main stage">
         <section className="guided-content" aria-labelledby="guided-heading" tabIndex={0}>
           <div className="guided-kicker">{['Your voice. Your Mac.', '01 / Get connected', '02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step]}</div>
-          <h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 0 ? <>Less typing.<br />More you.</> : guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
+          <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 0 ? <>Less typing.<br />More you.</> : guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
+            {guided.step === 0 ? <LoomLine shortcut={state.settings.shortcut} /> : guided.step === 4 && <LoomLine />}</div>
           {guided.step === 0 && <>
             <p className="guided-intro">Speak naturally. Voxloom turns your words into text, right where you’re writing.</p>
             <WelcomeSteps shortcut={state.settings.shortcut} />
@@ -260,7 +264,7 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
             <p className="guided-mini guided-settings-note">You can change this later in Settings.</p>
           </>}
           {guided.step === 3 && <>
-            <div className="guided-modes" aria-label="Two ways to use the same shortcut"><span aria-current={guided.mode === 'hold' ? 'step' : undefined}>{guided.holdDone ? '✓' : '1'} Hold to talk</span><span aria-current={guided.mode === 'tap' ? 'step' : undefined}>{guided.tapDone ? '✓' : '2'} Double-tap</span></div>
+            <div className="guided-modes" aria-label="Two ways to use the same shortcut"><span aria-current={guided.mode === 'hold' ? 'step' : undefined} data-done={guided.holdDone || undefined}>{guided.holdDone ? '✓' : '1'} Hold to talk</span><span aria-current={guided.mode === 'tap' ? 'step' : undefined} data-done={guided.tapDone || undefined}>{guided.tapDone ? '✓' : '2'} Double-tap</span></div>
             <p className="guided-intro">{both ? 'You’ve tried both ways. Use whichever suits the moment.' : guided.mode === 'tap' ? 'Double-tap the same shortcut, then let go. Say a short sentence. Press the shortcut once more to finish.' : 'Click the note. Hold your shortcut, say a short sentence, then release to finish.'}</p>
             <div className="guided-note"><div><span>PRACTICE NOTE</span><span role="status">{status}</span></div><textarea aria-label="Practice dictation field" defaultValue="" placeholder={guided.mode === 'tap' ? 'Try: Now I can speak hands-free.' : 'Try: My first words with Voxloom.'} ref={field} /></div>
             <KeyCombo combo={state.settings.shortcut} />

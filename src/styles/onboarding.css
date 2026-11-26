@@ -9,12 +9,7 @@
 .guided-mark i { display: block; width: 4px; background: var(--brand); border-radius: 4px; height: 12px; }
 .guided-mark i:nth-child(2) { height: 20px; }
 .guided-mark i:nth-child(3) { height: 15px; }
-.guided-rail ol { padding: 0; margin: 0; list-style: none; }
-.guided-rail li { display: flex; gap: 12px; align-items: center; margin-bottom: 24px; font-size: var(--fs-label); color: var(--mut); }
-.guided-rail li b { height: 25px; width: 25px; display: grid; place-items: center; border: 1px solid var(--ctl-line); border-radius: 50%; font-weight: 450; font-size: var(--fs-micro); flex: none; }
-.guided-rail li[aria-current] { color: var(--fg); }
-.guided-rail li[aria-current] b { background: var(--accent); color: var(--on-accent, #08080c); border-color: var(--accent); }
-.guided-rail li.done b { color: var(--ok); border-color: var(--ok); }
+/* The rail's step thread lives in onboarding-stage.css. */
 .guided-private { margin-top: auto; font-size: var(--fs-micro); line-height: 1.7; color: var(--mut); }
 .guided-main { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; }
 .guided-main:has(.guided-disclosure) { grid-template-rows: minmax(0, 1fr) auto auto; }
@@ -27,7 +22,7 @@
 .guided-mini { font-size: var(--fs-label); line-height: 1.65; }
 /* BUS-220 · Option A: step 0 lists the three setup steps. Badges follow the mock (28px, --fs-label, 500) in the spine's circle style. */
 .guided-steps { list-style: none; margin: 0; padding: 0; max-width: 520px; border-bottom: 1px solid var(--line); }
-.guided-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-top: 1px solid var(--line); }
+.guided-steps li { --row-pad: 14px; display: flex; gap: 14px; align-items: flex-start; padding: var(--row-pad) 0; border-top: 1px solid var(--line); }
 .guided-steps-badge { height: 28px; width: 28px; display: grid; place-items: center; border: 1px solid var(--ctl-line); border-radius: 50%; font-size: var(--fs-label); font-weight: 500; color: var(--fg); flex: none; }
 .guided-steps h3 { margin: 0 0 2px; font-size: var(--fs-emph); font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
 .guided-content .guided-steps p { margin: 0; font-size: var(--fs-body); line-height: 1.5; color: var(--mut); }
@@ -107,7 +102,6 @@
 @media (max-width: 760px) {
   .guided-setup { grid-template-columns: 155px minmax(0, 1fr); }
   .guided-rail { padding: 26px 16px; }
-  .guided-rail li { gap: 8px; font-size: var(--fs-micro); }
   .guided-brand { font-size: var(--fs-secondary); gap: 7px; }
   .guided-content { padding: 30px 22px 18px; }
   .guided-footer { padding: 14px 22px 18px; }
@@ -121,7 +115,7 @@
   .guided-content:has(> .guided-steps) { padding-top: 24px; }
   .guided-content:has(> .guided-steps) h2 { margin-bottom: 12px; }
   .guided-content:has(> .guided-steps) .guided-intro { margin-bottom: 14px; }
-  .guided-steps li { padding: 10px 0; gap: 12px; }
+  .guided-steps li { --row-pad: 10px; gap: 12px; }
   /* BUS-225: step 4 only (the only step with the shortcut card), so a two-line error fits at 620 tall. */
   .guided-content:has(> .guided-shortcut) .guided-intro { margin-bottom: 14px; }
 }
