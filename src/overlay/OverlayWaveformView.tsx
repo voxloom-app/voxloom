@@ -1,8 +1,7 @@
-import { Icon } from '../components/Icon';
 import { isMacPlatform } from '../components/KeyCombo';
-import { Waveform, WAVEFORM_BARS } from '../components/Waveform';
+import { Waveform, WAVEFORM_SAMPLES } from '../components/Waveform';
 import type { OverlayResult, OverlayWaveform } from '../services/shortcut/overlayVisibility';
-import { AuroraListeningEffect } from './AuroraListeningEffect';
+import { ShuttleBody } from './ShuttleBody';
 
 interface Props {
   levels: readonly number[];
@@ -36,32 +35,58 @@ export function spokenResultText(result: OverlayResult | null, mac = isMacPlatfo
 
 const isResult = (w: OverlayWaveform) => w.startsWith('result-');
 
+type ResultKind = 'copied' | 'unverified' | 'failed';
+
 /**
- * Non-focusable desktop HUD (SPEC § HUD behavior rules). Listening: waveform
- * inside the decorative Aurora rim and halo, which stay mounted through
- * transcribing. Transcribing: Option A (pulsing, shimmering lime→cyan bar row;
- * slow breathe under Reduce Motion). Results: a brief Copied / maybe-copied /
- * error. One permanent role=status node announces "Transcribing" and results.
+ * How the thread ends, so the outcome reads by shape as well as colour (the same
+ * knots as History): copied ties a solid knot, an uncertain write half-ties one,
+ * and a failure frays into a broken ring.
+ */
+function ResultKnot({ kind }: { kind: ResultKind }) {
+  return (
+    <svg className="hud-result__knot" height="14" viewBox="0 0 14 14" width="14">
+      {kind === 'copied' && <><circle cx="7" cy="7" r="5.25" /><circle className="hud-result__core" cx="7" cy="7" r="2.75" /></>}
+      {kind === 'unverified' && <><circle cx="7" cy="7" r="5.25" /><path className="hud-result__core" d="M7 3.5a3.5 3.5 0 0 0 0 7z" /></>}
+      {kind === 'failed' && <circle className="hud-result__fray" cx="7" cy="7" r="5.25" />}
+    </svg>
+  );
+}
+
+/**
+ * Non-focusable desktop HUD (SPEC § HUD behavior rules), drawn as a weaving shuttle
+ * (ui-iter-06). Listening: your voice twists a three-strand thread through the
+ * shuttle, swelling with the live level. Transcribing: the strands settle into a
+ * rope that shimmers lime→cyan while text pays out of the cyan eyelet (a slow
+ * breathe under Reduce Motion). The shuttle stays mounted across both. Results: the
+ * thread ties off on a small tag: Copied / maybe-copied / error. One permanent
+ * role=status node announces "Transcribing" and results.
  */
 export function OverlayWaveformView({ levels, waveform, result = null, mac = isMacPlatform() }: Props) {
   // Levels arrive as 0–1 display levels (OverlayApp applies toDisplayLevel).
-  const energy = levels.reduce((sum, level) => sum + level, 0) / WAVEFORM_BARS;
+  const energy = levels.reduce((sum, level) => sum + level, 0) / WAVEFORM_SAMPLES;
   const text = isResult(waveform) ? resultText(result, mac) : '';
   const spoken = waveform === 'processing' ? 'Transcribing' : isResult(waveform) ? spokenResultText(result, mac) : '';
-  const kind = waveform === 'result-copied' ? 'copied' : waveform === 'result-unverified' ? 'unverified' : 'failed';
+  const kind: ResultKind = waveform === 'result-copied' ? 'copied' : waveform === 'result-unverified' ? 'unverified' : 'failed';
   return (
     <>
       <div aria-atomic="true" className="sr-only" role="status">{spoken}</div>
       {isResult(waveform) ? (
         <div aria-hidden="true" className={`hud-result hud-result--${kind}`} data-waveform={waveform}>
-          <Icon name={kind === 'failed' ? 'warn' : 'copy'} size={14} />
-          <span>{text}</span>
+          <span className="hud-result__lead" />
+          <span className="hud-result__tag">
+            <ResultKnot kind={kind} />
+            <span className="hud-result__text">{text}</span>
+          </span>
+          <span className="hud-result__lead hud-result__lead--out" />
         </div>
       ) : (
         <div className="recording recording--overlay" data-waveform={waveform}>
-          <AuroraListeningEffect energy={energy} />
+          <ShuttleBody energy={energy} />
           {waveform === 'processing'
-            ? <div aria-hidden="true" className="hud-transcribing"><i /></div>
+            ? <>
+              <div aria-hidden="true" className="hud-transcribing"><i /></div>
+              <span aria-hidden="true" className="hud-payout" />
+            </>
             : <Waveform levels={levels} waveform={waveform} />}
         </div>
       )}

@@ -7,6 +7,7 @@ import { createOverlayBridge } from '../../src/services/shortcut/overlayBridge';
 import { resultWaveform } from '../../src/services/shortcut/overlayVisibility';
 import { hudResultFor } from '../../src/services/stt/useDogfoodCapture';
 import { OVERLAY_LISTEN_PLACEMENT } from '../../src/services/shortcut/constants';
+import { WEAVE } from '../../src/components/Waveform';
 
 const levels = Array<number>(24).fill(0.5);
 
@@ -135,21 +136,30 @@ describe('HUD motion (Option A)', () => {
     expect(css).toMatch(/@keyframes hud-shimmer \{ to \{ transform: translateX\(-50%\); \} \}/);
     expect(css).not.toMatch(/background-position/);
   });
-  it('uses whole rounded bars (no half cap at either end)', () => {
-    expect(css).toMatch(/rect width='3' height='6' rx='1\.5'/);
-    expect(css).toMatch(/\/ 5px 6px repeat-x/);
-    expect((118 + 2) % 5).toBe(0); // 24 bars × 3px + 23 gaps × 2px
+  it('shimmers a rope of the same three twisted strands the voice thread uses (ui-iter-06)', () => {
+    const rope = css.slice(css.indexOf('.hud-transcribing {'), css.indexOf('.hud-transcribing i {'));
+    expect(rope.match(/%3Cpath d='M1 6L/g)).toHaveLength(6); // three strands, -webkit-mask and mask
+    expect(rope).toMatch(/stroke-linecap='round'/);
+    expect(rope).toMatch(/\) 0 0 \/ 118px 12px no-repeat;/);
+  });
+  it('pays text out of the cyan eyelet with a compositor-only scaleX', () => {
+    expect(css).toMatch(/\.hud-payout \{[^}]*animation: hud-payout 1\.6s ease-out infinite;[^}]*background: linear-gradient\(90deg, var\(--brand-b\), transparent\);/);
+    expect(css).toMatch(/@keyframes hud-payout \{ 0% \{ opacity: 0; transform: scaleX\(0\); \}.* 100% \{ opacity: 0; transform: scaleX\(1\); \} \}/);
   });
   it('falls back to a slow 3 s opacity breathe under Reduce Motion', () => {
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.hud-transcribing \{ animation: hud-breathe 3s ease-in-out infinite; \}\s*\.hud-transcribing i \{ animation: none;/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.hud-transcribing \{ animation: hud-breathe 3s ease-in-out infinite; \}\s*\.hud-transcribing i \{ animation: none;[^}]*\}\s*\.hud-payout \{ animation: none;/);
     expect(css).toMatch(/@keyframes hud-breathe \{ 0%, 100% \{ opacity: \.6; \} 50% \{ opacity: \.9; \} \}/);
   });
 });
 
 describe('HUD sizing (no jump between listening and transcribing)', () => {
   const css = readFileSync('src/styles/hud.css', 'utf8');
-  it('uses one 118px row for the waveform and the transcribing row', () => {
-    expect(css).toMatch(/\.recording--overlay \.wave \{[^}]*width: 118px/);
-    expect(css).toMatch(/\.hud-transcribing \{[^}]*width: 118px/);
+  it('uses one 118px row for the voice thread and the transcribing rope', () => {
+    expect(WEAVE.x1 - WEAVE.x0).toBe(118);
+    expect(WEAVE.x0).toBe(12);
+    expect(css).toMatch(/\.hud-transcribing \{[^}]*left: 12px;[^}]*width: 118px/);
+    // Both sit on the shuttle's centre line.
+    expect(css).toMatch(/\.hud-transcribing \{[^}]*height: 12px;[^}]*top: 8px;/);
+    expect(WEAVE.mid).toBe(8 + 12 / 2);
   });
 });

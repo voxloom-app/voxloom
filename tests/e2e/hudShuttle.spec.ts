@@ -55,67 +55,88 @@ async function emit(page: Page, name: string, payload: Record<string, unknown>) 
 
 async function fillLevels(page: Page, level: number) {
   for (let i = 0; i < 24; i++) {
-    await emit(page, 'capture:event', { generation: 1, kind: 'capture-level', level, request_id: 'aurora-test' });
+    await emit(page, 'capture:event', { generation: 1, kind: 'capture-level', level, request_id: 'shuttle-test' });
   }
 }
 
-test('Aurora is a flowing decorative rim and soft reactive halo around the original capsule', async ({ page }, testInfo) => {
+/** Vertical spread of the braid, in px (the meter's viewBox is the shuttle's 142×28). */
+async function braidHeight(page: Page) {
+  return page.locator('.wave').evaluate((svg) => {
+    const boxes = [...svg.querySelectorAll<SVGGraphicsElement>('.wave__strand')].map((path) => path.getBBox());
+    return Math.max(...boxes.map((box) => box.y + box.height)) - Math.min(...boxes.map((box) => box.y));
+  });
+}
+
+test('The shuttle has a flowing rim and reactive halo, and your voice swells the braid inside it', async ({ page }, testInfo) => {
   await openOverlay(page);
-  const aurora = page.locator('.hud-aurora');
-  await expect(aurora).toHaveAttribute('aria-hidden', 'true');
-  await expect(aurora).toHaveCSS('pointer-events', 'none');
+  const shuttle = page.locator('.hud-shuttle');
+  await expect(shuttle).toHaveAttribute('aria-hidden', 'true');
+  await expect(shuttle).toHaveCSS('pointer-events', 'none');
   await expect(page.getByRole('status')).toHaveText('');
-  await expect(page.getByRole('img', { name: 'Microphone level' }).locator('i')).toHaveCount(24);
+  const meter = page.getByRole('img', { name: 'Microphone level' });
+  for (const strand of [0, 1, 2]) await expect(meter.locator(`.wave__strand--${strand}`).first()).toBeVisible();
   await expect(page.locator('button, input, [tabindex]')).toHaveCount(0);
-  const pill = page.locator('.recording--overlay');
-  await expect(pill).toHaveCSS('width', '136px');
-  await expect(pill).toHaveCSS('height', '22px');
-  await expect(pill).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)'); // The rim replaces the border.
-  const flow = aurora.locator('.hud-aurora__rim .hud-aurora__flow');
-  await expect(flow).toHaveCSS('animation-name', 'hud-aurora-flow');
+  const body = page.locator('.recording--overlay');
+  await expect(body).toHaveCSS('width', '142px');
+  await expect(body).toHaveCSS('height', '28px');
+  await expect(body).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)'); // The hull is the masked shuttle, not a box.
+  const flow = shuttle.locator('.hud-shuttle__rim .hud-shuttle__flow');
+  await expect(flow).toHaveCSS('animation-name', 'hud-shuttle-flow');
   const before = await flow.evaluate((node) => getComputedStyle(node).transform);
   await expect.poll(() => flow.evaluate((node) => getComputedStyle(node).transform)).not.toBe(before);
-  const haloOpacity = async () => Number(await aurora.locator('.hud-aurora__halo').evaluate((node) => getComputedStyle(node).opacity));
+  const haloOpacity = async () => Number(await shuttle.locator('.hud-shuttle__halo').evaluate((node) => getComputedStyle(node).opacity));
   const quietOpacity = await haloOpacity();
-  await page.screenshot({ path: testInfo.outputPath('aurora-silent.png'), omitBackground: true });
+  const quietBraid = await braidHeight(page);
+  expect(quietBraid).toBeLessThan(4); // At rest it is one taut, twisted thread.
+  await page.screenshot({ path: testInfo.outputPath('shuttle-silent.png'), omitBackground: true });
   await emit(page, 'overlay:waveform', { waveform: 'speaking' });
   await fillLevels(page, 1);
-  await expect(aurora).toHaveCSS('--aurora-energy', '1');
+  await expect(shuttle).toHaveCSS('--shuttle-energy', '1');
   await expect.poll(haloOpacity).toBeGreaterThan(quietOpacity);
-  await expect(page.locator('.wave i').last()).toHaveCSS('--h', '13px');
-  const rimBox = await aurora.locator('.hud-aurora__rim').boundingBox();
+  expect(await braidHeight(page)).toBeGreaterThan(14);
+  // The thread leaves both eyelets, and the hull stays clear of the window edge for the halo.
+  for (const eye of ['in', 'out']) await expect(shuttle.locator(`.hud-shuttle__eye--${eye}`)).toBeVisible();
+  const rimBox = await shuttle.locator('.hud-shuttle__rim').boundingBox();
   expect(rimBox!.x).toBeGreaterThanOrEqual(24);
   expect(rimBox!.y).toBeGreaterThanOrEqual(24);
   expect(rimBox!.x + rimBox!.width).toBeLessThanOrEqual(190 - 24);
   expect(rimBox!.y + rimBox!.height).toBeLessThanOrEqual(76 - 24);
-  await page.screenshot({ path: testInfo.outputPath('aurora-speaking.png'), omitBackground: true });
-  await page.screenshot({ path: testInfo.outputPath('aurora-speaking-dark.png'), style: 'html { background: #10151a !important; }' });
-  await page.screenshot({ path: testInfo.outputPath('aurora-speaking-light.png'), style: 'html { background: #eef1f5 !important; }' });
+  const braidBox = await meter.locator('.wave__front').boundingBox();
+  expect(braidBox!.y).toBeGreaterThanOrEqual(rimBox!.y);
+  expect(braidBox!.y + braidBox!.height).toBeLessThanOrEqual(rimBox!.y + rimBox!.height);
+  const weftBox = await shuttle.locator('.hud-shuttle__weft').boundingBox();
+  expect(weftBox!.x).toBeGreaterThanOrEqual(0);
+  expect(weftBox!.x + weftBox!.width).toBeLessThanOrEqual(190);
+  await page.screenshot({ path: testInfo.outputPath('shuttle-speaking.png'), omitBackground: true });
+  await page.screenshot({ path: testInfo.outputPath('shuttle-speaking-dark.png'), style: 'html { background: #10151a !important; }' });
+  await page.screenshot({ path: testInfo.outputPath('shuttle-speaking-light.png'), style: 'html { background: #eef1f5 !important; }' });
+  const loud = await meter.innerHTML();
   await emit(page, 'capture:event', { generation: 0, kind: 'capture-level', level: 0, request_id: 'stale' });
-  await expect(aurora).toHaveCSS('--aurora-energy', '1');
+  await expect(shuttle).toHaveCSS('--shuttle-energy', '1');
+  expect(await meter.innerHTML()).toBe(loud);
 });
 
-test('Aurora immediately stops new animations and transitions when Reduce Motion changes live', async ({ page }) => {
+test('The shuttle immediately stops new animations and transitions when Reduce Motion changes live', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await openOverlay(page);
-  const aurora = page.locator('.hud-aurora');
-  await expect(aurora.locator('.hud-aurora__flow').first()).toHaveCSS('animation-name', 'hud-aurora-flow');
+  const shuttle = page.locator('.hud-shuttle');
+  await expect(shuttle.locator('.hud-shuttle__flow').first()).toHaveCSS('animation-name', 'hud-shuttle-flow');
   await fillLevels(page, 1);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(aurora.locator('.hud-aurora__flow').first()).toHaveCSS('animation-name', 'none');
-  expect(await aurora.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
+  await expect(shuttle.locator('.hud-shuttle__flow').first()).toHaveCSS('animation-name', 'none');
+  expect(await shuttle.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
   await fillLevels(page, 0);
-  expect(await aurora.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
-  for (const node of await aurora.locator('*').all()) {
+  expect(await shuttle.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
+  for (const node of await shuttle.locator('*').all()) {
     await expect(node).toHaveCSS('transition-duration', '0s');
     await expect(node).toHaveCSS('will-change', 'auto');
   }
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await expect(aurora.locator('.hud-aurora__flow').first()).toHaveCSS('animation-name', 'hud-aurora-flow');
+  await expect(shuttle.locator('.hud-shuttle__flow').first()).toHaveCSS('animation-name', 'hud-shuttle-flow');
 });
 
 for (const platform of ['MacIntel', 'Linux x86_64']) {
-  test(`Aurora preserves processing continuity and unmounts for every result while the existing live region remains (${platform})`, async ({ page }, testInfo) => {
+  test(`The shuttle stays put through transcribing and unmounts for every result while the live region remains (${platform})`, async ({ page }, testInfo) => {
     const pasteModifier = platform === 'MacIntel' ? 'Command' : 'Control';
     await page.addInitScript((value) => {
       Object.defineProperty(navigator, 'platform', { value, configurable: true });
@@ -123,24 +144,24 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     await openOverlay(page);
     const status = page.getByRole('status');
     await status.evaluate((node) => node.setAttribute('data-original-status', 'true'));
-    const aurora = page.locator('.hud-aurora');
+    const shuttle = page.locator('.hud-shuttle');
     const pill = page.locator('.recording--overlay');
     await emit(page, 'overlay:waveform', { waveform: 'speaking' });
     await fillLevels(page, 1);
-    await expect(aurora).toHaveCSS('--aurora-energy', '1');
+    await expect(shuttle).toHaveCSS('--shuttle-energy', '1');
     // Let the energy opacity transitions settle before snapshotting styles.
-    await expect.poll(() => aurora.evaluate((node) => node.getAnimations({ subtree: true })
+    await expect.poll(() => shuttle.evaluate((node) => node.getAnimations({ subtree: true })
       .filter((animation) => animation instanceof CSSTransition).length)).toBe(0);
     const continuity = await pill.evaluateHandle((node) => {
-      const nodes = [node, ...node.querySelectorAll('.hud-aurora, .hud-aurora *')];
+      const nodes = [node, ...node.querySelectorAll('.hud-shuttle, .hud-shuttle *')];
       const properties = ['background-color', 'border-color', 'border-radius', 'opacity', 'filter', 'mask-image', 'mask-composite', 'padding'];
       const styles = nodes.map((element) => ({
-        box: element.classList.contains('hud-aurora__flow')
+        box: element.classList.contains('hud-shuttle__flow')
             ? { width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }
             : element.getBoundingClientRect().toJSON(),
         style: properties.map((property) => getComputedStyle(element).getPropertyValue(property)),
       }));
-      const animations = [...node.querySelectorAll('.hud-aurora__flow')].flatMap((element) => element.getAnimations());
+      const animations = [...node.querySelectorAll('.hud-shuttle__flow')].flatMap((element) => element.getAnimations());
       nodes.forEach((element, index) => element.setAttribute('data-continuity-token', String(index)));
       return { nodes, styles, properties, animations };
     });
@@ -148,16 +169,16 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     const times = await continuity.evaluate(({ animations }) => animations.map((animation) => Number(animation.currentTime)));
     expect(times).toHaveLength(2);
     await emit(page, 'overlay:waveform', { waveform: 'processing' });
-    await expect(aurora).toHaveCount(1);
-    await expect(aurora).toHaveCSS('--aurora-energy', '1');
+    await expect(shuttle).toHaveCount(1);
+    await expect(shuttle).toHaveCSS('--shuttle-energy', '1');
     const after = await continuity.evaluate(({ nodes, properties, animations }) => {
-      const current = [document.querySelector('.recording--overlay')!, ...document.querySelectorAll('.hud-aurora, .hud-aurora *')];
-      const currentAnimations = [...document.querySelectorAll('.hud-aurora__flow')].flatMap((element) => element.getAnimations());
+      const current = [document.querySelector('.recording--overlay')!, ...document.querySelectorAll('.hud-shuttle, .hud-shuttle *')];
+      const currentAnimations = [...document.querySelectorAll('.hud-shuttle__flow')].flatMap((element) => element.getAnimations());
       return {
         sameNodes: current.length === nodes.length && current.every((element, index) => element === nodes[index] && element.getAttribute('data-continuity-token') === String(index)),
         sameAnimations: currentAnimations.length === animations.length && currentAnimations.every((animation, index) => animation === animations[index]),
         styles: current.map((element) => ({
-          box: element.classList.contains('hud-aurora__flow')
+          box: element.classList.contains('hud-shuttle__flow')
             ? { width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height }
             : element.getBoundingClientRect().toJSON(),
           style: properties.map((property) => getComputedStyle(element).getPropertyValue(property)),
@@ -170,7 +191,7 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     await expect.poll(async () => (await continuity.evaluate(({ animations }) => animations.map((animation) => Number(animation.currentTime))))
       .every((time, index) => time > times[index])).toBe(true);
     await fillLevels(page, 0); // Late capture levels must not change processing energy.
-    await expect(aurora).toHaveCSS('--aurora-energy', '1');
+    await expect(shuttle).toHaveCSS('--shuttle-energy', '1');
     await expect(page.getByRole('img', { name: 'Microphone level' })).toHaveCount(0);
     await expect(page.locator('.hud-transcribing')).toHaveCount(1);
     await expect(page.locator('.hud-transcribing')).toHaveAttribute('aria-hidden', 'true');
@@ -178,25 +199,36 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     await expect(status).toHaveAttribute('data-original-status', 'true');
     await expect(status).toHaveText('Transcribing');
     await expect(page.locator('.hud-transcribing')).toHaveCSS('animation-name', 'hud-pulse');
+    // The finished thread pays out of the text eyelet while the rope is twisted.
+    const payout = page.locator('.hud-payout');
+    await expect(payout).toHaveAttribute('aria-hidden', 'true');
+    await expect(payout).toHaveCSS('animation-name', 'hud-payout');
     const processingBox = await pill.boundingBox();
-    expect(processingBox?.width).toBe(136);
-    expect(processingBox?.height).toBe(22);
+    expect(processingBox?.width).toBe(142);
+    expect(processingBox?.height).toBe(28);
     expect(processingBox!.x).toBeGreaterThanOrEqual(24);
     expect(processingBox!.y).toBeGreaterThanOrEqual(24);
     expect(processingBox!.x + processingBox!.width).toBeLessThanOrEqual(190 - 24);
     expect(processingBox!.y + processingBox!.height).toBeLessThanOrEqual(76 - 24);
-    await page.screenshot({ path: testInfo.outputPath('aurora-processing.png'), omitBackground: true });
+    const ropeBox = await page.locator('.hud-transcribing').boundingBox();
+    expect(ropeBox!.x).toBeGreaterThanOrEqual(processingBox!.x);
+    expect(ropeBox!.x + ropeBox!.width).toBeLessThanOrEqual(processingBox!.x + processingBox!.width);
+    const payoutBox = await payout.boundingBox();
+    expect(payoutBox!.x + payoutBox!.width).toBeLessThanOrEqual(190);
+    await page.screenshot({ path: testInfo.outputPath('shuttle-processing.png'), omitBackground: true });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    expect(await aurora.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
-    for (const node of await aurora.locator('*').all()) {
+    expect(await shuttle.evaluate((node) => node.getAnimations({ subtree: true }).length)).toBe(0);
+    for (const node of await shuttle.locator('*').all()) {
       await expect(node).toHaveCSS('animation-name', 'none');
       await expect(node).toHaveCSS('transition-duration', '0s');
       await expect(node).toHaveCSS('will-change', 'auto');
     }
     await expect(page.locator('.hud-transcribing')).toHaveCSS('animation-name', 'hud-breathe');
     await expect(page.locator('.hud-transcribing i')).toHaveCSS('animation-name', 'none');
+    await expect(payout).toHaveCSS('animation-name', 'none');
+    await expect(payout).toBeVisible(); // Still shows where the text will go, without moving.
     await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect(aurora.locator('.hud-aurora__flow').first()).toHaveCSS('animation-name', 'hud-aurora-flow');
+    await expect(shuttle.locator('.hud-shuttle__flow').first()).toHaveCSS('animation-name', 'hud-shuttle-flow');
     await expect(page.locator('.hud-transcribing')).toHaveCSS('animation-name', 'hud-pulse');
     await continuity.dispose();
     await page.setViewportSize({ width: 248, height: 40 });
@@ -207,7 +239,7 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
       ['result-failed', 'transcribe-failed', 'Couldn’t transcribe'],
     ] as const) {
       await emit(page, 'overlay:waveform', { result, waveform });
-      await expect(page.locator('.hud-aurora')).toHaveCount(0);
+      await expect(page.locator('.hud-shuttle')).toHaveCount(0);
       await expect(page.locator('.hud-transcribing')).toHaveCount(0);
       await expect(status).toHaveAttribute('data-original-status', 'true');
       await expect(status).toHaveText(text);
@@ -217,11 +249,21 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
       expect(box!.x + box!.width).toBeLessThanOrEqual(244);
       expect(box!.y).toBeGreaterThanOrEqual(0);
       expect(box!.y + box!.height).toBeLessThanOrEqual(40);
+      // The message sits inside the tag's straight section, clear of its pointed tips.
+      const tag = await page.locator('.hud-result__tag').boundingBox();
+      const words = await page.locator('.hud-result__text').evaluate((node) => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        return range.getBoundingClientRect().toJSON() as DOMRect;
+      });
+      expect(words.left).toBeGreaterThanOrEqual(tag!.x + 20);
+      expect(words.right).toBeLessThanOrEqual(tag!.x + tag!.width - 20);
+      await page.screenshot({ path: testInfo.outputPath(`shuttle-${result}.png`), omitBackground: true });
     }
     await page.setViewportSize({ width: 190, height: 76 });
     await emit(page, 'overlay:waveform', { waveform: 'silent' });
-    await expect(page.locator('.hud-aurora')).toHaveCount(1);
+    await expect(page.locator('.hud-shuttle')).toHaveCount(1);
     await expect(status).toHaveText('');
-    await expect(page.locator('.hud-aurora')).toHaveCSS('--aurora-energy', '0');
+    await expect(page.locator('.hud-shuttle')).toHaveCSS('--shuttle-energy', '0');
   });
 }

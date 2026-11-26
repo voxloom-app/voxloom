@@ -1,20 +1,40 @@
-/* HUD (UI PR 8, SPEC § HUD behavior rules; mocks hud.html, hud-transcribing.html).
-   The HUD is the same dark pill on any wallpaper, so it doesn't follow the app theme. */
+/* HUD (UI PR 8, SPEC § HUD behavior rules), threaded through a weaving shuttle (ui-iter-06).
+   The HUD is the same dark shuttle on any wallpaper, so it doesn't follow the app theme. */
 
-/* Option A: the bars settle into an even row; the gradient shimmers and pulses (1.6 s). */
-/* Listening and transcribing share one 118px row in a 136px pill, so nothing jumps. */
-.recording--overlay .wave { gap: 2px; width: 118px; }
-.recording--overlay .wave i { flex-basis: 3px; }
+/* Listening: the meter is three strands on one 118px row (x 12–130 of the 142px shuttle),
+   clipped to the hull so a loud voice never crosses the rim. Strands have no transitions:
+   they follow the measured level, and Reduce Motion has nothing extra to stop. */
+.recording--overlay .wave {
+  height: 100%;
+  inset: 0;
+  -webkit-mask: var(--shuttle-hull) center / 100% 100% no-repeat;
+  mask: var(--shuttle-hull) center / 100% 100% no-repeat;
+  position: absolute;
+  width: 100%;
+  z-index: 1;
+}
 
-/* 24 rounded 3px bars on a 5px pitch (exactly 118px, full caps at both ends). */
+.wave__strand,
+.wave__gap { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }
+.wave__gap { stroke: #111118; stroke-linecap: butt; stroke-width: 3.5px; }
+.wave__back .wave__strand { opacity: .6; }
+.wave__strand--0 { stroke: var(--brand-a); }
+.wave__strand--1 { stroke: color-mix(in srgb, var(--brand-a) 45%, var(--brand-b)); }
+.wave__strand--2 { stroke: var(--brand-b); }
+
+/* Transcribing (Option A, re-threaded): the strands settle into a rope on the same 118px row
+   and a 2× wide lime→cyan gradient slides through it (1.6 s) while it pulses. */
 .hud-transcribing {
   animation: hud-pulse 1.6s ease-in-out infinite;
-  height: 6px;
-  margin: 4px 0;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='6'%3E%3Crect width='3' height='6' rx='1.5'/%3E%3C/svg%3E") 0 0 / 5px 6px repeat-x;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='6'%3E%3Crect width='3' height='6' rx='1.5'/%3E%3C/svg%3E") 0 0 / 5px 6px repeat-x;
+  height: 12px;
+  left: 12px;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='118' height='12' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 6L4.6 6.3L8.3 7.5L11.9 8.9L15.5 9.2L19.1 9L22.8 8.3L26.4 7.2L30 6L33.6 4.8L37.3 3.7L40.9 3L44.5 2.8L48.1 3L51.8 3.7L55.4 4.8L59 6L62.6 7.2L66.3 8.3L69.9 9L73.5 9.2L77.1 9L80.8 8.3L84.4 7.2L88 6L91.6 4.8L95.3 3.7L98.9 3L102.5 2.8L106.1 3.1L109.8 4.5L113.4 5.7L117 6'/%3E%3Cpath d='M1 6L4.6 6.5L8.3 6.6L11.9 5.6L15.5 4.4L19.1 3.5L22.8 2.9L26.4 2.8L30 3.2L33.6 4.1L37.3 5.2L40.9 6.4L44.5 7.6L48.1 8.5L51.8 9.1L55.4 9.2L59 8.8L62.6 7.9L66.3 6.8L69.9 5.6L73.5 4.4L77.1 3.5L80.8 2.9L84.4 2.8L88 3.2L91.6 4.1L95.3 5.2L98.9 6.4L102.5 7.6L106.1 8.5L109.8 8.1L113.4 6.7L117 6'/%3E%3Cpath d='M1 6L4.6 5.3L8.3 3.9L11.9 3.5L15.5 4.4L19.1 5.6L22.8 6.8L26.4 7.9L30 8.8L33.6 9.2L37.3 9.1L40.9 8.5L44.5 7.6L48.1 6.4L51.8 5.2L55.4 4.1L59 3.2L62.6 2.8L66.3 2.9L69.9 3.5L73.5 4.4L77.1 5.6L80.8 6.8L84.4 7.9L88 8.8L91.6 9.2L95.3 9.1L98.9 8.5L102.5 7.6L106.1 6.4L109.8 5.4L113.4 5.5L117 6'/%3E%3C/svg%3E") 0 0 / 118px 12px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='118' height='12' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 6L4.6 6.3L8.3 7.5L11.9 8.9L15.5 9.2L19.1 9L22.8 8.3L26.4 7.2L30 6L33.6 4.8L37.3 3.7L40.9 3L44.5 2.8L48.1 3L51.8 3.7L55.4 4.8L59 6L62.6 7.2L66.3 8.3L69.9 9L73.5 9.2L77.1 9L80.8 8.3L84.4 7.2L88 6L91.6 4.8L95.3 3.7L98.9 3L102.5 2.8L106.1 3.1L109.8 4.5L113.4 5.7L117 6'/%3E%3Cpath d='M1 6L4.6 6.5L8.3 6.6L11.9 5.6L15.5 4.4L19.1 3.5L22.8 2.9L26.4 2.8L30 3.2L33.6 4.1L37.3 5.2L40.9 6.4L44.5 7.6L48.1 8.5L51.8 9.1L55.4 9.2L59 8.8L62.6 7.9L66.3 6.8L69.9 5.6L73.5 4.4L77.1 3.5L80.8 2.9L84.4 2.8L88 3.2L91.6 4.1L95.3 5.2L98.9 6.4L102.5 7.6L106.1 8.5L109.8 8.1L113.4 6.7L117 6'/%3E%3Cpath d='M1 6L4.6 5.3L8.3 3.9L11.9 3.5L15.5 4.4L19.1 5.6L22.8 6.8L26.4 7.9L30 8.8L33.6 9.2L37.3 9.1L40.9 8.5L44.5 7.6L48.1 6.4L51.8 5.2L55.4 4.1L59 3.2L62.6 2.8L66.3 2.9L69.9 3.5L73.5 4.4L77.1 5.6L80.8 6.8L84.4 7.9L88 8.8L91.6 9.2L95.3 9.1L98.9 8.5L102.5 7.6L106.1 6.4L109.8 5.4L113.4 5.5L117 6'/%3E%3C/svg%3E") 0 0 / 118px 12px no-repeat;
   overflow: hidden;
+  position: absolute;
+  top: 8px;
   width: 118px;
+  z-index: 1;
 }
 
 /* Shimmer is a compositor-only transform: a 2× wide repeating gradient slides by half. */
@@ -27,39 +47,107 @@
   will-change: transform;
 }
 
+/* Text pays out of the cyan eyelet while Voxloom transcribes (a scaleX, also compositor-only). */
+.hud-payout {
+  animation: hud-payout 1.6s ease-out infinite;
+  background: linear-gradient(90deg, var(--brand-b), transparent);
+  height: 2px;
+  left: calc(100% - 8px);
+  position: absolute;
+  top: 13px;
+  transform-origin: left center;
+  width: 30px;
+  z-index: 1;
+}
+
 @keyframes hud-shimmer { to { transform: translateX(-50%); } }
 @keyframes hud-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@keyframes hud-payout { 0% { opacity: 0; transform: scaleX(0); } 25% { opacity: 1; } 100% { opacity: 0; transform: scaleX(1); } }
 
 @keyframes hud-breathe { 0%, 100% { opacity: .6; } 50% { opacity: .9; } }
 
-/* Reduce Motion (BUS-50): no shimmer, a slow 3 s opacity breathe. */
+/* Reduce Motion (BUS-50): no shimmer or pay-out, a slow 3 s opacity breathe. */
 @media (prefers-reduced-motion: reduce) {
   .hud-transcribing { animation: hud-breathe 3s ease-in-out infinite; }
   .hud-transcribing i { animation: none; will-change: auto; }
+  .hud-payout { animation: none; opacity: .7; }
 }
 
-/* Result states: ~2.5 s each (timed by overlayBridge). */
+/* Results (~2.5 s each, timed by overlayBridge): the thread ties off on a fixed 216px tag.
+   Copied is cyan like History's Copied knots; uncertain is amber; failed is red. */
 .hud-result {
+  --hud-tone: var(--brand-b);
+  --hud-tag: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='30'%3E%3Cpath d='M1 15C12 7.5 26 1.5 46 1.5H170C190 1.5 204 7.5 215 15C204 22.5 190 28.5 170 28.5H46C26 28.5 12 22.5 1 15Z'/%3E%3C/svg%3E");
+  --hud-tag-rim: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='30' fill='none' stroke='%23000' stroke-width='2'%3E%3Cpath d='M1 15C12 7.5 26 1.5 46 1.5H170C190 1.5 204 7.5 215 15C204 22.5 190 28.5 170 28.5H46C26 28.5 12 22.5 1 15Z'/%3E%3C/svg%3E");
   align-items: center;
-  background: #0e0e14;
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-a) 35%, transparent), 0 0 0 .5px rgba(0, 0, 0, .6), 0 0 18px color-mix(in srgb, var(--brand-b) 14%, transparent);
+  display: flex;
+  height: 30px;
+  isolation: isolate;
+  left: 4px;
+  position: absolute;
+  right: 4px;
+  top: 5px;
+}
+
+.hud-result--unverified { --hud-tone: #ffc04d; }
+.hud-result--failed { --hud-tone: #ff8585; }
+
+/* Soft glow in the outcome's tone, behind the tag. */
+.hud-result::before {
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--hud-tone) 22%, transparent), transparent);
+  content: "";
+  inset: -5px 18px;
+  position: absolute;
+  z-index: -1;
+}
+
+.hud-result__lead {
+  background: linear-gradient(90deg, transparent, var(--hud-tone));
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, .75));
+  flex: 1 1 0;
+  height: 1.5px;
+}
+
+.hud-result__lead--out { background: linear-gradient(90deg, var(--hud-tone), transparent); }
+/* An uncertain write trails a dashed thread; a failure frays in and never leaves. */
+.hud-result--unverified .hud-result__lead--out,
+.hud-result--failed .hud-result__lead {
+  background: repeating-linear-gradient(90deg, var(--hud-tone) 0 3px, transparent 3px 6px);
+}
+.hud-result--failed .hud-result__lead--out { visibility: hidden; }
+
+.hud-result__tag {
+  align-items: center;
+  background: linear-gradient(180deg, #2a2a36, #111118 45%, #08080c);
   color: #ececf1;
   display: flex;
+  flex: none;
   font-size: 12.5px;
   font-weight: 600;
   gap: 7px;
   height: 30px;
-  left: 50%;
-  padding: 0 14px;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  justify-content: center;
+  -webkit-mask: var(--hud-tag) center / 100% 100% no-repeat;
+  mask: var(--hud-tag) center / 100% 100% no-repeat;
+  padding: 0 22px;
+  position: relative;
   white-space: nowrap;
+  width: 216px;
 }
 
-.hud-result--copied .icon { color: var(--brand-a); }
-.hud-result--failed { box-shadow: inset 0 0 0 1px rgba(255, 107, 107, .5), 0 0 0 .5px rgba(0, 0, 0, .6); }
-.hud-result--failed .icon { color: #ff6b6b; }
-.hud-result--unverified { box-shadow: inset 0 0 0 1px rgba(255, 176, 32, .5), 0 0 0 .5px rgba(0, 0, 0, .6); }
-.hud-result--unverified .icon { color: #ffb020; }
+.hud-result__tag::before {
+  background: var(--hud-tone);
+  content: "";
+  inset: 0;
+  -webkit-mask: var(--hud-tag-rim) center / 100% 100% no-repeat;
+  mask: var(--hud-tag-rim) center / 100% 100% no-repeat;
+  opacity: .6;
+  position: absolute;
+}
+
+.hud-result__text { min-width: 0; overflow: hidden; }
+.hud-result__knot { flex: none; overflow: visible; }
+.hud-result__knot circle,
+.hud-result__knot path { fill: none; stroke: var(--hud-tone); stroke-width: 1.5px; }
+.hud-result__knot .hud-result__core { fill: var(--hud-tone); stroke: none; }
+.hud-result__knot .hud-result__fray { stroke-dasharray: 2.6 2.6; }

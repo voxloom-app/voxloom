@@ -1,6 +1,7 @@
 import { useApp } from '../../app/AppContext';
 import { initialSettings } from '../../domain/fixtures';
 import { SegmentedControl } from '../../components/SegmentedControl';
+import { ShuttleGlyph } from '../../components/ShuttleGlyph';
 import { Switch } from '../../components/Switch';
 import type { WritingStyle } from '../../domain/types';
 import { isTauriEnv } from '../../services/capture/captureService';
@@ -131,7 +132,7 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
           <span>Recording indicator</span>
           <small className="frow__help">Fixed bottom-center while listening or transcribing.</small>
         </span>
-        <span aria-hidden="true" className="mini-hud"><i /><i /><i /><i /><i /></span>
+        <ShuttleGlyph />
       </div>
     </div>
   );

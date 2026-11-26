@@ -9,11 +9,11 @@ beforeEach(() => {
 });
 
 describe('overlay window placement', () => {
-  it('clears the Aurora halo on every side without moving the 136×22 pill', () => {
+  it('clears the shuttle halo on every side without moving the 142×28 body', () => {
     const { height, marginBottom, width } = OVERLAY_LISTEN_PLACEMENT;
-    expect((width - 136) / 2).toBeGreaterThanOrEqual(24);
-    expect((height - 22) / 2).toBeGreaterThanOrEqual(24);
-    // Same pill center as the original 142×28 window resting 28pt above the work area.
+    expect((width - 142) / 2).toBeGreaterThanOrEqual(24);
+    expect((height - 28) / 2).toBeGreaterThanOrEqual(24);
+    // Same body center as the original 142×28 window resting 28pt above the work area.
     expect(marginBottom + height / 2).toBe(28 + 28 / 2);
   });
 

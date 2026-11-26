@@ -172,12 +172,16 @@ describe('BUS-51 brand tokens', () => {
   });
 
   it('keeps raw brand hex and rgba out of the HUD stylesheets', () => {
-    for (const file of ['hud.css', 'hud-aurora.css']) {
+    for (const file of ['hud.css', 'hud-shuttle.css']) {
       expect(css(file), file).not.toMatch(/#(b6ff3c|3cf0ff)\b/i);
       expect(css(file), file).not.toMatch(/rgba\((182, 255, 60|60, 240, 255)/);
     }
+    // ui-iter-06: the shuttle's rim, thread and Copied tone come from the brand tokens.
     const hud = css('hud.css');
-    expect(hud).toMatch(/\.hud-result \{[^}]*box-shadow: inset 0 0 0 1px color-mix\(in srgb, var\(--brand-a\) 35%, transparent\)[^;]*color-mix\(in srgb, var\(--brand-b\) 14%, transparent\);/);
+    expect(hud).toMatch(/\.hud-result \{[^}]*--hud-tone: var\(--brand-b\);/);
+    const shuttle = css('hud-shuttle.css');
+    expect(shuttle).toContain('background: linear-gradient(90deg, var(--brand-a), var(--brand-b), var(--brand-a), var(--brand-b), var(--brand-a));');
+    expect(shuttle).toMatch(/\.hud-shuttle__weft \{[^}]*var\(--brand-a\) 20px,[^}]*var\(--brand-b\) calc\(100% - 20px\)/);
   });
 
   it('paints the AppTile gradient with the brand tokens', () => {

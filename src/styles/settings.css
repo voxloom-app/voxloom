@@ -95,20 +95,9 @@
 .shortcut-recorder__status { flex-basis: 100%; font-size: var(--fs-label); line-height: 1.35; min-height: 1.35em; order: 99; }
 .shortcut-recorder__status[data-tone="error"] { color: var(--danger); }
 
-.mini-hud {
-  align-items: center;
-  background: var(--tile-bg);
-  border-radius: var(--r-pill);
-  box-shadow: var(--hud-shadow);
-  display: inline-flex;
-  gap: 2px;
-  height: 22px;
-  justify-content: center;
-  width: 78px;
-}
-
-.mini-hud i { background: var(--brand); border-radius: 2px; height: 8px; width: 2px; }
-.mini-hud i:nth-child(2n) { height: 13px; }
+/* A still of the HUD shuttle (ui-iter-06); the same drawing on light and dark panels. */
+.shuttle-glyph { display: block; filter: drop-shadow(0 4px 8px rgba(15, 23, 42, .25)); height: 26px; width: 158px; }
+.shuttle-glyph__weft { stroke-width: 1.5px; }
 
 .callout {
   align-items: flex-start;

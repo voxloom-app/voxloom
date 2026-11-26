@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { toDisplayLevel, WAVEFORM_BARS } from '../components/Waveform';
+import { toDisplayLevel, WAVEFORM_SAMPLES } from '../components/Waveform';
 import type { CaptureEvent } from '../services/capture/types';
 import type { OverlayResult, OverlayWaveform } from '../services/shortcut/overlayVisibility';
 import { OverlayWaveformView } from './OverlayWaveformView';
 
-const emptyLevels = () => Array<number>(WAVEFORM_BARS).fill(0);
+const emptyLevels = () => Array<number>(WAVEFORM_SAMPLES).fill(0);
 
 /** Separate, non-focusable Tauri window. Only level metadata crosses IPC. */
 export function OverlayApp() {

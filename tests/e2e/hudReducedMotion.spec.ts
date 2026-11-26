@@ -1,14 +1,15 @@
 import { expect, test } from '@playwright/test';
 
-// BUS-50: under Reduce Motion, transcribing keeps only the slow hud-breathe;
-// the processing waveform has no animations. With motion allowed, the pulse runs.
+// BUS-50: under Reduce Motion, transcribing keeps only the slow hud-breathe (the payout
+// thread holds still); the braided meter has no animations. With motion allowed, the pulse runs.
 // Only CSS animations are counted: a load-time CSS transition can still be running on slow CI runners (BUS-72).
 const transcribing =
-  '<div class="recording recording--overlay" data-waveform="processing"><div class="hud-transcribing"><i></i></div></div>';
+  '<div class="recording recording--overlay" data-waveform="processing"><div class="hud-transcribing"><i></i></div><span class="hud-payout"></span></div>';
 const processingWave =
-  '<div class="recording recording--overlay" data-waveform="processing"><div class="wave"><i style="--h:6px"></i><i style="--h:10px"></i></div></div>';
+  '<div class="recording recording--overlay" data-waveform="speaking"><svg class="wave" viewBox="0 0 142 28">'
+  + '<g class="wave__front"><path class="wave__gap" d="M12 14L130 14"></path><path class="wave__strand wave__strand--0" d="M12 14L130 14"></path></g></svg></div>';
 
-test('HUD under prefers-reduced-motion: breathe only on transcribing, none on processing waveform', async ({ page }) => {
+test('HUD under prefers-reduced-motion: breathe only on transcribing, none on the braided meter', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ height: 40, width: 248 });
   await page.goto('/overlay.html');
@@ -57,5 +58,6 @@ test('HUD still pulses with motion allowed', async ({ page }) => {
     return document.getAnimations().map((a) => (a as CSSAnimation).animationName ?? 'transition');
   }, transcribing);
   expect(running).toContain('hud-pulse');
+  expect(running).toContain('hud-payout');
   expect(running.length).toBeGreaterThan(0);
 });
