@@ -46,6 +46,8 @@
 
   --font: -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* ui-iter-09: your words. Transcripts and spellings are set in a macOS system serif (no font files). */
+  --font-words: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, Georgia, ui-serif, serif;
   /* BUS-41 type scale: windowed value at <=1280px wide, growing linearly to
      the fullscreen value at >=1920px (TYPE-SCALE.md). The HUD keeps its own sizes.
      Media queries + calc(), no clamp() (project rule). The app requires macOS

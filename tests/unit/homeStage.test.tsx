@@ -91,10 +91,11 @@ describe('Home voice stage', () => {
     expect(stage()).toHaveAttribute('data-phase', 'speaking');
   });
 
-  it('marks each recent row with its delivery status for the spool knot', () => {
+  it('marks each earlier row with its delivery status for the spool knot', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
+    // The newest dictation is the stage's last pick; the spool holds the four before it.
     const rows = [...document.querySelectorAll('.home .recent-row')];
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(4);
     for (const row of rows) {
       expect(row.getAttribute('data-status')).toBe(row.querySelector('.badge')!.getAttribute('data-status'));
     }

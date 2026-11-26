@@ -77,11 +77,13 @@
 .proof__heard:hover { border-color: rgba(255, 255, 255, .22); }
 .proof__heard:focus { background: rgba(255, 255, 255, .06); border-color: color-mix(in srgb, var(--brand-a) 45%, transparent); }
 
+/* What Voxloom writes is set in the words face; what it heard stays in mono (ui-iter-09). */
 .proof__typed {
   color: #f6f6f9;
-  font-size: var(--typed-fs);
-  font-weight: 650;
-  letter-spacing: -.01em;
+  font-family: var(--font-words);
+  font-size: calc(var(--typed-fs) * 1.08);
+  font-weight: 400;
+  letter-spacing: -.005em;
   line-height: var(--typed-lh);
   margin: 0;
   min-width: 0;

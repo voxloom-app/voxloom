@@ -136,10 +136,11 @@ describe('App shell (UI PR 3)', () => {
 });
 
 describe('Home (UI PR 3)', () => {
-  it('shows a status badge on each recent row', () => {
+  it('shows a status badge on each earlier row and on the last pick', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const rows = document.querySelectorAll('.home .recent-row');
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(4);
+    expect(document.querySelector('.home .pick .badge')).toHaveAttribute('data-status', 'inserted');
     rows.forEach((row) => expect(row.querySelector('.badge')).not.toBeNull());
   });
 

@@ -68,7 +68,7 @@
 .history-row.recent-row > .timestamp { grid-area: time; line-height: var(--line-h); text-align: right; width: auto; }
 .history-row.recent-row > .history-row__body { grid-area: body; min-width: 0; }
 .history-row.recent-row > .action-group { gap: 2px; grid-area: actions; margin: calc((var(--line-h) - 44px) / 2) -8px 0 0; }
-.history-row .history-row__text { font-size: var(--fs-emph); font-weight: 560; letter-spacing: -.005em; line-height: var(--line-h); margin: 0; }
+.history-row .history-row__text { font-family: var(--font-words); font-size: calc(var(--fs-emph) * 1.06); font-weight: 400; letter-spacing: .003em; line-height: var(--line-h); margin: 0; }
 
 /* Knot: hollow in its status colour; the newest of the list is tied tight and glows. */
 .history-row.recent-row::before {
@@ -142,4 +142,5 @@
 }
 
 .history-row__original summary { cursor: default; width: fit-content; }
-.history-row__original p { margin: 4px 0 0; white-space: pre-wrap; }
+/* The original is what the engine heard: mono, like the Dictionary's Heard tape. */
+.history-row__original p { font-family: var(--mono); font-size: var(--fs-mono); margin: 4px 0 0; white-space: pre-wrap; }

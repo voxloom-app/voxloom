@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Home } from '../../src/features/home/Home';
@@ -27,13 +27,15 @@ function stubDogfood(
 }
 
 describe('Home', () => {
-  it('limits recent rows and reports copy success', async () => {
+  it('limits earlier rows and reports copy success', async () => {
     const user = userEvent.setup();
     const toast = vi.fn();
     renderWithApp(<Home dogfood={stubDogfood()} onToast={toast} />);
-    expect(screen.getAllByRole('button', { name: 'Copy dictation' }))
-      .toHaveLength(5);
-    expect(screen.getAllByText(/AM|PM/)).toHaveLength(5);
+    // The newest dictation leads the stage; the cloth lists the ones before it.
+    const earlier = screen.getByRole('region', { name: 'Earlier dictations' });
+    expect(within(earlier).getAllByRole('button', { name: 'Copy dictation' }))
+      .toHaveLength(4);
+    expect(within(earlier).getAllByText(/AM|PM/)).toHaveLength(4);
     await user.click(screen.getAllByRole('button', {
       name: 'Copy dictation',
     })[0]);

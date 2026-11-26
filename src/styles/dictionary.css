@@ -81,7 +81,8 @@
 .dictionary .term-row:focus-within .term-row__forms::before { border-top-color: var(--accfg); border-top-style: solid; }
 
 .dictionary .term-row:last-child { border-bottom: 0; }
-.dictionary .term-row strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+/* Saved spellings are your words: set in the words face (ui-iter-09). */
+.dictionary .term-row strong { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .dictionary .term-row__actions { gap: var(--s-1); opacity: 1; visibility: visible; }
 .dictionary .term-row__actions .ib { height: 32px; width: 32px; }
 .dictionary .term-row:hover,

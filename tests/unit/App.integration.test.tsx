@@ -186,7 +186,8 @@ describe('App integration', () => {
       await user.click(screen.getByRole('button', { name: 'Set up later' }));
       expect(
         screen.getAllByRole('button', { name: 'Copy dictation' }),
-      ).toHaveLength(5);
+      ).toHaveLength(4);
+      expect(screen.getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
 
       await user.click(
         screen.getByRole('button', { name: 'Settings' }),
