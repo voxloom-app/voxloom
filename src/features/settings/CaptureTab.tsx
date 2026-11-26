@@ -38,7 +38,7 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
   const styleHelp = cleanupActive ? STYLE_HELP_ON : STYLE_HELP_OFF;
   return (
     <div className="settings-rows">
-      <div className="frow frow--recorder">
+      <div className="frow frow--recorder" data-path-stop="shortcut">
         <span className="frow__label">
           <span id="settings-shortcut-label">Shortcut</span>
           <small className="frow__help" id="settings-shortcut-help">
@@ -73,7 +73,7 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
           {!isNative && <option>English (UK)</option>}
         </select>
       </div>
-      <div className="frow">
+      <div className="frow" data-path-stop="style">
         <span className="frow__label">
           <span>Writing style</span>
           {mentionCleanup && <small className="frow__help">{styleHelp}</small>}
@@ -104,7 +104,7 @@ export function CaptureTab({ cleanupModelStore, onSetup }: {
           </select>
         </div>
       )}
-      <div className="frow">
+      <div className="frow" data-path-stop="output">
         <span className="frow__label"><span>Clipboard fallback</span></span>
         <Switch
           checked={state.settings.clipboardFallback}

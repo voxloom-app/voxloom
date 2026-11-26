@@ -119,7 +119,7 @@ describe('Settings', () => {
     captureMocks.captureReady = false;
     renderWithApp(<Settings onSetup={vi.fn()} />);
 
-    expect(screen.getByLabelText(/Microphone/)).toBeDisabled();
+    expect(screen.getByLabelText('Microphone')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Refresh microphones' }))
       .toBeDisabled();
     expect(screen.getByRole('button', { name: 'Test Microphone' }))
@@ -133,9 +133,9 @@ describe('Settings', () => {
     );
     renderWithApp(<Settings onSetup={vi.fn()} />);
 
-    await user.selectOptions(screen.getByLabelText(/Microphone/), 'input-2');
+    await user.selectOptions(screen.getByLabelText('Microphone'), 'input-2');
     expect(captureMocks.prepareDeviceChange).toHaveBeenCalledOnce();
-    expect(screen.getByLabelText(/Microphone/)).toHaveValue(
+    expect(screen.getByLabelText('Microphone')).toHaveValue(
       'system-default',
     );
   });
@@ -145,8 +145,8 @@ describe('Settings', () => {
     captureMocks.prepareDeviceChange.mockResolvedValueOnce(false);
     renderWithApp(<Settings onSetup={vi.fn()} />);
 
-    await user.selectOptions(screen.getByLabelText(/Microphone/), 'input-2');
-    expect(screen.getByLabelText(/Microphone/)).toHaveValue(
+    await user.selectOptions(screen.getByLabelText('Microphone'), 'input-2');
+    expect(screen.getByLabelText('Microphone')).toHaveValue(
       'system-default',
     );
   });
@@ -154,15 +154,15 @@ describe('Settings', () => {
   it('retains a missing selected device as unavailable', async () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
-    await user.selectOptions(screen.getByLabelText(/Microphone/), 'input-2');
-    expect(screen.getByLabelText(/Microphone/)).toHaveValue('input-2');
+    await user.selectOptions(screen.getByLabelText('Microphone'), 'input-2');
+    expect(screen.getByLabelText('Microphone')).toHaveValue('input-2');
 
     captureMocks.devices = [
       { available: true, id: 'input-1', label: 'Built-in Microphone' },
     ];
     await user.click(screen.getByRole('radio', { name: 'Casual' }));
 
-    expect(screen.getByLabelText(/Microphone/)).toHaveValue('input-2');
+    expect(screen.getByLabelText('Microphone')).toHaveValue('input-2');
     expect(screen.getByRole('option', {
       name: 'USB Audio (unavailable)',
     })).toBeDisabled();

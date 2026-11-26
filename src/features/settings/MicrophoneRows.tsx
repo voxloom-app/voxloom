@@ -52,7 +52,7 @@ export function MicrophoneRows() {
 
   return (
     <>
-      <div className="frow">
+      <div className="frow" data-path-stop="microphone">
         <span className="frow__label"><label htmlFor="settings-microphone">Microphone</label></span>
         <span className="frow__control">
           <select

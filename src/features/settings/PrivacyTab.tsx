@@ -30,7 +30,7 @@ export function PrivacyTab() {
   return (
     <>
       <div className="settings-rows">
-        <div className="frow">
+        <div className="frow" data-path-stop="transcripts">
           <span className="frow__label">
             <span id="transcript-retention-label">Transcript retention</span>
             <small className="frow__help" id="transcript-retention-help">

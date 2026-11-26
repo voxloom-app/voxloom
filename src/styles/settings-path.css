@@ -1,0 +1,190 @@
+/* The voice path (ui-iter-04): the Settings header becomes the stage material (stage.css)
+   in both themes, so Settings shares the rail's, Home's and History's instrument. One
+   brand thread runs left to right through a knot per stop a dictation passes; each stop
+   shows its saved value and opens its control. The open tab ties its stops (filled knots).
+   Voice comes in on the lime side, text leaves on the cyan side, as on the Home loom. */
+.settings-window__bar.stage {
+  align-items: stretch;
+  /* settings.css paints the old toolbar later in the cascade; restate the stage material. */
+  background:
+    linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat,
+    linear-gradient(180deg, #17171f, #0a0a0e);
+  border-bottom: 0;
+  container: settings-bar / inline-size;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 0;
+  margin: 0;
+  padding: var(--s-9) var(--s-11) 0;
+}
+
+.settings-window__head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px var(--s-6); }
+.settings-window__bar.stage h1 { color: var(--fg); font-size: var(--fs-section); font-weight: 700; }
+.settings-window__head p { color: var(--mut); font-size: var(--fs-label); margin: 0; }
+
+.voice-path { container-type: inline-size; margin: var(--s-8) calc(var(--s-11) * -1) 0; }
+.voice-path__stops {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--s-9);
+}
+
+.voice-path__stop {
+  --pad: var(--s-3);
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 12px;
+  color: var(--fg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  gap: var(--s-2);
+  height: 100%;
+  padding: var(--s-3) var(--pad) var(--s-5);
+  text-align: center;
+  width: 100%;
+}
+.voice-path__stop:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.voice-path__label { color: var(--mut); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.voice-path__value { font-size: var(--fs-secondary); font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
+.voice-path__value[data-inactive] { color: var(--mut); }
+.voice-path__detail { color: var(--mut); font-size: var(--fs-label); line-height: 1.3; }
+
+/* Each stop owns one slice of a single lime → cyan gradient, so the thread reads as one. */
+.voice-path__thread {
+  align-self: stretch;
+  display: grid;
+  height: 18px;
+  margin: var(--s-1) calc(var(--pad) * -1);
+  overflow: hidden;
+  place-items: center;
+  position: relative;
+}
+.voice-path__thread::before,
+.voice-path__thread::after {
+  content: "";
+  height: 2px;
+  inset: 8px 0 auto;
+  position: absolute;
+}
+.voice-path__thread::before {
+  background: linear-gradient(90deg, var(--brand-a), var(--brand-b)) calc(var(--i) * 20%) 0 / 600% 100%;
+  opacity: .55;
+}
+li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
+li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(270deg, transparent, #000 45%); mask-image: linear-gradient(270deg, transparent, #000 45%); }
+
+/* A pulse of light carries a dictation stop to stop, then the path rests (12 s loop). */
+.voice-path__thread::after {
+  animation: path-carry 12s linear infinite;
+  animation-delay: calc(var(--i) * 1.2s);
+  background: linear-gradient(90deg, transparent 30%, color-mix(in srgb, var(--brand-a) 50%, var(--brand-b)) 50%, transparent 70%);
+  opacity: 0;
+  transform: translateX(-100%);
+}
+@keyframes path-carry {
+  0% { opacity: 0; transform: translateX(-100%); }
+  1% { opacity: 1; }
+  10% { opacity: 1; transform: translateX(100%); }
+  10.01%, 100% { opacity: 0; transform: translateX(100%); }
+}
+
+.voice-path__thread i {
+  background: var(--panel);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--ctl-line);
+  height: 12px;
+  position: relative;
+  transition: transform .15s ease, box-shadow .15s ease;
+  width: 12px;
+  z-index: 1;
+}
+
+/* The open tab's stops are tied: a filled knot in that stop's colour, with a soft glow. */
+.voice-path li[data-current] .voice-path__thread i {
+  --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b));
+  background: var(--knot);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--knot) 22%, transparent), 0 0 12px color-mix(in srgb, var(--knot) 38%, transparent);
+}
+.voice-path li[data-current] .voice-path__label { color: var(--fg); }
+.voice-path__stop:hover .voice-path__thread i,
+.voice-path__stop:focus-visible .voice-path__thread i { transform: scale(1.3); }
+.voice-path__stop:hover { background: rgba(255, 255, 255, .04); }
+
+/* The shortcut stop shows small key caps, the rail's material. */
+.voice-path__value .key-combo__caps { display: inline-flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.voice-path__value .kbd {
+  background: linear-gradient(180deg, #32323f, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-bottom-color: rgba(255, 255, 255, .04);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 0 #050508;
+  color: #f6f6f9;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  min-width: 20px;
+  padding: 0 5px;
+}
+.voice-path__value[data-inactive] .kbd { color: var(--mut); }
+
+/* The tabs become the stage's deck: chapters of the same path. */
+.settings-window__bar.stage .settings-tabs {
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  flex-wrap: wrap;
+  margin: var(--s-4) calc(var(--s-11) * -1) 0;
+  padding: var(--s-4) var(--s-11);
+}
+.settings-window__bar.stage .settings-tab { flex-direction: row; gap: 7px; min-width: 0; padding: 7px 12px; }
+.settings-window__bar.stage .settings-tab:hover:not([aria-selected="true"]) { background: rgba(255, 255, 255, .05); color: var(--fg); }
+
+/* Landing: the row a stop opens wears a lime selvedge, and a tint that fades. */
+.settings-panel [data-landed],
+.settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); }
+.settings-panel [data-landed] { animation: path-land 2.4s ease-out; }
+.settings-rows .frow[data-landed],
+.settings-rows .frow:has(:focus-visible) { margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
+@keyframes path-land {
+  from { background-color: color-mix(in srgb, var(--accfg) 16%, transparent); }
+  to { background-color: transparent; }
+}
+
+/* Narrow windows: the thread runs down the left and each stop becomes a row. */
+@container (max-width: 600px) {
+  .voice-path__stops { grid-auto-flow: row; grid-template-columns: 1fr; padding: 0 var(--s-6); }
+  .voice-path__stop {
+    align-items: center;
+    column-gap: var(--s-6);
+    display: grid;
+    grid-template-columns: 18px 9em minmax(0, 1fr);
+    padding: var(--s-3) var(--s-4);
+    text-align: left;
+  }
+  .voice-path__thread { grid-column: 1; grid-row: 1 / span 2; height: auto; margin: calc(var(--s-3) * -1) 0; }
+  .voice-path__thread::before,
+  .voice-path__thread::after { height: auto; inset: 0 8px; width: 2px; }
+  .voice-path__thread::before { background: linear-gradient(180deg, var(--brand-a), var(--brand-b)) 0 calc(var(--i) * 20%) / 100% 600%; }
+  li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(180deg, transparent, #000 45%); mask-image: linear-gradient(180deg, transparent, #000 45%); }
+  li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(0deg, transparent, #000 45%); mask-image: linear-gradient(0deg, transparent, #000 45%); }
+  .voice-path__thread::after { animation: none; display: none; }
+  .voice-path__label { grid-column: 2; grid-row: 1; }
+  .voice-path__value { grid-column: 3; grid-row: 1; }
+  .voice-path__detail { grid-column: 3; grid-row: 2; }
+  .voice-path__value .key-combo__caps { justify-content: flex-start; }
+}
+
+@container settings-bar (max-width: 600px) {
+  .settings-window__bar.stage .settings-tab { flex-direction: column; gap: 3px; min-width: 76px; padding: 6px 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No travelling light and no fading tint: the landed row keeps its selvedge only. */
+  .voice-path__thread::after { animation: none; display: none; }
+  .settings-panel [data-landed] { animation: none; }
+  .voice-path__thread i { transition: none; }
+}
