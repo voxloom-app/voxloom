@@ -20,7 +20,7 @@ describe('History clipping sheet', () => {
     await user.click(clip(newer));
     expect(clip(newer)).toHaveAttribute('aria-pressed', 'true');
     await user.click(clip(older));
-    await user.click(screen.getByRole('radio', { name: 'Failed' }));
+    await user.click(screen.getByRole('radio', { name: /^Failed \d+$/ }));
     expect(rows()).toHaveLength(1);
     const opener = review();
     expect(opener).toHaveAccessibleName(/2 passages/);

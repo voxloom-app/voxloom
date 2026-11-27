@@ -36,13 +36,15 @@ describe('The loom frame (ui-iter-08): each page is a beam on the frame, and the
     expect(home.querySelector('.stage .recent-list')).toBeNull();
   });
 
-  it('History: the masthead is the beam; search, filters and the timeline lie open under it', () => {
+  it('History: the masthead is the beam and holds the search; filters and the timeline lie open under it', () => {
     renderWithApp(<History onToast={vi.fn()} />);
     const history = document.querySelector('.history')!;
     expect(layers(history)).toEqual(['stage', 'page-body']);
     expect(history.querySelector('.cloth')).toBeNull();
+    const stage = history.querySelector(':scope > .stage') as HTMLElement;
+    expect(within(stage).getByRole('searchbox', { name: 'Search history' })).toBeInTheDocument();
     const page = history.querySelector(':scope > .page-body')!;
-    expect(within(page as HTMLElement).getByRole('searchbox', { name: 'Search history' })).toBeInTheDocument();
+    expect(within(page as HTMLElement).getByRole('radiogroup', { name: 'History status' })).toBeInTheDocument();
     expect(page.querySelector('.history-timeline')).not.toBeNull();
     expect(history.querySelector('.stage .history-timeline')).toBeNull();
   });

@@ -24,7 +24,7 @@ describe('History empty states (UI PR 4)', () => {
 
   it('names the real Settings section in the retention line', () => {
     renderWithApp(<History onToast={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Transcripts' }).parentElement).toHaveTextContent('(Settings › Transcripts)');
+    expect(screen.getByRole('button', { name: 'Transcripts' }).parentElement).toHaveTextContent('Kept for 30 days · Settings › Transcripts');
   });
 });
 
@@ -33,13 +33,13 @@ describe('History segmented filter (UI PR 4)', () => {
     renderWithApp(<History onToast={vi.fn()} />);
     expect(rows()).toHaveLength(initialRecords.length);
     for (const status of statuses) {
-      fireEvent.click(screen.getByRole('radio', { name: status[0].toUpperCase() + status.slice(1) }));
+      fireEvent.click(screen.getByRole('radio', { name: new RegExp(`^${status[0].toUpperCase()}${status.slice(1)} \\d+$`) }));
       const expected = initialRecords.filter((r) => r.status === status).length;
       expect(rows(), status).toHaveLength(expected);
       rows().forEach((row) => expect(within(row).getByRole('button', { name: /^Recording details/ }))
         .toHaveAccessibleName(new RegExp(`${status}$`, 'i')));
     }
-    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
+    fireEvent.click(screen.getByRole('radio', { name: /^All \d+$/ }));
     expect(rows()).toHaveLength(initialRecords.length);
   });
 
@@ -53,17 +53,18 @@ describe('History segmented filter (UI PR 4)', () => {
     expect(screen.queryByText('No dictations yet')).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(rows()).toHaveLength(initialRecords.length);
-    screen.getByRole('radio', { name: 'All' }).focus();
+    screen.getByRole('radio', { name: /^All \d+$/ }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('radio', { name: 'Inserted' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /^Inserted \d+$/ })).toHaveAttribute('aria-checked', 'true');
     expect(rows()).toHaveLength(initialRecords.filter((r) => r.status === 'inserted').length);
   });
 
   it('keeps the failure note on the page and its badge in the recording slip; Retry only in the browser', () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     renderWithApp(<History onToast={vi.fn()} />);
-    expect(screen.getByText(/Audio isn’t saved/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: 'Failed' }));
+    // Said once, on the failed row that needs it, not in the masthead too (ui-iter-39).
+    expect(screen.queryByText(/Audio isn’t saved/)).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /^Failed \d+$/ }));
     const row = rows()[0];
     fireEvent.click(within(row).getByRole('button', { name: /Recording details.*Failed/ }));
     expect(within(row).getByText('Failed')).toHaveClass('badge');
@@ -115,10 +116,12 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     expect(css).not.toMatch(/\.history-list \.action-group \{[^}]*visibility: hidden/);
   });
 
-  it('keeps actions always visible on Failed and Unverified rows (designer)', async () => {
+  it('keeps actions always visible on Failed rows; Unverified ones show on hover or focus (ui-iter-39)', async () => {
     const { readFileSync } = await import('node:fs');
     const css = readFileSync('src/styles/lists.css', 'utf8');
-    expect(css).toMatch(/\.recent-row\[data-status="failed"\] \.action-group,\s*\.history-list \.recent-row\[data-status="unverified"\] \.action-group \{ opacity: 1; \}/);
+    expect(css).toMatch(/\.history-list \.recent-row\[data-status="failed"\] \.action-group \{ opacity: 1; \}/);
+    // The day says its Unverified caution once, so 38 such rows don't show 76 icons.
+    expect(css).not.toMatch(/\[data-status="unverified"\] \.action-group/);
     renderWithApp(<History onToast={() => {}} />);
     for (const row of screen.getAllByRole('article')) {
       expect(row).toHaveAttribute('data-status');

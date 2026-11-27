@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { act, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { useApp } from '../../src/app/AppContext';
 import { unverifiedDay } from '../../src/dev/ScenarioPanel';
@@ -43,16 +44,28 @@ describe('History says it once (ui-iter-23)', () => {
     }
   });
 
-  it('keys only the outcomes present in the filtered day and uses the same shapes in its time margin', () => {
+  it('keys the outcomes once, on the status filter, with the same shapes as its time margin (ui-iter-39)', async () => {
+    const user = userEvent.setup();
     renderWithApp(<History onToast={vi.fn()} />, NOON);
-    const key = document.querySelector('.ledger-key')!;
-    for (const [status, count] of [['inserted', 3], ['copied', 2], ['failed', 1]] as const) {
-      expect(key).toHaveTextContent(`${count} ${status}`);
-      expect(key.querySelector(`.ledger-knot[data-status="${status}"]`)).not.toBeNull();
+    const filter = screen.getByRole('radiogroup', { name: 'History status' });
+    expect(within(filter).getByRole('radio', { name: 'All 6' })).toHaveAttribute('aria-checked', 'true');
+    for (const [status, count] of [['inserted', 3], ['copied', 2], ['failed', 1], ['unverified', 0]] as const) {
+      const label = `${status[0].toUpperCase()}${status.slice(1)}`;
+      const radio = within(filter).getByRole('radio', { name: `${label} ${count}` });
+      expect(radio.querySelector(`.ledger-knot[data-status="${status}"]`)).toHaveAttribute('aria-hidden', 'true');
       expect(document.querySelectorAll(`.ledger-stamp .ledger-knot[data-status="${status}"]`)).toHaveLength(count);
     }
-    act(() => screen.getByRole('radio', { name: 'Copied' }).click());
-    expect(key).toHaveTextContent(/^2 copied$/);
+    // No per-day key or "Run details" line repeats them.
+    expect(document.querySelector('.ledger-key')).toBeNull();
+    expect(screen.queryByText(/Run details/i)).toBeNull();
+    // Counts follow the search, not the status you picked, so every chip says what it would show.
+    await user.click(within(filter).getByRole('radio', { name: 'Copied 2' }));
+    expect(screen.getAllByRole('article')).toHaveLength(2);
+    expect(within(filter).getByRole('radio', { name: 'Inserted 3' })).toHaveAttribute('aria-checked', 'false');
+    await user.type(screen.getByRole('searchbox', { name: 'Search history' }), 'pnpm');
+    expect(within(filter).getByRole('radio', { name: 'All 1' })).toBeInTheDocument();
+    expect(within(filter).getByRole('radio', { name: 'Copied 1' })).toHaveAttribute('aria-checked', 'true');
+    expect(within(filter).getByRole('radio', { name: 'Inserted 0' })).toBeInTheDocument();
   });
 
   it('uses the singular for a lone unverified dictation', () => {
@@ -96,8 +109,8 @@ describe('History says it once (ui-iter-23)', () => {
     expect(badge).not.toMatch(/background: color-mix\(in srgb, var\(--warn\)/);
     const quiet = 'color-mix(in srgb, var(--warn) 45%, var(--mut))';
     expect(css('history.css')).toContain(`.ledger-knot[data-status="unverified"] { background: var(--bg); border: 2px dotted ${quiet};`);
-    // The time index measures activity, never delivery outcomes.
-    expect(css('history-stage.css')).not.toContain('[data-status');
+    // Hour marks measure time, never delivery outcomes.
+    expect(css('history.css')).not.toMatch(/\.history-hour[^{]*\[data-status/);
     expect(css('home.css')).toContain(`.home .recent-row[data-status="unverified"]::before { border: 2px dotted ${quiet};`);
     // ui-iter-33: the last pick has no knot of its own; its badge alone says Unverified.
     expect(css('home-pick.css')).not.toMatch(/--pick-tone|\[data-status/);

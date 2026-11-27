@@ -54,19 +54,19 @@ describe('History masthead', () => {
     expect(screen.queryByRole('button', { name: /^Show (failed|unverified)$/ })).toBeNull();
   });
 
-  it('leaves the empty state to the timeline, without a time index or clipping sheet', () => {
+  it('leaves the empty state to the timeline, without hour marks or a clipping sheet', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
     for (const button of screen.getAllByRole('button', { name: 'Delete transcript' })) fireEvent.click(button);
-    expect(screen.queryByRole('navigation', { name: 'Time index' })).toBeNull();
+    expect(document.querySelector('.history-hour')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Open clipping sheet/ })).toBeNull();
     expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
     expect(screen.getByText('No dictations yet')).toBeInTheDocument();
   });
 
-  it('keeps index text and ink legible on the graphite and linen materials', () => {
-    const css = readFileSync('src/styles/history-stage.css', 'utf8');
-    expect(css).toMatch(/\.time-index__period \{[^}]*background: var\(--field\)/);
-    expect(css).toMatch(/\.time-index__imprint i\[data-ink\] \{ background: var\(--info\)/);
+  it('keeps hour marks, filter counts and knots legible on the graphite and linen materials', () => {
+    const css = readFileSync('src/styles/history.css', 'utf8');
+    expect(css).toMatch(/\.history-hour > span \{[^}]*background: var\(--bg\);[^}]*color: var\(--fg\);/);
+    expect(readFileSync('src/styles/history-stage.css', 'utf8')).toMatch(/\.history-filter__count \{ color: var\(--mut\);/);
     expect(css).not.toContain('animation:'); // static data, even with motion enabled
     const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
     const lum = (hex: string) => [1, 3, 5].reduce((sum, i, n) => sum + [0.2126, 0.7152, 0.0722][n] * lin(parseInt(hex.slice(i, i + 2), 16)), 0);

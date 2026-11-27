@@ -3,17 +3,19 @@
 .page-head h1 { font-size: var(--fs-page); font-weight: 850; letter-spacing: -.03em; margin-bottom: 4px; }
 .page-head p { color: var(--mut); margin: 0; max-width: 640px; }
 
-.history-tools { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-6); margin-bottom: var(--s-6); }
-.history-tools .search { min-width: 220px; }
+.history-tools { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-6); margin-bottom: var(--s-4); }
 
-/* The reading ledger. Technical notes live behind their time stamp, rather
-   than between passages. The tinted time margin runs unbroken down the day. */
+/* The day's words on one thread (ui-iter-39), as on Home: the time margin holds each stamp
+   with its knot on the thread, and a mark where the hour turns. No boxes or rules between
+   rows; a row's tools show on hover or focus. Technical notes stay behind the stamp. */
 .history-timeline { display: grid; gap: var(--s-11); margin-inline: auto; max-width: 64rem; }
 .history-day {
   --stamp-w: calc(var(--fs-mono) * 6 + 22px);
   --row-gap-x: var(--s-8);
-  --row-y: 12px;
+  --row-y: 11px;
   --line-h: calc(var(--fs-emph) * 1.55);
+  --knot-y: calc(var(--row-y) + max(28px, var(--line-h)) / 2);
+  --thread: color-mix(in srgb, var(--accfg) 30%, var(--line));
   min-width: 0;
 }
 .ledger-dateline {
@@ -22,11 +24,12 @@
 }
 .ledger-dateline h2 { font: normal calc(var(--fs-sheet) * 1.65)/1.2 var(--font-words); letter-spacing: -.035em; margin: 0; }
 .ledger-dateline > span { color: var(--mut); font-size: var(--fs-label); }
-.ledger-headings { align-items: center; display: grid; gap: var(--row-gap-x); grid-template-columns: var(--stamp-w) 1fr; padding-block: var(--s-5); }
-.ledger-headings__time { color: var(--mut); font: 650 var(--fs-micro)/1.4 var(--mono); letter-spacing: .04em; padding-left: 8px; text-transform: uppercase; }
-.ledger-key { color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-label); gap: var(--s-2) var(--s-8); }
-.ledger-key > span { align-items: baseline; display: inline-flex; gap: 6px; }
-.ledger-key .ledger-knot { align-self: flex-start; margin-top: .38em; }
+/* The day's one caution sits on the knots' column, its words where the transcripts start. */
+.history-day__unsure {
+  align-items: baseline; color: var(--mut); column-gap: var(--row-gap-x); display: grid;
+  font-size: var(--fs-label); grid-template-columns: var(--stamp-w) minmax(0, 1fr); margin: var(--s-6) 0 0;
+}
+.history-day__unsure .ledger-knot { justify-self: end; margin-right: -5px; }
 
 /* A shared alphabet in the margin and its key: solid, open, frayed, uncertain.
    No newest-row fill: an unknown delivery must never look like a verified one. */
@@ -35,25 +38,29 @@
 .ledger-knot[data-status="failed"] { background: var(--bg); border: 2px dashed var(--err); border-radius: 2px; }
 .ledger-knot[data-status="unverified"] { background: var(--bg); border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); }
 
-.history-day .history-list { border-top: 1px solid var(--line); gap: 0; }
+.history-day .history-list { gap: 0; padding-top: var(--s-4); }
 .history-row.recent-row {
-  align-items: start; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  align-items: start; border: 0; border-radius: 0;
   column-gap: var(--row-gap-x); grid-template-areas: "time body actions";
   grid-template-columns: var(--stamp-w) minmax(0, 1fr) auto;
-  padding: var(--row-y) var(--s-4) var(--row-y) 0; position: relative; row-gap: 0;
+  padding: var(--row-y) var(--s-4) var(--row-y) 0; position: relative; row-gap: 0; scroll-margin-block: 3.5rem 1rem;
 }
 .history-row.recent-row:first-child { padding-top: var(--row-y); }
-.history-row.recent-row::before {
-  background: color-mix(in srgb, var(--mut) 5%, transparent); border-right: 1px dashed var(--ctl-line);
-  bottom: 0; content: ''; left: 0; pointer-events: none; position: absolute; top: 0; width: var(--stamp-w);
+/* Each row and hour mark draws its piece of the thread, so it runs from the first knot to the last. */
+:is(.history-row.recent-row, .history-hour:not([data-first]))::before {
+  background: var(--thread); bottom: 0; content: ''; left: calc(var(--stamp-w) - 1px);
+  pointer-events: none; position: absolute; top: 0; width: 2px;
 }
+.history-list > .history-row:first-of-type::before { top: var(--knot-y); }
+.history-list > .history-row:last-of-type::before { bottom: auto; height: var(--knot-y); }
+.history-list > .history-row:only-of-type::before { content: none; }
 .history-row.recent-row > .ledger-stamp {
-  align-items: center; border: 0; border-radius: 0; color: var(--mut); display: flex;
+  align-items: center; background: none; border: 0; border-radius: var(--r-ctl) 0 0 var(--r-ctl); color: var(--mut); display: flex;
   gap: 4px; grid-area: time; justify-content: space-between; min-height: max(28px, var(--line-h));
   padding: 0 0 0 8px; position: relative; text-align: start;
 }
 .ledger-stamp .timestamp { color: inherit; font-variant-numeric: tabular-nums; text-decoration: underline dotted var(--ctl-line); text-underline-offset: 4px; }
-.ledger-stamp .ledger-knot { margin-right: -5px; }
+.ledger-stamp .ledger-knot { margin-right: -5px; position: relative; }
 .ledger-stamp:is(:hover, :focus-visible, [aria-expanded="true"]) { background: var(--navon); color: var(--fg); }
 .ledger-stamp:focus-visible { outline-color: var(--accfg); }
 .ledger-stamp[aria-expanded="true"] .timestamp { text-decoration: underline solid var(--accfg); }
@@ -64,6 +71,20 @@
 .history-row.recent-row[data-status="failed"] { background: var(--panel); box-shadow: inset -2px 0 var(--err); }
 .history-row .recovery-state, .history-row .history-row__exception { color: var(--mut); font-size: var(--fs-secondary); margin: 2px 0 0; }
 .history-row .recovery-state { align-items: baseline; color: var(--warn); display: flex; gap: 6px; }
+
+/* Where the hour turns, its mark rides the top of the margin while you read that hour. */
+.history-list > .history-hour {
+  display: grid; grid-template-columns: var(--stamp-w) 1fr; margin: 0; padding: var(--s-8) 0 var(--s-3);
+  pointer-events: none; position: sticky; top: 0; z-index: 2;
+}
+/* Same padding on every mark, so a stuck later mark covers the first one exactly; the first just sits higher. */
+.history-list > .history-hour[data-first] { margin-top: calc(var(--s-2) - var(--s-8)); }
+.history-hour > span {
+  background: var(--bg); border: 1px solid var(--ctl-line); border-radius: var(--r-pill); color: var(--fg);
+  font: 650 var(--fs-micro)/1 var(--mono); justify-self: start; letter-spacing: .04em;
+  padding: 5px 8px; text-align: center; width: calc(var(--stamp-w) - var(--s-6));
+}
+.history .page-body:has(> .history-tools[data-clipping]) .history-hour { top: calc(36px + var(--s-4) * 2); }
 
 /* The slip opens on the same baseline grid, outside the word measure. */
 .history-row.recent-row > .recording-slip { border-block: 1px dashed var(--ctl-line); grid-column: 2 / -1; margin: var(--s-6) 0 var(--s-2); padding: var(--s-6) 0; }

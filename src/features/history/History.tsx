@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { canStartDictation } from '../../app/state';
 import { EmptyState } from '../../components/EmptyState';
@@ -9,7 +9,7 @@ import type { DictationRecord, HistoryStatus, Settings } from '../../domain/type
 import { isTauriEnv } from '../../services/capture/captureService';
 import { canClip, ClippingSheet } from './ClippingSheet';
 import { SettingsStopLink } from '../settings/SettingsStopLink';
-import { TimeIndex } from './TimeIndex';
+import { hourRuns } from './hourRuns';
 import { HistoryRow } from './HistoryRow';
 import { groupByDay } from './historyLoom';
 import { HistoryDayHead } from './HistoryDayHead';
@@ -28,14 +28,32 @@ const filters: { value: Filter; label: string }[] = [
   { value: 'unverified', label: 'Unverified' },
 ];
 
+/** The filter is also the key: each outcome shows its margin knot and how many match
+ * the search, so the knots are explained once, at the top, instead of per day. */
+function filterOptions(records: DictationRecord[]) {
+  const counts: Record<Filter, number> = { all: records.length, copied: 0, failed: 0, inserted: 0, unverified: 0 };
+  for (const record of records) counts[record.status]++;
+  return filters.map(({ value, label }) => ({
+    value,
+    label: (
+      <>
+        {value !== 'all' && <i aria-hidden="true" className="ledger-knot" data-status={value} />}
+        <span>{label}</span>{' '}
+        <b className="history-filter__count" data-none={counts[value] === 0 || undefined}>{counts[value]}</b>
+      </>
+    ),
+  }));
+}
+
 const retentionCopy: Record<Settings['transcriptRetention'], string> = {
   '30-days': 'Kept for 30 days',
   forever: 'Kept until you delete them',
   off: 'Transcript retention is off',
 };
 
-/** The time index leads into day-grouped transcripts. Each day states its
- * unverified caution once instead of boxing every row. */
+/** History opens on the words (ui-iter-39): one header line with the search, one filter
+ * that doubles as the knot key, then each day's words on one thread with their hours in
+ * the time margin. Each day states its unverified caution once instead of on every row. */
 export function History({ onToast }: HistoryProps) {
   const { clipboard, dictation, history, now, state } = useApp();
   const isNative = isTauriEnv();
@@ -56,9 +74,8 @@ export function History({ onToast }: HistoryProps) {
       return next;
     });
   }
-  const records = sorted
-    .filter((record) => status === 'all' || record.status === status)
-    .filter((record) => record.text.toLowerCase().includes(query.toLowerCase()));
+  const found = sorted.filter((record) => record.text.toLowerCase().includes(query.toLowerCase()));
+  const records = found.filter((record) => status === 'all' || record.status === status);
   const groups = groupByDay(records, currentTime);
 
   // The clipping sheet only earns a place once something can be clipped.
@@ -97,18 +114,16 @@ export function History({ onToast }: HistoryProps) {
         <div className="history-stage__title">
           <h1 id="history-title">History</h1>
           <p className="history-stage__lede">
-            {retentionCopy[state.settings.transcriptRetention]} (Settings › <SettingsStopLink tab="transcripts">Transcripts</SettingsStopLink>).{' '}
-            {isNative
-              ? 'Audio isn’t saved, so audio retry isn’t available in the desktop app.'
-              : 'Failed dictations can be retried while their temporary recovery buffer lasts.'}
+            {retentionCopy[state.settings.transcriptRetention]} · Settings › <SettingsStopLink tab="transcripts">Transcripts</SettingsStopLink>
           </p>
         </div>
-        <TimeIndex groups={groups} key={`${status}:${query}`} />
+        <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
       </header>
       <div className="page-body">
         <div className="history-tools" data-clipping={passages.length > 0 || undefined}>
-          <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
-          <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />
+          <div className="history-filter">
+            <SegmentedControl label="History status" onChange={setStatus} options={filterOptions(found)} size="sm" value={status} />
+          </div>
           {clippable && <ClippingSheet onCopy={(text) => clipboard.copy(text)} passages={passages} />}
         </div>
         <div className="history-timeline">
@@ -116,19 +131,25 @@ export function History({ onToast }: HistoryProps) {
             <div className="history-day" key={group.key}>
               <HistoryDayHead group={group} />
               <div className="history-list">
-                {group.records.map((record) => (
-                  <HistoryRow
-                    canStart={canStartDictation(state.dictation)}
-                    clipNumber={numbers.get(record.id)}
-                    currentTime={currentTime}
-                    isNative={isNative}
-                    key={record.id}
-                    onClip={canClip(record) ? toggleClip : undefined}
-                    onCopy={(text) => { void copy(text); }}
-                    onDelete={(id) => history.delete(id)}
-                    onRetry={retry}
-                    record={record}
-                  />
+                {hourRuns(group.records).map((run, i, runs) => (
+                  <Fragment key={run.key}>
+                    {/* One hour needs no mark; two or more get one each, in the time margin. */}
+                    {runs.length > 1 && <p className="history-hour" data-first={i === 0 || undefined}><span>{run.label}</span></p>}
+                    {run.records.map((record) => (
+                      <HistoryRow
+                        canStart={canStartDictation(state.dictation)}
+                        clipNumber={numbers.get(record.id)}
+                        currentTime={currentTime}
+                        isNative={isNative}
+                        key={record.id}
+                        onClip={canClip(record) ? toggleClip : undefined}
+                        onCopy={(text) => { void copy(text); }}
+                        onDelete={(id) => history.delete(id)}
+                        onRetry={retry}
+                        record={record}
+                      />
+                    ))}
+                  </Fragment>
                 ))}
               </div>
             </div>
