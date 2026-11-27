@@ -12,7 +12,7 @@ const initialRecords = createRecords(0);
 afterEach(() => vi.mocked(isTauriEnv).mockReturnValue(false));
 
 const rows = () => screen.queryAllByRole('article');
-const statuses: HistoryStatus[] = ['inserted', 'copied', 'failed', 'unverified'];
+const statuses: HistoryStatus[] = ['inserted', 'pasted', 'copied', 'failed', 'unverified'];
 
 describe('History empty states (UI PR 4)', () => {
   it('shows "No dictations yet" when there is no history at all, not the no-match state', () => {

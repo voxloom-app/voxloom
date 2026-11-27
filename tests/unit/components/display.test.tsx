@@ -20,9 +20,9 @@ describe('Icon', () => {
 
 describe('Badge', () => {
   it('states every status in text', () => {
-    const statuses: BadgeStatus[] = ['inserted', 'copied', 'failed', 'unverified', 'missing', 'downloading', 'available'];
+    const statuses: BadgeStatus[] = ['inserted', 'pasted', 'copied', 'failed', 'unverified', 'missing', 'downloading', 'available'];
     render(<>{statuses.map((s) => <Badge key={s} status={s} />)}</>);
-    for (const text of ['Inserted', 'Copied', 'Failed', 'Unverified', 'Not downloaded', 'Downloading', 'On disk']) {
+    for (const text of ['Inserted', 'Pasted', 'Copied', 'Failed', 'Unverified', 'Not downloaded', 'Downloading', 'On disk']) {
       expect(screen.getByText(text)).toBeTruthy();
     }
     expect(screen.getByText('Failed').className).toBe('badge badge--failed');

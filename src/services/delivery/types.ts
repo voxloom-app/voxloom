@@ -54,7 +54,7 @@ export interface TargetSnapshot {
 }
 
 /** Evidence-backed delivery result — never claim Inserted/Copied/Failed without it. */
-export type DeliveryStatus = 'inserted' | 'copied' | 'failed' | 'unverified';
+export type DeliveryStatus = 'inserted' | 'pasted' | 'copied' | 'failed' | 'unverified';
 
 export interface DeliveryOutcome {
   /** Clipboard restore ran successfully after a temporary paste path. */

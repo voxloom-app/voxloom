@@ -84,7 +84,7 @@ describe('stale sessions across real adapter and orchestration awaits', () => {
       expect(invoke.mock.calls.map(([command]) => command)).toEqual(expectedCommands);
       expect(clipboard.copy).not.toHaveBeenCalled();
       if (stage === 'delivery_paste_target' && settle !== 'safe-reject') {
-        expect(result.delivery.status).toBe('unverified');
+        expect(result.delivery.status).toBe(settle === 'resolve' ? 'pasted' : 'unverified');
         if (settle === 'unknown-reject') expect(result.delivery.mayHaveInserted).toBe(true);
       } else {
         expect(result.delivery.status).toBe('failed');

@@ -4,6 +4,7 @@ export type BadgeStatus = HistoryStatus | 'missing' | 'downloading' | 'available
 
 const labels: Record<BadgeStatus, string> = {
   inserted: 'Inserted',
+  pasted: 'Pasted',
   copied: 'Copied',
   failed: 'Failed',
   unverified: 'Unverified',

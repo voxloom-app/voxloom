@@ -187,7 +187,7 @@ export function useDogfoodProcessing({
       }
       // Stale session: evidence still surfaces as a toast, phase untouched.
       // An empty message is a clean terminal paste: silent, no status line, no
-      // toast (History keeps the Unverified record). Clear the stale status.
+      // toast (History keeps the Pasted record). Clear the stale status.
       const said = result.delivery.message;
       if (!said) {
         if (current()) setMessage(null);

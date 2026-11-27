@@ -97,7 +97,7 @@ describe('every delivery path gets the replaced text', () => {
   it('terminal paste', async () => {
     const { deliveryPlatform, result } = run({ target: WEZTERM });
     const done = await result;
-    expect(done.delivery.status).toBe('unverified');
+    expect(done.delivery.status).toBe('pasted');
     expect(deliveryPlatform.pasteText).toHaveBeenCalledWith(FIXED, {
       appPid: 77, pasteApp: '/Applications/WezTerm.app',
     });

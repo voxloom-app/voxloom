@@ -4,9 +4,12 @@
 
 import type { DeliveryStatus, TargetKind } from './types';
 
-export function statusLabel(status: DeliveryStatus): 'Inserted' | 'Copied' | 'Failed' | 'Unverified' {
+export function statusLabel(
+  status: DeliveryStatus,
+): 'Inserted' | 'Pasted' | 'Copied' | 'Failed' | 'Unverified' {
   if (status === 'unverified') return 'Unverified';
   if (status === 'inserted') return 'Inserted';
+  if (status === 'pasted') return 'Pasted';
   if (status === 'copied') return 'Copied';
   return 'Failed';
 }

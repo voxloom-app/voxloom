@@ -77,12 +77,12 @@ describe('Messages on the paste route', () => {
     }
   });
 
-  it('pastes natively and records Unverified; a clean paste is silent', async () => {
+  it('pastes natively and records Pasted; a clean paste is silent', async () => {
     const { outcome, platform } = await run(messages());
     expect(platform.pasteText).toHaveBeenCalledWith('hello', BOUND);
     expect(platform.insertText).not.toHaveBeenCalled();
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
-    expect(outcome).toMatchObject({ clipboardRestored: true, message: '', status: 'unverified' });
+    expect(outcome).toMatchObject({ clipboardRestored: true, message: '', status: 'pasted' });
     expect(hudResultFor(outcome)).toBeNull();
     expect(outcome.detail).toBe('Pasted with ⌘V through the clipboard; input not verified');
   });

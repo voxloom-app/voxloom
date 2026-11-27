@@ -1,9 +1,10 @@
 /**
  * Outcome of shared or legacy paste (clipboard + ⌘V). Posting is not an
- * insertion receipt, so a posted paste is recorded `unverified`
- * (History keeps the badge). A clean paste is silent: its message is empty, so no status line and
- * no toast, and the HUD shows nothing (as for any successful insert). Only a
- * paste whose clipboard was not restored says so.
+ * insertion receipt: a clean paste (prior clipboard restored) is recorded
+ * `pasted`, a neutral "⌘V was posted" result, never `inserted`. It is
+ * silent: its message is empty, so no status line and no toast, and the HUD
+ * shows nothing (as for any successful insert). A paste whose clipboard was
+ * not restored says so and stays `unverified`.
  */
 
 import { copyFallback, failOutcome, mayHaveInserted } from './fallback';
@@ -22,7 +23,7 @@ export function pastedOutcome(text: string, report: PasteReport): DeliveryOutcom
     detail: 'Pasted with ⌘V through the clipboard; input not verified',
     message: skipped ? TERMINAL_PASTE_MESSAGE + restoreSkippedSuffix(skipped) : '',
     restoreSkippedReason: skipped,
-    status: 'unverified',
+    status: skipped ? 'unverified' : 'pasted',
     text,
   };
 }
