@@ -18,7 +18,7 @@ export function createRecords(now: number): DictationRecord[] {
       'Transcription failed before insertion.'],
     ['record-4', 68, 'inserted',
       'Assign the API contract review to Rowan, not Casey.'],
-    ['record-5', 91, 'inserted',
+    ['record-5', 91, 'pasted',
       'Do not remove --dry-run from the deploy task.'],
     ['record-6', 112, 'copied',
       'Open src/auth/session.ts and check line 48.'],

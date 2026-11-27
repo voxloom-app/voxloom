@@ -55,9 +55,9 @@ It never presses Return or Send for you.
 
 With Clipboard fallback on (the default), Voxloom usually inserts with a
 short clipboard paste, then restores your previous clipboard after about
-1.5 seconds unless you've copied something else. If the result is Copied,
-paste it yourself. If it is Unverified, check the destination before trying
-again so you don't insert the same text twice.
+1.5 seconds unless you've copied something else. History shows that as
+Pasted. If the result is Copied, paste it yourself. If it is Unverified, check
+the destination before trying again so you don't insert the same text twice.
 
 Avoid dictating into password fields or sensitive terminal prompts. macOS
 doesn't identify every secure field, and terminal input can trigger actions

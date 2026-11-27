@@ -129,7 +129,7 @@ describe('native completion shared paste through adapter and orchestration', () 
       ]);
       expect(invoke).toHaveBeenLastCalledWith('delivery_paste_target', { text: result.text, intended });
       expect(intended.kind).toBe(kind);
-      expect(result).toMatchObject({ status: 'unverified', message: '', clipboardRestored: true });
+      expect(result).toMatchObject({ status: 'pasted', message: '', clipboardRestored: true });
       expect(clipboard.copy).not.toHaveBeenCalled();
     },
   );

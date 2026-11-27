@@ -15,6 +15,8 @@
 .badge--failed { background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
 .badge--unverified { background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); }
 .badge--missing { background: var(--tag-bg); color: var(--tag-fg); } /* neutral grey (designer #43) */
+/* A clean ⌘V paste is success without read-back: neutral, not a warning. */
+.badge--pasted { background: var(--tag-bg); color: var(--tag-fg); }
 
 .banner {
   align-items: center;

@@ -124,7 +124,7 @@ describe('shared completion binding and legacy recording-start compatibility', (
     expect(platform.pasteText).not.toHaveBeenCalled();
     expect(platform.insertText).not.toHaveBeenCalled();
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
-    expect(records[0].status).toBe('unverified');
+    expect(records[0].status).toBe('pasted');
     expect(result.current.message).toBeNull();
     expect(toasts.filter((t) => /paste|clipboard|inserted|copied/i.test(t))).toEqual([]);
   });
@@ -135,7 +135,7 @@ describe('shared completion binding and legacy recording-start compatibility', (
       appPid: APPS.ghostty.appPid, sharedPasteToken: 'completion-ghostty',
     }));
     expect(platform.clipboardWrite).not.toHaveBeenCalled();
-    expect(records[0].status).toBe('unverified');
+    expect(records[0].status).toBe('pasted');
   });
 
   it('Notes at hold start, WezTerm at delivery: copies, never pastes', async () => {
@@ -156,7 +156,7 @@ describe('shared completion binding and legacy recording-start compatibility', (
     expect(platform.pasteText).toHaveBeenCalledWith('hello there', { appPid: 77, pasteApp: '/Applications/WezTerm.app' });
     // Looked up once, when the session started: not again at delivery.
     expect(pasteBinding).toHaveBeenCalledTimes(1);
-    expect(records[0].status).toBe('unverified');
+    expect(records[0].status).toBe('pasted');
     // No status line, no toast beyond the progress ones; the HUD stays quiet.
     expect(result.current.message).toBeNull();
     expect(result.current.hudResult).toBeNull();

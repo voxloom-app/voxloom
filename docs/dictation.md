@@ -52,13 +52,18 @@ transcript can be recovered from History when retention is enabled.
 | Result | Meaning | What to do |
 | --- | --- | --- |
 | Inserted | The insertion route reported verified success. | Continue normally. |
+| Pasted | Voxloom pasted with ⌘V and restored your clipboard. It does not read the field back. | Continue normally. |
 | Copied | Text is on the clipboard rather than inserted. | Focus the destination and paste it yourself. |
 | Unverified | Input may have been sent, but Voxloom could not confirm the destination contents. | Inspect the destination before copying or retrying. |
 | Failed | Delivery did not complete. | Check permissions/focus and recover from History if the transcript was retained. |
 
-A successful paste does not prove that the destination consumed the text.
-Unverified is intentional, including when native communication is lost or a
-write's outcome is uncertain. Do not treat it as an instruction to retry.
+A successful paste does not prove that the destination consumed the text, so
+it is Pasted, never Inserted. A paste that could not restore your clipboard
+stays Unverified. Unverified is intentional, including when native
+communication is lost or a write's outcome is uncertain. Do not treat it as an
+instruction to retry. History rows saved before Pasted existed keep their
+Unverified label: an older clean paste can't be told apart from an Apple
+Terminal dispatch.
 
 ## Password fields and terminals
 

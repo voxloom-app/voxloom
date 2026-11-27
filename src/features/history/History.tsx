@@ -18,6 +18,7 @@ type Filter = HistoryStatus | 'all';
 const filters: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'inserted', label: 'Inserted' },
+  { value: 'pasted', label: 'Pasted' },
   { value: 'copied', label: 'Copied' },
   { value: 'failed', label: 'Failed' },
   { value: 'unverified', label: 'Unverified' },

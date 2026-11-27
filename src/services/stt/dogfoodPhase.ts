@@ -20,16 +20,15 @@ export type DogfoodOrigin = 'home' | 'gesture';
 
 /**
  * HUD rules 3–6: only Copied (or maybe-copied) and a definite failure show
- * anything after delivery. Unverified and "may have been inserted, nothing
- * copied" dismiss silently like a success; History keeps the
- * Unverified badge.
+ * anything after delivery. Pasted, Unverified and "may have been inserted,
+ * nothing copied" dismiss silently like a success; History keeps the badge.
  */
 export function hudResultFor(
   { mayHaveInserted = false, status }: Pick<DeliveryOutcome, 'mayHaveInserted' | 'status'>,
 ): OverlayResult | null {
   if (status === 'copied') return mayHaveInserted ? 'maybe-copied' : 'copied';
   if (status === 'failed') return mayHaveInserted ? null : 'insert-failed';
-  return null; // inserted, unverified, or may-have-inserted: silent dismiss
+  return null; // inserted, pasted, unverified, may-have-inserted: silent
 }
 
 /** Phases the HUD shows and Escape can cancel. */

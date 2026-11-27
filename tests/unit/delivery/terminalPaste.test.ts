@@ -145,7 +145,7 @@ describe('terminal paste delivery', () => {
       clipboardRestored: true,
       message: '',
       restoreSkippedReason: null,
-      status: 'unverified',
+      status: 'pasted',
       text: 'hello',
     });
   });
@@ -186,11 +186,11 @@ describe('terminal paste delivery', () => {
     expect(outcome.text).toBe('hello');
   });
 
-  it('a clean paste is silent: empty message (no status line, no toast), no HUD result, Unverified in History', async () => {
+  it('a clean paste is silent: empty message (no status line, no toast), no HUD result, Pasted in History', async () => {
     const { outcome } = await run(wezterm());
     expect(outcome.message).toBe('');
     expect(hudResultFor(outcome)).toBeNull();
-    expect(outcome.status).toBe('unverified');
+    expect(outcome.status).toBe('pasted');
     expect(outcome.detail).toContain('Pasted with ⌘V');
   });
 

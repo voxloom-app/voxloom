@@ -82,6 +82,7 @@ export function createSuccessfulRecord({
  *
  * Status is honest about delivery evidence (BUS-14):
  * - `inserted` when AX/platform insert completed
+ * - `pasted` when a clean ⌘V paste was posted (no read-back)
  * - `copied` when clipboard write succeeded as fallback
  * - `failed` when STT produced text but delivery soft-failed (text retained)
  */
