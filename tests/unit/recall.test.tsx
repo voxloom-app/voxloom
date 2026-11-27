@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { createRef } from 'react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/app/App';
+import { Recall } from '../../src/app/shell/Recall';
 import { RECALL_LIMIT, recallMatches, recallSnippet, recallTerms } from '../../src/app/shell/recallSearch';
 import { createRecords } from '../../src/domain/fixtures';
 import { renderWithApp } from './testUtils';
@@ -141,6 +143,21 @@ describe('Recall in the toolbar (ui-iter-11)', () => {
     expect(field()).toHaveAttribute('aria-expanded', 'false');
   });
 
+  it('previews and copies the whole passage, not the excerpt around a deep match', async () => {
+    const user = userEvent.setup();
+    const text = `${'Earlier words. '.repeat(80)}\n\nThe needle is here.\nKeep this line too.`;
+    let copied = '';
+    render(<Recall records={[{ ...records[0], text }]} now={() => NOW} inputRef={createRef()}
+      onCopy={(value) => { copied = value; }} onShow={() => {}} onNavigate={() => {}} />);
+    await user.type(field(), 'needle');
+    expect(activeOption()).toHaveTextContent(/^…/);
+    const quote = screen.getByRole('blockquote', { name: 'Full dictation' });
+    expect(quote.textContent).toBe(text);
+    expect(quote.querySelector('mark')).toHaveTextContent('needle');
+    await user.keyboard('{Enter}');
+    expect(copied).toBe(text);
+  });
+
   it('Shift+Enter shows the dictation in History and focuses its row', async () => {
     const user = await openApp();
     await user.keyboard('{Meta>}k{/Meta}rowan{Shift>}{Enter}{/Shift}');
@@ -149,15 +166,22 @@ describe('Recall in the toolbar (ui-iter-11)', () => {
     expect(document.activeElement).toHaveAttribute('data-recalled');
   });
 
-  it('Enter on a page goes there, and a click copies a dictation', async () => {
+  it('Enter on a page goes there; clicking a dictation reads it before an explicit copy', async () => {
     const user = await openApp();
     await user.keyboard('{Meta>}k{/Meta}dictionary');
     expect(activeOption()).toHaveTextContent('Dictionary');
     await user.keyboard('{Enter}');
     expect(currentScreen()).toBe('Dictionary');
     await user.click(field());
+    await navigator.clipboard.writeText('Leave this alone while browsing');
     await user.click(within(results()).getAllByRole('option')[1]);
+    const leaf = screen.getByRole('region', { name: 'Passage preview' });
+    expect(within(leaf).getByRole('blockquote')).toHaveTextContent('Run pnpm test --filter transcription.');
+    expect(activeOption()).toHaveAttribute('aria-selected', 'true');
+    expect(await navigator.clipboard.readText()).toBe('Leave this alone while browsing');
+    await user.click(within(leaf).getByRole('button', { name: /Copy passage/ }));
     expect(await navigator.clipboard.readText()).toBe('Run pnpm test --filter transcription.');
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('says when nothing matches; Escape clears it, and leaving the field closes it', async () => {
@@ -174,6 +198,11 @@ describe('Recall in the toolbar (ui-iter-11)', () => {
     await user.click(field());
     expect(field()).toHaveAttribute('aria-expanded', 'true');
     await user.tab();
+    expect(screen.getByRole('region', { name: 'Passage preview' })).toContainElement(document.activeElement as HTMLElement);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).toBeNull();
+    await user.click(field());
+    await user.click(screen.getByRole('button', { name: 'Home' }));
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 });
@@ -186,9 +215,8 @@ describe('Recall styles (ui-iter-11)', () => {
     expect(css('index.css')).toMatch(/@import "\.\/rail-loom\.css";\n@import "\.\/recall\.css";\n@import "\.\/primary-layered\.css";/);
   });
 
-  it('keeps the shuttle still and the sheet in place under reduced motion', () => {
+  it('keeps the sheet in place under reduced motion', () => {
     const reduced = recall.slice(recall.indexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toMatch(/\.recall__shuttle \{ transition: none; \}/);
     expect(reduced).toMatch(/\.recall__scrim,\s*\.recall__sheet \{ animation: none; \}/);
     expect(reduced).toMatch(/\.history-row\[data-recalled\] \{ animation: none;/);
   });
@@ -222,10 +250,16 @@ describe('Recall styles (ui-iter-11)', () => {
       }
     });
 
-    it('the prompt holds AA over the whole glass, and the focus ring 3:1 over the toolbar', () => {
-      const prompt = read(recall, 'color', recall.indexOf('.recall__field::placeholder'));
-      for (const glass of ['#2a2a36', '#111118']) expect(ratio(prompt, glass)).toBeGreaterThanOrEqual(4.5);
-      expect(recall).toMatch(/\.recall__ring \{ background: var\(--focus\);/);
+    it('the tab and passage read at AA on the field in both themes, with visible keyboard focus', () => {
+      expect(recall).toContain('.recall__field::placeholder { color: var(--mut)');
+      const fields = { dark: read(css('frame.css'), '--field'), light: read(daylight, '--field', lightTokens) };
+      for (const name of ['light', 'dark'] as const) {
+        for (const ink of [themes[name].mut, themes[name].fg, themes[name].mark]) {
+          expect(ratio(ink, fields[name])).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+      expect(recall).toContain('.recall__tab:focus-within { outline: 2px solid var(--focus)');
+      expect(recall).toContain('.recall-leaf__words:focus-visible { outline: 2px solid var(--focus)');
       expect(ratio(themes.dark.lime, '#17171f')).toBeGreaterThanOrEqual(3);
       expect(ratio(read(daylight, '--focus', lightTokens), read(daylight, '--linen'))).toBeGreaterThanOrEqual(3);
     });

@@ -1,9 +1,10 @@
-import { type FocusEvent, type KeyboardEvent, type RefObject, useId, useRef, useState } from 'react';
+import { type FocusEvent, type KeyboardEvent, type RefObject, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from '../../components/Icon';
 import { comboLabel, isMacPlatform } from '../../components/KeyCombo';
-import type { DictationRecord, HistoryStatus, Screen } from '../../domain/types';
+import type { DictationRecord, Screen } from '../../domain/types';
 import { dayLabel } from '../../features/history/historyLoom';
 import { formatTime } from '../../features/history/HistoryRow';
+import { RecallLeaf } from './RecallLeaf';
 import { recallMatches, recallSnippet, recallTerms } from './recallSearch';
 import { navScreens } from './screens';
 
@@ -15,9 +16,6 @@ const pages: Page[] = [
 
 type Option = { kind: 'words'; record: DictationRecord } | { kind: 'page'; page: Page };
 
-const statusWord: Record<HistoryStatus, string> = {
-  copied: 'copied', failed: 'failed', inserted: 'inserted', unverified: 'unverified',
-};
 const shortDate = new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short' });
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -37,10 +35,8 @@ type Props = {
 };
 
 /**
- * Recall (ui-iter-11): pick up any thread. A shuttle in the toolbar finds anything you've
- * said, newest first; Enter copies it, Shift+Enter shows it in History, and the pages are
- * one Enter away too. It is an ARIA combobox: focus stays in the field and the active
- * result is announced through aria-activedescendant.
+ * Recall pairs the search index with a reading leaf. Selecting a passage doesn't write
+ * to the clipboard. Enter still copies immediately; Shift+Enter opens its History row.
  */
 export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: Props) {
   const base = useId();
@@ -63,7 +59,18 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
   const listId = `${base}-list`;
   const optionId = (index: number) => `${base}-opt-${index}`;
   const expanded = open && options.length > 0;
-  const activeIsPage = options[current]?.kind === 'page';
+  const selected = options[current];
+  const list = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const pane = list.current;
+    const row = pane?.querySelector('[aria-selected="true"]');
+    if (!pane || !row) return;
+    const bounds = pane.getBoundingClientRect();
+    const option = row.getBoundingClientRect();
+    // Keep the list's 6px inset around a keyboard landing, including fractional rows.
+    if (option.top < bounds.top) pane.scrollTop += option.top - bounds.top - 6;
+    else if (option.bottom > bounds.bottom) pane.scrollTop += option.bottom - bounds.bottom + 6;
+  }, [current, query, open]);
 
   const wordsLabel = !terms.length ? 'Recent'
     : total > shown.length ? `${shown.length} of ${total} matches` : `${total} ${total === 1 ? 'match' : 'matches'}`;
@@ -89,7 +96,7 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
     } else if (show) {
       close(false);
       onShow(option.record.id);
-    } else {
+    } else if (option.record.text.trim()) {
       onCopy(option.record.text);
       close(true);
     }
@@ -104,11 +111,6 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing) return;
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      close(true);
-      return;
-    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (!open) {
@@ -131,8 +133,13 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
     const common = {
       'aria-selected': selected,
       id: optionId(index),
-      onClick: (event: { shiftKey: boolean }) => choose(option, event.shiftKey),
-      onMouseMove: () => { if (!selected) setActive(index); },
+      onClick: (event: { shiftKey: boolean }) => {
+        if (option.kind === 'page' || event.shiftKey) choose(option, event.shiftKey);
+        else {
+          setActive(index);
+          inputRef.current?.focus({ preventScroll: true });
+        }
+      },
       role: 'option',
     } as const;
     if (option.kind === 'page') {
@@ -155,7 +162,7 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
         </span>
         <span className="recall__when">
           <time dateTime={new Date(record.createdAt).toISOString()}>{when(record.createdAt, openedAt)}</time>
-          <span className="sr-only">, {statusWord[record.status]}</span>
+          <span className="sr-only">, {record.status}</span>
         </span>
       </div>
     );
@@ -167,13 +174,19 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
       className="recall"
       data-open={open || undefined}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) close(false);
+      }}
+      onKeyDown={(event) => {
+        if (open && event.key === 'Escape' && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          event.stopPropagation();
+          close(true);
+        }
       }}
     >
       {open && <div aria-hidden="true" className="recall__scrim" />}
-      <div className="recall__shuttle">
-        <span aria-hidden="true" className="recall__ring" />
-        <span aria-hidden="true" className="recall__eye recall__eye--in" />
+      <label className="recall__tab">
+        <Icon name="search" size={16} />
         <input
           aria-activedescendant={expanded && current >= 0 ? optionId(current) : undefined}
           aria-autocomplete="list"
@@ -197,7 +210,7 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
           }}
           onFocus={onFocus}
           onKeyDown={onKeyDown}
-          placeholder="Find anything you said"
+          placeholder={open ? 'Find words in a dictation…' : 'Recall a dictation'}
           ref={inputRef}
           role="combobox"
           spellCheck={false}
@@ -205,19 +218,22 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
           value={query}
         />
         <kbd aria-hidden="true" className="recall__key">{comboLabel('CommandOrControl+K')}</kbd>
-        <span aria-hidden="true" className="recall__eye recall__eye--out" />
-      </div>
+      </label>
       <span className="sr-only" id={`${base}-hint`}>Enter copies a dictation. Shift+Enter shows it in History.</span>
       <span aria-live="polite" className="sr-only">{summary}</span>
       {open && (
-        <div className="recall__sheet">
+        <div className="recall__sheet" data-spread={shown.length > 0 || undefined} onMouseDown={(event) => {
+          // Keep the field focused through a pointer action. On macOS a button needn't
+          // take focus on mousedown; a blur there would dismiss the sheet before click.
+          if ((event.target as Element).closest('button, [role="option"]')) event.preventDefault();
+        }}>
           {shown.length === 0 && (
             <p className="recall__empty">
               {records.length ? <>Nothing you said matches “{query.trim()}”.</> : 'Nothing to recall yet. Dictate something first.'}
             </p>
           )}
           {expanded && (
-            <div aria-label="Recall results" className="recall__list" id={listId} onMouseDown={(event) => event.preventDefault()} role="listbox">
+            <div aria-label="Recall results" className="recall__list" id={listId} ref={list} role="listbox">
               {shown.length > 0 && (
                 <div aria-label={terms.length ? 'Dictations' : 'Recent dictations'} className="recall__group" role="group">
                   <div aria-hidden="true" className="recall__label">{wordsLabel}</div>
@@ -232,12 +248,17 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
               )}
             </div>
           )}
-          <p aria-hidden="true" className="recall__legend">
-            <span><kbd>↑</kbd><kbd>↓</kbd> Move</span>
-            <span><kbd>↵</kbd> {activeIsPage ? 'Open' : 'Copy'}</span>
-            {!activeIsPage && shown.length > 0 && <span><kbd>{mac ? '⇧' : 'Shift'}</kbd><kbd>↵</kbd> Show in History</span>}
-            <span><kbd>esc</kbd> Close</span>
-          </p>
+          {selected?.kind === 'words' && (
+            <RecallLeaf count={shown.length} index={current} onCopy={() => choose(selected, false)}
+              onShow={() => choose(selected, true)} query={query} record={selected.record} terms={terms} />
+          )}
+          {selected?.kind === 'page' && shown.length > 0 && (
+            <div className="recall-leaf recall-leaf--page">
+              <Icon name={selected.page.icon} size={26} />
+              <span>{selected.page.label}</span>
+              <button className="link-button" onClick={() => choose(selected, false)} type="button">Open page ↵</button>
+            </div>
+          )}
         </div>
       )}
     </div>
