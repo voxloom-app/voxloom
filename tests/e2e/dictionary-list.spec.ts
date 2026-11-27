@@ -48,7 +48,7 @@ async function expectUsableRange(page: Page, testInfo: TestInfo, state: string) 
       dictionary: box(element),
       footer: box(footer),
       list: { ...box(list), clientHeight: list.clientHeight, scrollHeight: list.scrollHeight, scrollTop: list.scrollTop },
-      controls: [...element.querySelectorAll('.dictionary-stage .btn, .proof__heard, .search, .history-tools .fine')].map(box),
+      controls: [...element.querySelectorAll('.dictionary-stage button, .specimen-plate__word, .proof__heard, .search, .history-tools .fine')].map(box),
       rows: [...list.children].map((row) => ({
         name: box(row.querySelector('strong')!),
         actions: box(row.querySelector('.term-row__actions')!),
@@ -110,7 +110,7 @@ for (const viewport of [
       const dense = await expectUsableRange(page, testInfo, 'dense-long-range');
       expect(dense.list.scrollHeight).toBeGreaterThan(dense.list.clientHeight);
       // Focus/activate actions at both scroll extremes, without scrolling the page.
-      const lastEdit = list.getByRole('listitem').last().getByRole('button').first();
+      const lastEdit = list.getByRole('listitem').last().getByRole('button', { name: /^Edit / });
       await lastEdit.focus();
       await expect(lastEdit).toBeInViewport();
       await page.keyboard.press('Enter');
@@ -124,7 +124,7 @@ for (const viewport of [
       await expect(list.getByRole('listitem')).toHaveCount(1);
       await expect(range).toHaveText(`${stressWords[0]} — ${stressWords[0]}`);
       await expectUsableRange(page, testInfo, 'filtered-single-long');
-      const firstEdit = list.getByRole('button').first();
+      const firstEdit = list.getByRole('button', { name: /^Edit / }).first();
       await firstEdit.click();
       const field = page.getByRole('textbox', { name: 'Word', exact: true });
       await expect(field).toBeFocused();
@@ -218,7 +218,7 @@ for (const width of [640, 1120, 1600]) {
 test.describe('coarse pointer', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { height: 760, width: 640 } });
 
-  test('keeps both persistent actions at least 44px', async ({ page }) => {
+  test('keeps all three persistent actions at least 44px', async ({ page }) => {
     await openDictionary(page);
     expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
     const buttons = page.getByRole('listitem').first().getByRole('button');
@@ -228,10 +228,11 @@ test.describe('coarse pointer', () => {
       expect(box.width).toBeGreaterThanOrEqual(44);
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
-    await buttons.first().tap();
+    const edit = page.getByRole('button', { name: 'Edit JSON', exact: true });
+    await edit.tap();
     await expect(page.getByRole('textbox', { name: 'Word', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Cancel', exact: true }).tap();
-    await expect(buttons.first()).toBeFocused();
+    await expect(edit).toBeFocused();
   });
 });
 
@@ -245,6 +246,11 @@ test('row actions are persistent pointer targets and direct keyboard stops', asy
   await expect(edit.locator('..')).toHaveCSS('opacity', '1');
   await expect(remove).toBeVisible();
   await page.getByRole('searchbox').focus();
+  await page.keyboard.press('Tab');
+  const inspect = page.getByRole('button', { name: 'Inspect JSON', exact: true });
+  await expect(inspect).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region', { name: 'Saved spelling specimen' }).getByRole('heading', { name: 'JSON' })).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(edit).toBeFocused();
   await page.keyboard.press('Enter');
@@ -308,11 +314,36 @@ for (const width of [640, 1120, 1600]) {
   });
 }
 
+test('auditions a spelling from the index without overwriting the sentence proof', async ({ page }) => {
+  await page.setViewportSize({ height: 620, width: 640 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openDictionary(page);
+  const mode = page.getByRole('radio', { name: 'Word specimen' });
+  await mode.focus();
+  await page.keyboard.press('ArrowRight');
+  const proof = page.getByRole('textbox', { name: 'Heard: try a sentence' });
+  await proof.fill('keep json');
+  await page.getByRole('button', { name: 'Inspect TypeScript', exact: true }).click();
+  await expect(mode).toHaveAttribute('aria-checked', 'true');
+  const testForm = page.getByRole('button', { name: 'Test type-script', exact: true });
+  await testForm.focus();
+  await page.keyboard.press('Enter');
+  await expect(proof).toBeFocused();
+  await expect(proof).toHaveValue('type-script');
+  await expect(page.locator('#dictionary-proof-typed mark')).toHaveText('TypeScript');
+  await page.getByRole('button', { name: 'Return to my sentence' }).click();
+  await expect(proof).toBeFocused();
+  await expect(proof).toHaveValue('keep json');
+  await expect(page.locator('#dictionary-proof-typed mark')).toHaveText('JSON');
+  await expect(page.getByRole('list', { name: 'Dictionary words, alphabetical' }).getByRole('listitem')).toHaveCount(4);
+});
+
 // ui-iter-05: the stage's spelling proof runs the real deterministic match.
 test('spelling proof restores what you type, live, and saves nothing', async ({ page }) => {
   await page.setViewportSize({ height: 760, width: 1120 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openDictionary(page);
+  await page.getByRole('radio', { name: 'Sentence proof' }).click();
   const proof = page.getByRole('textbox', { name: 'Heard: try a sentence', exact: true });
   const typed = page.locator('#dictionary-proof-typed');
   await expect(proof).toHaveValue('Follow up on type script, tan stack query and postgres.');

@@ -4,27 +4,39 @@ import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
 import { IconButton } from '../../components/IconButton';
 import { SearchField } from '../../components/SearchField';
+import { SegmentedControl } from '../../components/SegmentedControl';
 import { SpellingProof } from './SpellingProof';
+import { WordSpecimen } from './WordSpecimen';
 import { formsByWord, sampleSentence } from './spellingForms';
 import { WordDialog } from './WordDialog';
 import { sortedWords } from '../../services/dictionary/format';
 
 const count = (n: number) => `${n} ${n === 1 ? 'word' : 'words'}`;
+const views = [
+  { value: 'specimen', label: 'Word specimen' },
+  { value: 'sentence', label: 'Sentence proof' },
+] as const;
 
 /**
- * Dictionary as a spelling loom (ui-iter-05): a dark stage masthead (the Home
- * stage's material) proofs a sentence through the real spelling match, and
- * every saved spelling lists the heard forms it restores.
+ * The alphabetical index selects a spelling for the specimen plate. Auditioning
+ * one of its verified forms uses the sentence proof without replacing a draft.
  */
 export function Dictionary() {
   const { dictionary, state } = useApp();
   const [editing, setEditing] = useState<string>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [view, setView] = useState<'specimen' | 'sentence' | 'variant'>('specimen');
+  const [variant, setVariant] = useState('');
+  const [picked, setPicked] = useState<string>();
+  const [draft, setDraft] = useState<string | null>(null);
+  const proofInput = useRef<HTMLInputElement>(null);
   const opener = useRef<HTMLElement | null>(null);
-  const words = sortedWords(state.words).filter((word) =>
+  const alphabetical = useMemo(() => sortedWords(state.words), [state.words]);
+  const words = alphabetical.filter((word) =>
     word.toLowerCase().includes(query.toLowerCase())
   );
+  const selected = picked && words.includes(picked) ? picked : query ? words[0] : state.words.at(-1);
   const forms = useMemo(() => formsByWord(state.words), [state.words]);
   const sample = useMemo(() => sampleSentence(state.words, forms), [state.words, forms]);
 
@@ -41,15 +53,36 @@ export function Dictionary() {
           <div className="dictionary-stage__title">
             <h1 id="dictionary-title">Dictionary</h1>
             <p className="dictionary-stage__lede">
-              Your canonical spellings for names and terms, restored in every dictation even
-              when a word is heard in lowercase or split apart.
+              Select a spelling below to see how Voxloom restores it in a dictation.
             </p>
           </div>
           <button className="btn primary" onClick={(event) => edit(undefined, event.currentTarget)} type="button">
             <Icon name="plus" /> Add term
           </button>
         </div>
-        <SpellingProof sample={sample} words={state.words} />
+        <div className="dictionary-views">
+          <SegmentedControl
+            label="Spelling view" onChange={setView} options={views} size="sm"
+            value={view === 'variant' ? 'sentence' : view}
+          />
+          {view === 'variant' && (
+            <button className="link-button" onClick={() => { setView('sentence'); proofInput.current?.focus(); }} type="button">
+              {draft === null ? 'Use sample sentence' : 'Return to my sentence'}
+            </button>
+          )}
+        </div>
+        {view !== 'specimen' ? (
+          <SpellingProof
+            focusOnOpen={view === 'variant'} heard={view === 'variant' ? variant : draft ?? sample}
+            inputRef={proofInput} onChange={view === 'variant' ? setVariant : setDraft} words={state.words}
+          />
+        ) : selected && (
+          <WordSpecimen
+            forms={forms.get(selected) ?? []} index={alphabetical.indexOf(selected) + 1}
+            total={alphabetical.length} word={selected}
+            onTest={(form) => { setVariant(form); setView('variant'); }}
+          />
+        )}
       </header>
       <div className="cloth">
         <div className="history-tools">
@@ -67,8 +100,13 @@ export function Dictionary() {
         </div>
         <div aria-label={words.length ? 'Dictionary words, alphabetical' : undefined} className="term-grid" role={words.length ? 'list' : undefined}>
           {words.map((word) => (
-            <div className="term-row" key={word} role="listitem">
-              <strong>{word}</strong>
+            <div className="term-row" data-selected={view === 'specimen' && selected === word || undefined} key={word} role="listitem">
+              <button
+                aria-label={`Inspect ${word}`} aria-pressed={view === 'specimen' && selected === word}
+                className="term-row__inspect" onClick={() => { setPicked(word); setView('specimen'); }} type="button"
+              >
+                <strong>{word}</strong>
+              </button>
               <TermForms forms={forms.get(word) ?? []} />
               <div className="action-group term-row__actions">
                 <IconButton icon="edit" label={`Edit ${word}`} onClick={(event) => edit(word, event.currentTarget)} />
@@ -95,6 +133,7 @@ export function Dictionary() {
           onClose={() => setOpen(false)}
           onSave={(word, previous) => {
             dictionary.save(word, previous);
+            setPicked(word);
             setOpen(false);
           }}
           opener={opener.current}

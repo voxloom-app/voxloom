@@ -1,0 +1,112 @@
+/* A type specimen on the Dictionary beam: case in two inks, type guides and
+   a ruled foot. The perforation separates the spelling from forms to try. */
+.dictionary-views { align-items: center; display: flex; flex-wrap: wrap; gap: 3px var(--s-6); margin-block: var(--s-8) var(--s-5); }
+.dictionary-views .seg { width: fit-content; }
+.dictionary-views + .proof { margin-top: var(--s-6); }
+.word-specimen {
+  --plate: var(--field);
+  --rule: color-mix(in srgb, var(--mut) 22%, var(--plate));
+  background: var(--plate);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9.25rem, 29%);
+  overflow: hidden;
+}
+.specimen-plate {
+  background: radial-gradient(ellipse at 8% 90%, color-mix(in srgb, var(--brand-a) 6%, transparent), transparent 70%);
+  display: grid;
+  gap: 6px;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  padding: 12px var(--s-10) 10px;
+}
+.specimen-plate__legend, .specimen-variants__title {
+  color: var(--mut);
+  font: 650 var(--fs-micro)/1.35 var(--mono);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.specimen-plate__legend { align-items: baseline; display: flex; gap: 1ch; justify-content: space-between; }
+.specimen-plate__legend > :last-child { color: var(--fg); font-weight: 500; letter-spacing: .04em; }
+.specimen-plate__measure {
+  align-self: center;
+  background:
+    linear-gradient(var(--rule), var(--rule)) left .22em / 100% 1px no-repeat,
+    repeating-linear-gradient(90deg, var(--rule) 0 3px, transparent 3px 7px) left .46em / 100% 1px no-repeat,
+    linear-gradient(var(--rule), var(--rule)) left .88em / 100% 1px no-repeat;
+  --specimen-scale: 2.1;
+  font-size: calc(var(--fs-page) * var(--specimen-scale));
+  min-width: 0;
+}
+.specimen-plate__measure[data-length="medium"] { --specimen-scale: 1.55; }
+.specimen-plate__measure[data-length="long"] { --specimen-scale: 1; }
+.specimen-plate__word {
+  color: var(--fg);
+  font-family: var(--font-words);
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.16;
+  letter-spacing: -.035em;
+  margin: 0;
+  overflow-x: auto;
+  padding-inline: 2px;
+  scrollbar-width: thin;
+  white-space: pre;
+}
+.specimen-plate__word b { color: var(--accfg); font-weight: inherit; }
+.specimen-plate__word:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+.specimen-plate__rule {
+  background:
+    repeating-linear-gradient(90deg, var(--ctl-line) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px 8px) left bottom / 100% 3px no-repeat;
+  border-bottom: 1px solid var(--rule);
+  height: 7px;
+}
+.specimen-variants {
+  align-content: center;
+  background: var(--panel);
+  border-inline-start: 1px dashed var(--ctl-line);
+  display: grid;
+  min-width: 0;
+  padding: 10px var(--s-9);
+}
+.specimen-variants__title { margin: 0 0 5px; }
+.specimen-variants button {
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  border-radius: 0;
+  display: flex;
+  font: 500 var(--fs-mono)/1.4 var(--mono);
+  gap: 6px;
+  justify-content: space-between;
+  min-height: 32px;
+  min-width: 0;
+  padding: 3px 0;
+  text-align: start;
+}
+.specimen-variants button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.specimen-variants i { color: var(--accfg); font-style: normal; }
+.specimen-variants button:is(:hover, :focus-visible) { border-color: var(--accfg); color: var(--accfg); }
+.specimen-variants__empty { color: var(--mut); font-size: var(--fs-label); margin: 0; }
+.term-row__inspect { border: 0; border-radius: 3px; min-height: 32px; min-width: 0; padding: 0; text-align: start; }
+.term-row__inspect:hover { color: var(--accfg); text-decoration: underline; text-underline-offset: .16em; }
+.dictionary .term-row[data-selected] { background: color-mix(in srgb, var(--accfg) 7%, var(--panel)); box-shadow: inset 3px 0 var(--accfg); }
+.dictionary .term-row[data-selected]::before { background: var(--accfg); }
+@media (max-width: 780px) {
+  .word-specimen { grid-template-columns: minmax(0, 1fr); }
+  .specimen-plate { padding-inline: 14px; }
+  .specimen-plate__measure { --specimen-scale: 1.35; }
+  .specimen-plate__measure[data-length="medium"] { --specimen-scale: 1.15; }
+  .specimen-variants { align-items: center; border-inline: 0; border-top: 1px dashed var(--ctl-line); display: flex; flex-wrap: wrap; gap: 3px 10px; padding: 6px 14px; }
+  .specimen-variants__title { flex-basis: 100%; margin: 0; }
+  .specimen-variants button { max-width: 100%; min-height: 28px; }
+}
+@media (max-height: 700px) {
+  .dictionary-views { margin-block: 8px; }
+  .specimen-plate { gap: 2px; padding-block: 8px; }
+}
+@media (pointer: coarse) {
+  .term-row__inspect, .specimen-variants button { min-height: 44px; min-width: 44px; }
+}

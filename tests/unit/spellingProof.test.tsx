@@ -113,8 +113,10 @@ describe('proof segments', () => {
 });
 
 describe('Dictionary spelling stage', () => {
-  it('opens on a proof of the saved spellings, knotting each restored stretch', () => {
+  it('opens the sentence proof on the saved spellings, knotting each restored stretch', async () => {
+    const user = userEvent.setup();
     renderWithApp(<Dictionary />);
+    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
     const stage = document.querySelector('.dictionary-stage')!;
     expect(stage).toHaveClass('stage');
     expect(within(stage as HTMLElement).getByRole('heading', { level: 1, name: 'Dictionary' })).toBeInTheDocument();
@@ -138,6 +140,7 @@ describe('Dictionary spelling stage', () => {
     const save = vi.spyOn(store, 'save');
     const user = userEvent.setup();
     render(<AppProvider dictionaryPersistence={{ enabled: true, store }}><Dictionary /></AppProvider>);
+    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
     await waitFor(() => expect(proof()).toHaveValue('Follow up on type script and postgres.'));
     await user.clear(proof());
     expect(typedLine()).toHaveTextContent('Your spellings appear here.');
@@ -156,6 +159,7 @@ describe('Dictionary spelling stage', () => {
   it('follows the dictionary: a spelling added below is restored in the proof at once', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
+    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
     await user.clear(proof());
     await user.type(proof(), 'try vox loom');
     expect(screen.getByText('Nothing to restore')).toBeInTheDocument();
@@ -176,8 +180,9 @@ describe('Dictionary spelling stage', () => {
     expect(tanstack).toHaveTextContent('TanStack Query, restored from tan stack query, tanstack query, tan-stack query');
     expect([...tanstack.querySelectorAll('.term-row__form')].map((form) => form.textContent?.replace(/^, /, '')))
       .toEqual(['tan stack query', 'tanstack query', 'tan-stack query']);
-    // Only Edit and Delete take focus, so Tab still goes search → Edit → Delete.
-    expect(within(tanstack).getAllByRole('button')).toHaveLength(2);
+    // The spelling inspects the specimen; the variant annotations aren't tab stops.
+    expect(within(tanstack).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
+      .toEqual(['Inspect TanStack Query', 'Edit TanStack Query', 'Delete TanStack Query']);
     expect(tanstack.querySelector('.term-row__forms [tabindex], .term-row__forms button')).toBeNull();
     expect(screen.getByText('Restored from')).toBeInTheDocument();
   });

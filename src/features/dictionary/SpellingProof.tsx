@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, type Ref } from 'react';
 import { replaceDictionaryTerms } from '../../services/dictionary/replace';
 import { proofSegments } from './spellingForms';
 
@@ -6,8 +6,11 @@ import { proofSegments } from './spellingForms';
 const MAX_PROOF = 240;
 
 interface Props {
-  /** Opens on the user's own words; replaced by whatever they type. */
-  sample: string;
+  /** Only take focus when a user explicitly tests a variant from the plate. */
+  focusOnOpen: boolean;
+  heard: string;
+  inputRef: Ref<HTMLInputElement>;
+  onChange: (value: string) => void;
   words: readonly string[];
 }
 
@@ -17,9 +20,7 @@ interface Props {
  * runs. Each restored stretch is knotted, with what was heard hanging beneath.
  * Nothing typed here is saved.
  */
-export function SpellingProof({ sample, words }: Props) {
-  const [draft, setDraft] = useState<string | null>(null);
-  const heard = draft ?? sample;
+export function SpellingProof({ focusOnOpen, heard, inputRef, onChange, words }: Props) {
   const typed = useMemo(() => replaceDictionaryTerms(heard, words), [heard, words]);
   const segments = useMemo(() => proofSegments(heard, typed), [heard, typed]);
   const restored = segments.filter((segment) => segment.kind === 'catch').length;
@@ -36,10 +37,12 @@ export function SpellingProof({ sample, words }: Props) {
         autoCapitalize="off"
         autoComplete="off"
         autoCorrect="off"
+        autoFocus={focusOnOpen}
         className="proof__heard"
         id="dictionary-proof"
         maxLength={MAX_PROOF}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => onChange(event.target.value)}
+        ref={inputRef}
         placeholder="Type a sentence the way it might be heard"
         spellCheck={false}
         type="text"
