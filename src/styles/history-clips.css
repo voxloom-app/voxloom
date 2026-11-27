@@ -1,0 +1,92 @@
+/* History's clipping book. The header is a packet of slips with a numbered stub;
+   the matching wire clips in the margin collect text without changing the records. */
+.clip-ticket {
+  align-items: center;
+  background: linear-gradient(105deg, color-mix(in srgb, var(--accfg) 7%, var(--panel)), var(--panel) 68%);
+  border: 1px solid color-mix(in srgb, var(--ctl-line) 52%, var(--panel));
+  border-radius: 3px;
+  box-shadow: 0 3px 0 -1px var(--bg), 0 3px 0 var(--line), 0 5px 0 -1px var(--panel), 0 6px 0 -1px var(--line);
+  display: grid;
+  gap: var(--s-9);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 0 var(--s-10);
+  padding: 0 0 0 var(--s-8);
+  text-align: left;
+  width: 100%;
+}
+/* Keep the sheet within reach when gathering from several days. */
+.clip-ticket[data-filled] { border-color: var(--sel-edge); position: sticky; top: 4px; z-index: 3; }
+.history .cloth:has(.clip-ticket[data-filled]) :is(.history-tools, .history-timeline) :focus { scroll-margin-top: 8em; }
+.clip-ticket:hover { border-color: var(--sel-edge); }
+.clip-mark { display: block; width: 72px; }
+.clip-mark__back { fill: var(--navon); stroke: var(--ctl-line); }
+.clip-mark__middle { fill: var(--field); stroke: var(--ctl-line); }
+.clip-mark__face { fill: var(--bg); stroke: var(--ctl-line); }
+.clip-ticket__title { display: grid; gap: 2px; padding-block: var(--s-6); }
+.clip-ticket__title strong, .clip-proof h2 {
+  color: var(--fg); font: normal calc(var(--fs-hero) * 1.04)/1.1 var(--font-words); letter-spacing: -.035em;
+}
+.clip-ticket__title small { color: var(--mut); font-size: var(--fs-secondary); }
+.clip-ticket__stub {
+  align-items: center; align-self: stretch;
+  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--info) 7%, transparent) 4px 5px), var(--panel);
+  border-left: 1px dashed var(--ctl-line); color: var(--info); display: flex; flex-direction: column;
+  justify-content: center; min-width: 7em; padding: var(--s-5) var(--s-8);
+}
+.clip-ticket__stub b { font: normal var(--fs-hero)/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.08em; }
+.clip-ticket__stub span { color: var(--fg); font-size: var(--fs-label); font-weight: 650; margin-top: 3px; }
+
+/* The date opens a gathering of slips. The existing timeline and recovery knots stay intact. */
+.history-day__head { border-bottom: 1px solid var(--line); padding-block: var(--s-4); }
+.history-day__head h2 { font: normal calc(var(--fs-sheet) * 1.35)/1.1 var(--font-words); }
+.history-row.recent-row { --tab-w: 50px; grid-template-areas: "time knot body actions clip"; grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto var(--tab-w); }
+@media (min-width: 781px) {
+  .history-row.recent-row:not(:has(.clip-tab)) { grid-template-areas: "time knot body actions actions"; }
+}
+.history-row__text { overflow-wrap: anywhere; }
+.history-row.recent-row > .clip-tab {
+  align-items: center; align-self: stretch; border: 0; border-left: 1px dashed var(--ctl-line); border-radius: 0;
+  color: var(--mut); display: flex; flex-direction: column; gap: 1px; grid-area: clip; justify-content: center;
+  margin: 0 -4px 0 0; min-height: 44px; padding: 3px 0 3px 6px;
+}
+.clip-tab span { font: 600 var(--fs-micro)/1 var(--mono); }
+.history-row.recent-row > .clip-tab:is(:hover, :focus-visible, [aria-pressed="true"]) { background: var(--navon); color: var(--accfg); }
+.history-row.recent-row[data-clipped] { background: color-mix(in srgb, var(--accfg) 5%, var(--bg)); }
+.history-row.recent-row[data-clipped] > .clip-tab { border-left-style: solid; }
+
+/* The reviewed packet: text, in order, not a second list of log metadata. */
+.overlay__panel:has(.clip-proof) {
+  border-radius: 3px; box-shadow: 4px 4px 0 var(--field), 5px 5px 0 var(--ctl-line), var(--shadow-dialog);
+  max-width: 580px; padding: 0;
+}
+.clip-proof { display: flex; flex-direction: column; max-height: calc(100dvh - 60px); }
+.clip-proof header { border-bottom: 1px solid var(--line); margin: 0 var(--s-11); padding: var(--s-11) 0 var(--s-8); }
+.clip-proof__imprint { align-items: center; color: var(--accfg); display: flex; font: 600 var(--fs-label)/1.4 var(--mono); gap: var(--s-4); margin-bottom: var(--s-6); }
+.clip-proof header h2 { font-size: calc(var(--fs-page) * 1.23); }
+.clip-proof header p, .clip-proof footer { font-size: var(--fs-secondary); margin-bottom: 0; }
+.clip-proof__pages {
+  list-style: none; margin: 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
+  padding: var(--s-6) var(--s-11) var(--s-10); scrollbar-width: thin;
+}
+.clip-proof__pages:focus-visible { outline: 2px solid var(--accfg); outline-offset: -3px; }
+.clip-proof__pages li { align-items: baseline; display: grid; gap: var(--s-8); grid-template-columns: auto minmax(0, 1fr); padding-block: var(--s-6); }
+.clip-proof__pages li + li { border-top: 1px dashed var(--line); }
+.clip-proof__pages li > span { color: var(--info); font: 600 var(--fs-label)/1 var(--mono); }
+.clip-proof__pages li > p { color: var(--fg); font: normal calc(var(--fs-sheet) * 1.23)/1.45 var(--font-words); margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.clip-proof__empty { align-items: center; display: flex; gap: var(--s-8); padding: var(--s-10) var(--s-11); }
+.clip-proof__empty p { font-size: var(--fs-body); margin: 0; }
+.clip-proof footer {
+  align-items: center; background: var(--field); border-top: 1px dashed var(--ctl-line); color: var(--mut);
+  display: flex; flex-wrap: wrap; gap: var(--s-5) var(--s-8); justify-content: space-between; padding: var(--s-8) var(--s-11);
+}
+.clip-proof footer .btn { margin-left: auto; }
+@media (max-width: 780px) {
+  .clip-ticket { gap: var(--s-4); padding-left: var(--s-4); }
+  .clip-ticket .clip-mark { width: 48px; }
+  .clip-ticket__stub { min-width: 4.5em; padding-inline: var(--s-4); }
+  .clip-ticket__title strong { font-size: calc(var(--fs-sheet) * 1.4); }
+  .history-row.recent-row {
+    --tab-w: 38px; grid-template-areas: "time knot body clip" ". knot actions clip";
+    grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) var(--tab-w);
+  }
+}

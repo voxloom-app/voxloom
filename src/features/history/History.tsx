@@ -8,6 +8,7 @@ import { SegmentedControl } from '../../components/SegmentedControl';
 import { canRetry } from '../../domain/records';
 import type { DictationRecord, HistoryStatus, Settings } from '../../domain/types';
 import { isTauriEnv } from '../../services/capture/captureService';
+import { canClip, ClippingSheet } from './ClippingSheet';
 import { DayLoom } from './DayLoom';
 import { HistoryRow } from './HistoryRow';
 import {
@@ -51,6 +52,19 @@ export function History({ onToast }: HistoryProps) {
   // The row under the pointer or keyboard focus; its knot lights up on the day loom.
   const [active, setActive] = useState<string | null>(null);
   const sorted = [...state.records].sort((a, b) => b.createdAt - a.createdAt);
+  // Keep only IDs here. Filtering does not discard a clip; deleting a record does.
+  const [clipIds, setClipIds] = useState<Set<string>>(() => new Set());
+  const passages = sorted.filter((record) => clipIds.has(record.id) && canClip(record)).reverse();
+  // Forget withdrawn passages even if a later store reload reuses their IDs.
+  if (passages.length < clipIds.size) setClipIds(new Set(passages.map(({ id }) => id)));
+  const numbers = new Map(passages.map((record, i) => [record.id, i + 1]));
+  function toggleClip(id: string) {
+    setClipIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
   const records = sorted
     .filter((record) => status === 'all' || record.status === status)
     .filter((record) => record.text.toLowerCase().includes(query.toLowerCase()));
@@ -150,6 +164,7 @@ export function History({ onToast }: HistoryProps) {
         )}
       </header>
       <div className="cloth">
+        {state.records.length > 0 && <ClippingSheet onCopy={(text) => clipboard.copy(text)} passages={passages} />}
         <div className="history-tools">
           <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
           <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />
@@ -175,9 +190,11 @@ export function History({ onToast }: HistoryProps) {
                   {group.records.map((record) => (
                     <HistoryRow
                       canStart={canStartDictation(state.dictation)}
+                      clipNumber={numbers.get(record.id)}
                       currentTime={currentTime}
                       isNative={isNative}
                       key={record.id}
+                      onClip={canClip(record) ? toggleClip : undefined}
                       onCopy={(text) => { void copy(text); }}
                       onDelete={(id) => history.delete(id)}
                       onRetry={retry}

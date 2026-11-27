@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 
 const paths: Record<string, ReactElement> = {
   house: <path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
+  clip: <path d="m8 13 6.5-6.5a2.2 2.2 0 0 1 3.1 3.1l-8 8a4 4 0 0 1-5.7-5.7l9.6-9.6a5.6 5.6 0 0 1 8 8L11 20.8" />,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   book: <><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z" /><path d="M5 17a3 3 0 0 1 3-3h11" /></>,
   info: <><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.5v.01" /></>,
