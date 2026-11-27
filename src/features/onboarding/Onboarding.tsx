@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useApp } from '../../app/AppContext';
 import { KeyCombo } from '../../components/KeyCombo';
-import { initialSettings } from '../../domain/fixtures';
-import { ShortcutRecorder } from '../settings/ShortcutRecorder';
 import { useDogfoodCapture } from '../../services/stt/useDogfoodCapture';
 import type { OwnFieldDeliveryGuard } from '../../services/stt/dogfoodPath';
 import { resolveTranscriptionModelId } from '../../services/stt/resolveModelId';
@@ -17,6 +15,8 @@ import { LoomLine } from './LoomLine';
 import { createSetupBoundary } from './setupBoundary';
 import { SetupThread } from './SetupThread';
 import { ConnectionStep } from './ConnectionStep';
+import { PracticeStep, practiceLook } from './PracticeStep';
+import { ShortcutStep } from './ShortcutStep';
 import { SetupWindow } from './SetupWindow';
 import { SetupBrand, WelcomeCover } from './WelcomeCover';
 
@@ -202,10 +202,20 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
   const both = guided.holdDone && guided.tapDone;
   // Step 4 not ready shows a specific error in place of its attention line, so it is never shown twice.
   const shownError = error || guided.error;
+  // A success only belongs to this way once its try is tied off; after Try double-tap,
+  // the hold's result is history, so the note goes back to waiting.
+  const counted = guided.mode === 'tap' ? guided.tapDone : guided.holdDone;
+  const stale = practice.phase === 'success' && !counted;
+  const look = practiceLook(practice.phase, counted, hint !== null);
   const status = practice.phase === 'recording' ? (guided.mode === 'tap' ? 'Listening hands-free · press once to finish' : 'Listening · release to finish')
     : practice.phase === 'starting' ? 'Preparing microphone…'
-      : practice.phase === 'transcribing' || practice.phase === 'cleaning' ? 'Turning speech into text…'
-        : hint ?? practice.message ?? 'Ready when you are';
+      : practice.phase === 'transcribing' || practice.phase === 'cleaning' ? 'Transcribing…'
+        : hint ?? (look === 'done' ? `Inserted. ${guided.mode === 'tap' ? 'Hands-free' : 'Hold to talk'} works.` : stale ? null : practice.message) ?? 'Ready when you are';
+  // Say why the primary action is still waiting, beside it, instead of a dead button.
+  const waiting = guided.step === 2 ? (guided.ready ? '' : 'Waiting for your shortcut to be ready')
+    : guided.step === 3 && guided.mode === 'hold' ? (!guided.holdDone ? 'Opens after one hold-to-talk try' : busy ? 'Opens when this try ends' : '')
+      : guided.step === 3 ? (!guided.tapDone ? 'Opens after one hands-free try' : !guided.ready ? 'Waiting for access and the voice pack' : busy ? 'Opens when this try ends' : '')
+        : '';
   const next = () => action(async () => { cancel(); await controller.next(); });
   const finish = () => action(async () => {
     if (await controller.finish()) { controller.clearProgress(); setup.update({ complete: true }); close(); }
@@ -221,31 +231,16 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
       {/* ui-iter-07: the content column is the loom's stage, in both themes. */}
       <div className="guided-main stage">
         <section className="guided-content" aria-labelledby="guided-heading" tabIndex={0}>
-          {guided.step === 0 ? <WelcomeCover heading={heading} shortcut={state.settings.shortcut} /> : guided.step === 1 ?
+          {guided.step === 0 ? <WelcomeCover heading={heading} shortcut={state.settings.shortcut} /> : guided.step === 2 ?
+            <ShortcutStep heading={heading} onChange={(value) => settings.update({ key: 'shortcut', value })} shortcut={state.settings.shortcut} /> : guided.step === 3 ?
+            <PracticeStep attempted={hint !== null || ['success', 'error', 'cancelled'].includes(practice.phase)} busy={busy} field={field} heading={heading}
+              holdDone={guided.holdDone} look={look} mode={guided.mode} onCheck={() => void action(controller.refresh)}
+              onRetry={() => { cancel(); field.current?.focus(); }} ready={guided.ready} shortcut={state.settings.shortcut} status={status} tapDone={guided.tapDone} /> : guided.step === 1 ?
             <ConnectionStep guided={guided} heading={heading} modelLabel={modelLabel} size={size} connected={connected} native={io.native} error={shownError}
               permission={permission} refresh={() => void action(controller.refresh)} download={() => void action(controller.download)}
               cancelDownload={id => void action(() => io.cancelDownload(id))} /> : <>
-            <div className="guided-kicker">{['02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step - 2]}</div>
-            <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
-              {guided.step === 4 && <LoomLine />}</div>
-          </>}
-          {guided.step === 2 && <>
-            <p className="guided-intro">Hold these keys and talk, and Voxloom types your words where you’re writing. Keep them, or pick your own.</p>
-            <ShortcutRecorder defaultValue={initialSettings.shortcut} id="onboarding-shortcut" onChange={(value) => settings.update({ key: 'shortcut', value })} value={state.settings.shortcut} variant="card" />
-            <details className="guided-more"><summary>More ways to use it</summary><ul>
-              <li><b>Hands-free:</b> tap your shortcut twice quickly and Voxloom keeps listening without holding. Press it once more when you’re done. You’ll try both on the next step.</li>
-              <li><b>One key:</b> choose Change shortcut, then press just one key, like Right Option, Right Command or F13–F19. It uses the Accessibility access you allowed in step 1.</li>
-            </ul></details>
-            <p className="guided-mini guided-settings-note">You can change this later in Settings.</p>
-          </>}
-          {guided.step === 3 && <>
-            <div className="guided-modes" aria-label="Two ways to use the same shortcut"><span aria-current={guided.mode === 'hold' ? 'step' : undefined} data-done={guided.holdDone || undefined}>{guided.holdDone ? '✓' : '1'} Hold to talk</span><span aria-current={guided.mode === 'tap' ? 'step' : undefined} data-done={guided.tapDone || undefined}>{guided.tapDone ? '✓' : '2'} Double-tap</span></div>
-            <p className="guided-intro">{both ? 'You’ve tried both ways. Use whichever suits the moment.' : guided.mode === 'tap' ? 'Double-tap the same shortcut, then let go. Say a short sentence. Press the shortcut once more to finish.' : 'Click the note. Hold your shortcut, say a short sentence, then release to finish.'}</p>
-            <div className="guided-note"><div><span>PRACTICE NOTE</span><span role="status">{status}</span></div><textarea aria-label="Practice dictation field" defaultValue="" placeholder={guided.mode === 'tap' ? 'Try: Now I can speak hands-free.' : 'Try: My first words with Voxloom.'} ref={field} /></div>
-            <KeyCombo combo={state.settings.shortcut} />
-            <p className="guided-mini">{guided.mode === 'tap' ? 'Double-tap → speak → press once to finish.' : 'Hold → speak → release.'} Esc cancels without inserting.</p>
-            {!guided.ready && <p className="form-error">Check permissions, voice pack and registered shortcut before retrying.</p>}
-            <div className="guided-practice-actions"><button className="btn ghost" onClick={() => { cancel(); field.current?.focus(); }} type="button">{busy ? 'Cancel dictation' : 'Try again'}</button><button className="btn ghost" onClick={() => void action(controller.refresh)} type="button">Check again</button></div>
+            <div className="guided-kicker">Ready for your next thought</div>
+            <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>You speak.<br />Voxloom types.</h2><LoomLine /></div>
           </>}
           {guided.step === 4 && <>
             <p className="guided-intro">You’ve tried both ways to dictate. Choose Open Voxloom to finish, then use your shortcut in any app.</p>
@@ -253,7 +248,10 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
               <p className="form-error" role="alert">{shownError || 'Access or the voice pack needs attention before you finish.'}</p>
               <button className="btn" onClick={() => { cancel(); controller.back(); controller.back(); controller.back(); }} type="button">Review access and voice pack</button>
             </>}
-            <div className="guided-shortcut"><KeyCombo combo={state.settings.shortcut} /><p>Hold for a quick thought. Double-tap to go hands-free. Press once more to finish.</p></div>
+            <div className="guided-shortcut"><KeyCombo combo={state.settings.shortcut} /><ul aria-label="Two ways to use it">
+              <li><b>Hold</b> for a quick thought.</li>
+              <li><b>Double-tap</b> to go hands-free. Press once more to finish.</li>
+            </ul></div>
             <p className="guided-mini">Your shortcut works in other apps once setup closes. If an app won’t take typed text, Voxloom may copy your words so you can paste them.</p>
           </>}
           {shownError && guided.step !== 1 && !(guided.step === 4 && !guided.ready) && <p className="form-error" role="alert">{shownError}</p>}
@@ -262,12 +260,12 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
         <footer className="guided-footer">
           {guided.step > 0 && <button className="btn ghost" onClick={() => { cancel(); controller.back(); }} type="button">Back</button>}
           {guided.step < 4 && <button className="btn ghost" onClick={close} type="button">Set up later</button>}
-          <span />
+          <span className="guided-footer__wait" id="guided-wait">{waiting}</span>
           {guided.step === 0 ? <button className="btn primary" disabled={!io.native} onClick={() => void action(controller.start)} type="button">Start setup →</button>
             : guided.step === 1 ? <button className="btn primary" disabled={!connected} onClick={() => void next()} type="button">Continue →</button>
-              : guided.step === 2 ? <button className="btn primary" disabled={!guided.ready} onClick={() => void next()} type="button">Use this shortcut →</button>
-                : guided.step === 3 && guided.mode === 'hold' ? <button className="btn primary" disabled={!guided.holdDone || busy} onClick={() => { cancel(); controller.tryHandsFree(); field.current?.focus(); }} type="button">Try double-tap →</button>
-                  : guided.step === 3 ? <button className="btn primary" disabled={!both || !guided.ready || busy} onClick={() => void next()} type="button">Finish setup →</button>
+              : guided.step === 2 ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!guided.ready} onClick={() => void next()} type="button">Use this shortcut →</button>
+                : guided.step === 3 && guided.mode === 'hold' ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!guided.holdDone || busy} onClick={() => { cancel(); controller.tryHandsFree(); field.current?.focus(); }} type="button">Try double-tap →</button>
+                  : guided.step === 3 ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!both || !guided.ready || busy} onClick={() => void next()} type="button">Finish setup →</button>
                     : <button className="btn primary" disabled={!both || !guided.ready} onClick={() => void finish()} type="button">Open Voxloom</button>}
         </footer>
       </div>

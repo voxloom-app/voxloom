@@ -33,6 +33,8 @@
 @import "./onboarding.css";
 @import "./onboarding-stage.css";
 @import "./connection-step.css";
+@import "./setup-steps.css";
+@import "./practice-step.css";
 @import "./gesture-guide.css";
 @import "./welcome-cover.css";
 @import "./features.css";

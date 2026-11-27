@@ -82,7 +82,6 @@
 
 /* Big key caps in setup are the stage's physical caps (Home, the rail). */
 .guided-shortcut .kbd,
-.guided-content > .key-combo .kbd,
 .shortcut-card__keys .kbd {
   background: linear-gradient(180deg, #32323f, #1b1b24);
   border: 1px solid rgba(255, 255, 255, .13);

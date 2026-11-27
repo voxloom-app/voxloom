@@ -80,8 +80,9 @@ it('Resume setup during a product recording leaves Home the only transcription c
   await act(async () => {});
   const note = screen.getByRole('textbox', { name: 'Practice dictation field' });
   expect(note).toHaveValue('');
-  // A practice retry or Close must not cancel the product's native request.
-  await userEvent.setup().click(screen.getByRole('button', { name: /Try again|Cancel dictation/ }));
+  // Practice offers no retry before a try; Close (which cancels practice) must not cancel the product's native request.
+  expect(screen.queryByRole('button', { name: /Try again|Cancel dictation/ })).not.toBeInTheDocument();
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Set up later' }));
   expect(native.service.cancelCapture).not.toHaveBeenCalledWith(productRequest);
   // Product delivery would otherwise use BUS-201 own-field insertion here.
   act(() => note.blur());
@@ -96,7 +97,7 @@ it('Resume setup during a product recording leaves Home the only transcription c
   expect(copy).toHaveBeenCalledWith('Product words.');
   expect(note).toHaveValue('');
   expect(screen.getByRole('button', { name: /Try double-tap/ })).toBeDisabled();
-  expect(screen.queryByText('Turning speech into text…')).not.toBeInTheDocument();
+  expect(screen.queryByText('Transcribing…')).not.toBeInTheDocument();
 
   rerender(<AppProvider><Harness setupOpen={false} /></AppProvider>);
   expect(native.service.cancelCapture).not.toHaveBeenCalledWith(productRequest);

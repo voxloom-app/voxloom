@@ -46,3 +46,14 @@
 [data-appearance-resolved="light"] .setup-thread li[data-state="current"] > b { color: var(--accfg); }
 [data-appearance-resolved="light"] .guided-hero:has(> .loom-line) h2 { text-shadow: 0 0 8px var(--linen); }
 [data-appearance-resolved="light"] .guided-content h2:focus-visible::before { box-shadow: 0 0 10px color-mix(in srgb, #b6ff3c 80%, transparent); }
+/* Steps 2 and 3 (ui-iter-37): a pressed plate for your keys, a paper note, linen knots. */
+[data-appearance-resolved="light"] .shortcut-step .shortcut-card { background: rgba(70, 56, 30, .045); border-color: rgba(70, 56, 30, .12); box-shadow: inset 0 1px 3px rgba(70, 56, 30, .16), 0 1px 0 rgba(255, 255, 255, .8); }
+[data-appearance-resolved="light"] .practice__beats li > b { background-color: var(--linen); }
+[data-appearance-resolved="light"] .guided-footer__wait { --wait-bg: var(--linen); }
+[data-appearance-resolved="light"] .practice-note { background: linear-gradient(180deg, #fffdf8, #fbf8f1); box-shadow: 0 1px 0 rgba(70, 56, 30, .1), 0 16px 28px -22px rgba(70, 56, 30, .55); }
+[data-appearance-resolved="light"] .practice-note__signal { background: rgba(255, 255, 255, .7); }
+[data-appearance-resolved="light"] .practice[data-mode="hold"][data-look="listening"] .practice__beats .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 70%, transparent);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 var(--cap-edge), 0 0 18px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+  color: var(--accfg);
+}

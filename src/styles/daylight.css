@@ -91,7 +91,7 @@
 }
 
 /* ---- Key caps by daylight: white caps on a warm shadow, like the keyboard under your hands ---- */
-[data-appearance-resolved="light"] :is(.stage .home-hero h1, .voice-path__value, .guided-shortcut, .guided-content > .key-combo, .shortcut-card__keys) .kbd {
+[data-appearance-resolved="light"] :is(.stage .home-hero h1, .voice-path__value, .guided-shortcut, .practice__beats, .shortcut-card__keys) .kbd {
   --cap-edge: #cbc3b3;
   background: linear-gradient(180deg, #ffffff, #f3f0ea);
   border-color: rgba(70, 56, 30, .16);

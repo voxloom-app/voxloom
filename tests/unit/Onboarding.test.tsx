@@ -1,6 +1,6 @@
 import { dispatchPracticeGesture, subscribePracticeReset } from '../../src/features/onboarding/practiceBridge';
 import { act } from '@testing-library/react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Onboarding } from '../../src/features/onboarding/Onboarding';
@@ -267,11 +267,13 @@ describe('B guided setup', () => {
     const user = userEvent.setup();
     renderWithApp(<Onboarding boundary={setupBoundary()} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 2 }), write: vi.fn() }} />);
     expect(screen.getByRole('heading', { name: /Your shortcut/ })).toBeInTheDocument();
-    expect(screen.getByText('Hold these keys and talk, and Voxloom types your words where you’re writing. Keep them, or pick your own.')).toBeInTheDocument();
+    expect(screen.getByText('Voxloom types what you say wherever you’re writing. Keep these keys, or pick your own.')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Your shortcut Default' })).toBeInTheDocument();
     expect(screen.getAllByText('Control Shift Space')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Change shortcut' })).toHaveAccessibleDescription('Hold the keys while you talk. Let go when you’re done.');
-    expect(screen.getByText('More ways to use it')).toBeInTheDocument();
+    // ui-iter-37: the two ways sit beside the keys, not in a disclosure.
+    const ways = screen.getByRole('region', { name: 'Two ways to use it' });
+    expect(within(ways).getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent)).toEqual(['Hold to talk', 'Hands-free']);
     expect(screen.getByText('You can change this later in Settings.')).toBeInTheDocument();
     for (const gone of [/Global shortcut/, /Registered:/, /latch/i, /native binding/, /Reset to default/, /Prefer a single key/, /AltRight/]) {
       expect(screen.queryByText(gone)).not.toBeInTheDocument();
