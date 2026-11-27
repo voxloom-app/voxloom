@@ -45,6 +45,91 @@ for (const theme of ['dark', 'light']) for (const width of [640, 1000, 1440]) {
   });
 }
 
+for (const theme of ['dark', 'light']) {
+  test(`${theme} Get connected fits the minimum window with outstanding and completed checks`, async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 620 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const preview = `/tests/fixtures/guided-preview.html?step=1&theme=${theme}`;
+    const cases = [
+      ['&mic=off&access=off&ready=0', 'Allow microphone access.'],
+      ['&mic=denied&access=off&ready=0', 'Allow microphone access.'],
+      ['&access=off&pack=downloading', 'Turn on Accessibility.'],
+      ['&ready=0', 'Get your voice pack.'],
+      ['&pack=downloading', 'Downloading your voice pack.'],
+      ['&pack=failed', 'Retry the download.'],
+      ['', 'You’re connected.'],
+    ];
+    for (const [query, title] of cases) {
+      await page.goto(preview + query);
+      await page.addStyleTag({ content: ':root, html, body { --font: Verdana, sans-serif !important; }' });
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeFocused();
+      const content = page.locator('.guided-content');
+      expect(await content.evaluate(el => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect(page.getByRole('list', { name: 'Connection checks' }).getByRole('listitem')).toHaveCount(3);
+      await expect(page.locator('.guided-footer button')).toHaveText(['Back', 'Set up later', 'Continue →']);
+      if (query) await expect(page.getByRole('button', { name: 'Continue →' })).toBeDisabled();
+      else await expect(page.getByRole('button', { name: 'Continue →' })).toBeEnabled();
+      expect((await new AxeBuilder({ page }).include('.setup-window').analyze()).violations).toEqual([]);
+    }
+    // The same three confirmations sit beside (not below) the instruction in a large window.
+    await page.setViewportSize({ width: 1468, height: 888 });
+    const task = await page.getByRole('heading', { name: 'You’re connected.' }).boundingBox();
+    const receipt = await page.getByRole('heading', { name: 'Connection checks' }).boundingBox();
+    expect(receipt!.x).toBeGreaterThan(task!.x + task!.width);
+  });
+}
+
+// ui-iter-37: Your shortcut and First words show the user's own keys, glyphs on macOS and
+// words elsewhere, and fit the minimum window in the wider Linux font.
+for (const theme of ['dark', 'light']) for (const platform of ['MacIntel', 'Linux x86_64']) {
+  test(`${theme} Your shortcut and First words fit 640x620 with ${platform} keys`, async ({ page }) => {
+    await page.addInitScript((name) => Object.defineProperty(Navigator.prototype, 'platform', { get: () => name }), platform);
+    await page.setViewportSize({ width: 640, height: 620 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const mac = platform === 'MacIntel';
+    const cases: [string, RegExp, string[]][] = [
+      ['step=2', /^Your shortcut/, mac ? ['⌃', '⇧', 'Space'] : ['Ctrl', 'Shift', 'Space']],
+      ['step=2&shortcut=AltRight', /^Your shortcut/, mac ? ['⌥'] : ['Alt']],
+      ['step=2&shortcut=Ctrl+Alt+PageDown', /^Your shortcut/, mac ? ['⌃', '⌥', 'PageDown'] : ['Ctrl', 'Alt', 'PageDown']],
+      ['step=3', /^First, hold to talk/, mac ? ['⌃', '⇧', 'Space'] : ['Ctrl', 'Shift', 'Space']],
+      ['step=3&shortcut=Ctrl+Alt+PageDown', /^First, hold to talk/, mac ? ['⌃', '⌥', 'PageDown'] : ['Ctrl', 'Alt', 'PageDown']],
+      ['step=3&practice=holddone', /^That’s hold to talk/, []],
+      ['step=3&practice=tap', /^Now, go hands-free/, []],
+      ['step=3&practice=both', /^Both ways/, []],
+      ['step=3&access=off', /^First, hold to talk/, []],
+    ];
+    for (const [query, title, keys] of cases) {
+      await page.goto(`/tests/fixtures/guided-preview.html?theme=${theme}&${query}`);
+      await page.addStyleTag({ content: ':root, html, body { --font: Verdana, sans-serif !important; }' });
+      await expect(page.getByRole('heading', { level: 2, name: title })).toBeFocused();
+      const caps = page.locator(query.startsWith('step=2') ? '.shortcut-card__keys .kbd' : '.practice__beats .kbd');
+      if (keys.length) await expect(caps).toHaveText(keys);
+      const content = page.locator('.guided-content');
+      expect(await content.evaluate((el) => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth), query).toBe(true);
+      // A waiting primary says why beside it; an open one has nothing to explain.
+      const primary = page.locator('.guided-footer .btn.primary');
+      if (await primary.isDisabled()) await expect(primary).toHaveAccessibleDescription(/\S/);
+      else await expect(primary).not.toHaveAttribute('aria-describedby');
+      expect((await new AxeBuilder({ page }).include('.setup-window').analyze()).violations).toEqual([]);
+    }
+  });
+}
+for (const theme of ['dark', 'light']) {
+  test(`${theme} Your shortcut and First words use a large window as two columns`, async ({ page }) => {
+    await page.setViewportSize({ width: 1468, height: 888 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(`/tests/fixtures/guided-preview.html?theme=${theme}&step=2`);
+    const card = await page.getByRole('group', { name: /^Your shortcut/ }).boundingBox();
+    const ways = await page.getByRole('region', { name: 'Two ways to use it' }).boundingBox();
+    expect(ways!.x).toBeGreaterThan(card!.x + card!.width);
+    await page.goto(`/tests/fixtures/guided-preview.html?theme=${theme}&step=3`);
+    const beats = await page.locator('.practice__beats').boundingBox();
+    const note = await page.getByRole('textbox', { name: 'Practice dictation field' }).boundingBox();
+    expect(note!.x).toBeGreaterThan(beats!.x + beats!.width);
+    await expect(page.getByRole('status')).toHaveText('Ready when you are');
+  });
+}
+
 // BUS-224/BUS-225: Welcome with the voice pack not downloaded yet, and the finish step ready and not ready.
 const shot = async (page: import('@playwright/test').Page, testInfo: import('@playwright/test').TestInfo, filename: string) =>
   page.screenshot({ path: process.env.GUIDED_EVIDENCE_DIR ? join(process.env.GUIDED_EVIDENCE_DIR, filename) : testInfo.outputPath(filename) });

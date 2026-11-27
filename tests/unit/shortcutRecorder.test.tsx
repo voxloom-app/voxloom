@@ -100,6 +100,8 @@ describe('recorder copy (designer final copy)', () => {
     expect(comboLabel('Ctrl + Enter', false)).toBe('Ctrl+Enter');
     expect(spokenCombo('Ctrl + Meta + Space', true)).toBe('Control Command Space');
     expect(spokenCombo('Ctrl + Meta + Space', false)).toBe('Control Super Space');
+    expect(spokenCombo('CmdOrCtrl + K', false)).toBe('Control K');
+    expect(spokenCombo('CmdOrCtrl + K', true)).toBe('Command K');
   });
 });
 
@@ -126,7 +128,7 @@ describe('ShortcutRecorder', () => {
     expect(field().getAttribute('aria-describedby')).not.toMatch(/status/);
     await user.keyboard('{Alt>}{Meta>}j{/Meta}{/Alt}');
     expect(onChange).toHaveBeenCalledWith('Alt + Meta + J');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Option Command J');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Option Command J. Change keys');
     expect(screen.getByRole('status')).toHaveTextContent(/Shortcut set to/);
   });
 
@@ -138,7 +140,7 @@ describe('ShortcutRecorder', () => {
     await user.keyboard('{Escape}');
     expect(onChange).not.toHaveBeenCalled();
     expect(field()).toHaveAttribute('aria-pressed', 'false');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
     expect(screen.getByRole('status')).toHaveTextContent('Canceled. Shortcut unchanged.');
   });
 

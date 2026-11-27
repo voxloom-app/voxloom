@@ -1,0 +1,55 @@
+/* The loom by daylight, page by page (ui-iter-10; tokens and frame in daylight.css). Each
+   page's beam keeps its threads, knots and words; ink replaces the night's white type, a linen
+   halo replaces the night halo, and the voice glows become sunlight through dyed thread. */
+
+/* ---- Voice glows: vivid brand light, spilling over linen like sun through thread ---- */
+[data-appearance-resolved="light"] .stage::before { background: radial-gradient(42% 85% at 0% 45%, color-mix(in srgb, #b6ff3c 30%, transparent), transparent 70%); }
+[data-appearance-resolved="light"] .stage::after { background: radial-gradient(42% 85% at 100% 45%, color-mix(in srgb, #3cf0ff 26%, transparent), transparent 70%); }
+
+/* ---- Home: the voice stage and the last pick ---- */
+[data-appearance-resolved="light"] .stage .home-hero h1 { color: var(--fg); }
+[data-appearance-resolved="light"] .loom__warp { opacity: .42; }
+/* Small caps on the quiet shortcut line keep a short attached shadow (ui-iter-25). */
+[data-appearance-resolved="light"] .stage .home-hero[data-words] h1 .kbd { box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 var(--cap-edge); }
+[data-appearance-resolved="light"] .stage:is([data-phase="listening"], [data-phase="speaking"]) .home-hero[data-words] h1 .kbd {
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 1px color-mix(in srgb, var(--brand-a) 50%, transparent), 0 0 14px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+}
+[data-appearance-resolved="light"] .stage .stage__recovery { background: rgba(255, 255, 255, .42); border-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .stage .pick__words p { color: #121419; text-shadow: 0 0 18px var(--linen); }
+[data-appearance-resolved="light"] .pick__weft::before { opacity: .8; }
+[data-appearance-resolved="light"] .stage .pick__copy { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: 0 1px 2px rgba(70, 56, 30, .1); }
+[data-appearance-resolved="light"] .stage .pick__copy:hover { border-color: var(--sel-edge); color: var(--accfg); }
+
+/* ---- Page titles on the linen ---- */
+[data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1) { color: var(--fg); }
+
+/* ---- Dictionary: the word check's fixes wear a highlighter's lime. ---- */
+[data-appearance-resolved="light"] .word-check__fix { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
+
+/* ---- Settings: the path said as a sentence ---- */
+[data-appearance-resolved="light"] .path-sentence__stop { --plate: color-mix(in srgb, var(--knot) 13%, #ffffff); }
+[data-appearance-resolved="light"] .path-sentence__stop[data-stop="appearance"] { --plate: rgba(255, 255, 255, .75); }
+[data-appearance-resolved="light"] .path-sentence__stop:hover { background-color: rgba(255, 255, 255, .55); }
+[data-appearance-resolved="light"] .path-sentence__stop[data-current] { background-color: var(--plate); color: var(--fg); }
+
+/* ---- Setup: the welcome, the thread and the steps ---- */
+[data-appearance-resolved="light"] .guided-main.stage { --sheet: transparent; --bg: var(--linen); }
+[data-appearance-resolved="light"] .guided-main.stage :is(.guided-disclosure, .guided-footer) { background: rgba(255, 255, 255, .42); }
+[data-appearance-resolved="light"] .guided-main.stage .guided-footer { border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .setup-thread li > b { background-color: var(--linen); }
+[data-appearance-resolved="light"] .guided-modes span::before { background-color: var(--linen); }
+/* Step numbers are text: the dyed lime is a 3:1 thread, so the current one is set in deep lime ink. */
+[data-appearance-resolved="light"] .setup-thread li[data-state="current"] > b { color: var(--accfg); }
+[data-appearance-resolved="light"] .guided-hero:has(> .loom-line) h2 { text-shadow: 0 0 8px var(--linen); }
+[data-appearance-resolved="light"] .guided-content h2:focus-visible::before { box-shadow: 0 0 10px color-mix(in srgb, #b6ff3c 80%, transparent); }
+/* Steps 2 and 3 (ui-iter-37): a pressed plate for your keys, a paper note, linen knots. */
+[data-appearance-resolved="light"] .shortcut-step .shortcut-card { background: rgba(70, 56, 30, .045); border-color: rgba(70, 56, 30, .12); box-shadow: inset 0 1px 3px rgba(70, 56, 30, .16), 0 1px 0 rgba(255, 255, 255, .8); }
+[data-appearance-resolved="light"] .practice__beats li > b { background-color: var(--linen); }
+[data-appearance-resolved="light"] .guided-footer__wait { --wait-bg: var(--linen); }
+[data-appearance-resolved="light"] .practice-note { background: linear-gradient(180deg, #fffdf8, #fbf8f1); box-shadow: 0 1px 0 rgba(70, 56, 30, .1), 0 16px 28px -22px rgba(70, 56, 30, .55); }
+[data-appearance-resolved="light"] .practice-note__signal { background: rgba(255, 255, 255, .7); }
+[data-appearance-resolved="light"] .practice[data-mode="hold"][data-look="listening"] .practice__beats .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 70%, transparent);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 0 var(--cap-edge), 0 0 18px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+  color: var(--accfg);
+}

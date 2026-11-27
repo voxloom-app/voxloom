@@ -1,0 +1,155 @@
+/* Warp rail, part two (ui-iter-03): today's beam and the rail's foot. Since ui-iter-21 the
+   rail is quiet: no warp threads, no woven cloth, no docked shuttle (Start lives on Home's
+   stage, loom-bar.css). Today keeps its lit rod, and the day's picks are ticks on it, placed
+   by time of day in one dye whatever their outcome, so the rail never turns into a slab. */
+
+/* Today in words, set on the warp beam: a lit rod with a peg at each end. */
+.rail-today {
+  background: none;
+  border: 0;
+  border-radius: var(--r-tile) var(--r-tile) 0 0;
+  color: var(--fg);
+  display: grid;
+  gap: 5px;
+  padding: var(--s-4) var(--s-5) var(--s-7);
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+/* Whatever follows Today (the foot, the Developer panel) sits at the bottom of the rail. */
+.sidebar > .rail-today { margin-bottom: auto; }
+.rail-today:hover { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .05)); }
+.rail-today::after {
+  background:
+    radial-gradient(circle at 4px 50%, #f6f6f9 0 1.5px, var(--brand-a) 2.5px 4px, transparent 4.5px),
+    radial-gradient(circle at calc(100% - 4px) 50%, #f6f6f9 0 1.5px, var(--brand-b) 2.5px 4px, transparent 4.5px),
+    linear-gradient(90deg, transparent 3px, var(--brand-a) 3px, var(--brand-b) calc(100% - 3px), transparent calc(100% - 3px)) 0 50% / 100% 2px no-repeat;
+  bottom: -4px;
+  content: "";
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-a) 45%, transparent));
+  height: 8px;
+  inset-inline: 0;
+  position: absolute;
+}
+.rail-today__head {
+  align-items: baseline;
+  color: var(--accfg);
+  display: flex;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  justify-content: space-between;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.rail-today__head b { color: #f6f6f9; font-size: var(--fs-emph); letter-spacing: -.02em; }
+.rail-today__sum { color: var(--mut); font-size: var(--fs-label); }
+.rail-today__loose { align-items: center; color: var(--mut); display: inline-flex; font-size: var(--fs-label); gap: 6px; }
+.rail-today__knot { flex: none; height: 11px; width: 11px; }
+.rail-today__knot circle,
+.rail-today__knot path { fill: none; stroke: var(--warn); stroke-width: 1.5px; }
+.rail-today__knot .knot__core { fill: var(--warn); stroke: none; }
+
+/* The day on the rod: one tick per dictation, midnight at the left peg, midnight at the right.
+   One dye for every outcome; the newest is lit. Above the rod's own paint. */
+.rail-today__day { bottom: -4px; height: 8px; inset-inline: 0; position: absolute; z-index: 1; }
+.rail-today__day i {
+  background: #f6f6f9;
+  border-radius: 1px;
+  height: 100%;
+  left: calc(8px + (100% - 16px) * var(--at));
+  opacity: .42;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+.rail-today__day i[data-newest] { box-shadow: 0 0 5px 1px color-mix(in srgb, #f6f6f9 55%, transparent); opacity: 1; }
+
+/* The foot: the keys to hold away from Home, or the run you can finish from here. */
+.rail-foot { display: grid; gap: var(--s-4); }
+.rail-foot:empty { display: none; }
+.rail-foot .run-tag::before { display: none; } /* the foot is not under a capsule: no string to hang from */
+.rail-run { align-items: center; display: flex; gap: var(--s-3); justify-content: center; }
+.rail-run__stop { gap: 7px; min-height: 32px; padding: 4px 14px; }
+.rail-run__stop .rec-dot { height: 8px; width: 8px; }
+.rail-run__cancel { min-height: 32px; padding: 4px 10px; }
+.rail-run__busy { color: var(--mut); font-size: var(--fs-label); margin: 0; text-align: center; }
+
+/* With nothing to say: the keys to hold, then where, on two short lines (ui-iter-33). */
+.rail-key {
+  color: var(--mut);
+  display: grid;
+  font-size: var(--fs-label);
+  gap: var(--s-2);
+  justify-items: center;
+  line-height: 1.35;
+  margin: 0;
+  text-align: center;
+}
+.rail-key__hold { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-3) 7px; justify-content: center; }
+.rail-key .key-combo__caps { flex-wrap: wrap; gap: 4px; justify-content: center; }
+/* Real caps with room inside: the glyph sits in the middle of the face, and the 2px edge
+   below is paid for in the margin, so the cap's middle lines up with "Hold" beside it. */
+.rail-key .kbd {
+  align-items: center;
+  background: linear-gradient(180deg, #2c2c38, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-kbd);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 0 #050508;
+  color: #f6f6f9;
+  display: inline-flex;
+  font-size: var(--fs-micro);
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  margin-bottom: 2px;
+  min-width: 22px;
+  padding: 0 7px;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
+  white-space: nowrap;
+}
+/* Held while you speak: the caps sink and take the voice's lime. */
+.sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--brand-a) 60%, transparent);
+  color: var(--accfg);
+  transform: translateY(2px);
+}
+
+/* The rail's last line (ui-iter-27): Settings… and the shortcuts "?", which used to sit at
+   the right of a toolbar that crossed every page. Quieter than the pages until pointed at. */
+.rail-tools { align-items: center; border-top: 1px solid var(--line); display: flex; gap: var(--s-3); padding-top: var(--s-5); }
+.rail-settings {
+  align-items: center;
+  border: 0;
+  border-radius: var(--r-tile);
+  color: var(--mut);
+  display: flex;
+  flex: 1;
+  gap: 9px;
+  min-width: 0;
+  padding: var(--s-3) var(--s-5);
+  text-align: left;
+}
+.rail-settings kbd { color: var(--mut); font-size: var(--fs-micro); margin-left: auto; visibility: hidden; }
+.rail-settings:is(:hover, :focus-visible) kbd { visibility: visible; }
+.rail-settings:is(:hover, :focus-visible) { background: rgba(255, 255, 255, .05); color: var(--fg); }
+.rail-settings[aria-current="page"] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-a) 14%, transparent), transparent);
+  box-shadow: inset 3px 0 0 var(--sel-edge);
+  color: var(--fg);
+  font-weight: 600;
+}
+.rail-settings[aria-current="page"] .icon { color: var(--accfg); }
+.rail-help { border: 1px solid var(--ctl-line); border-radius: 50%; color: var(--mut); flex: none; height: 24px; padding: 0; width: 24px; }
+.rail-help:is(:hover, :focus-visible) { color: var(--fg); }
+/* The narrow rail has no room for the longer Ctrl+, hint beside Help. The title keeps it. */
+@media (max-width: 780px) { .rail-settings kbd { display: none; } }
+
+.dev-panel summary { color: var(--mut); cursor: pointer; font-size: var(--fs-label); padding: 0 var(--s-4); }
+.dev-panel .state-lab { border-top: 0; margin-top: var(--s-3); padding-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* No pulsing dot or sinking caps: they only brighten. */
+  .sidebar[data-phase] .brand__dot { animation: none; }
+  .sidebar[data-phase] .rail-key .kbd { transform: none; }
+}

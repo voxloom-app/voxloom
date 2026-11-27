@@ -1,6 +1,6 @@
 import { dispatchPracticeGesture, subscribePracticeReset } from '../../src/features/onboarding/practiceBridge';
 import { act } from '@testing-library/react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Onboarding } from '../../src/features/onboarding/Onboarding';
@@ -69,11 +69,33 @@ describe('B guided setup', () => {
       expect(screen.getByRole('button', { name: 'Set up later' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Skip setup' })).not.toBeInTheDocument();
     });
-    it('step 1 still shows the reason next to the voice-pack panel', async () => {
+    it('step 1 names the missing pack and its explicit action rather than listing every possible readiness state', async () => {
       renderWithApp(<Onboarding boundary={missingBoundary()} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 1 }), write: vi.fn() }} />);
-      expect(await screen.findByRole('alert')).toHaveTextContent(missingReason);
-      expect(screen.getByText('Voice pack needs attention')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Retry download' })).toBeInTheDocument();
+      expect(await screen.findByRole('alert')).toHaveTextContent('Download needed');
+      expect(screen.getByRole('heading', { name: 'Get your voice pack.' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download voice pack' })).toBeEnabled();
+    });
+    it('a resumed step starts no transfer; a requested download shows its real progress and remains cancellable', async () => {
+      const io = missingBoundary();
+      const user = userEvent.setup();
+      let finishTransfer!: () => void;
+      io.download = vi.fn((id, progress) => {
+        progress({ modelId: id, bytesReceived: 20, bytesTotal: 80, ratio: 0.25 });
+        return new Promise<void>(resolve => { finishTransfer = resolve; });
+      });
+      renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 1 }), write: vi.fn() }} />);
+      const start = await screen.findByRole('button', { name: 'Download voice pack' });
+      expect(io.download).not.toHaveBeenCalled();
+      await user.click(start);
+      const meter = await screen.findByRole('progressbar', { name: 'Voice pack download' });
+      expect(meter).toHaveAttribute('max', '80');
+      expect(meter).toHaveAttribute('value', '20');
+      expect(screen.getByRole('button', { name: /Continue/ })).toBeDisabled();
+      await user.click(screen.getByRole('button', { name: 'Cancel download' }));
+      expect(io.cancelDownload).toHaveBeenCalledWith('whisper-base.en');
+      await act(async () => finishTransfer());
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(io.download).toHaveBeenCalledTimes(1);
     });
     it('Start setup surfaces the reason once setup has started, and Back to Welcome hides it again', async () => {
       const user = userEvent.setup();
@@ -84,6 +106,7 @@ describe('B guided setup', () => {
       await user.click(screen.getByRole('button', { name: /Start setup/ }));
       // A failed download is a real failure and stays visible, on step 1 and back on Welcome.
       expect(await screen.findByRole('alert')).toHaveTextContent(/Download failed: Error: disk full/);
+      expect(screen.getByRole('button', { name: 'Retry download' })).toBeEnabled();
       await user.click(screen.getByRole('button', { name: 'Back' }));
       expect(screen.getByRole('heading', { name: /Less typing/ })).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(/Download failed/);
@@ -91,7 +114,7 @@ describe('B guided setup', () => {
     it('Back to Welcome hides only the expected readiness reason', async () => {
       const user = userEvent.setup();
       renderWithApp(<Onboarding boundary={missingBoundary()} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 1 }), write: vi.fn() }} />);
-      expect(await screen.findByRole('alert')).toHaveTextContent(missingReason);
+      expect(await screen.findByRole('alert')).toHaveTextContent('Download needed');
       await user.click(screen.getByRole('button', { name: 'Back' }));
       expect(screen.getByRole('heading', { name: /Less typing/ })).toBeInTheDocument();
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -172,14 +195,15 @@ describe('B guided setup', () => {
       expect(alerts[0].closest('.guided-content')!.lastElementChild).toBe(alerts[0]);
       expect(screen.queryByRole('button', { name: 'Review access and voice pack' })).not.toBeInTheDocument();
     });
-    it.each([1, 2, 3])('step %i keeps the specific error at the shared bottom spot', async (step) => {
+    it.each([1, 2, 3])('step %i keeps the specific error once, beside its task on the connection step', async (step) => {
       const io = setupBoundary();
       io.readiness = vi.fn(async (modelId) => ({ modelId, ready: false, status: 'missing' as const, reason: 'Missing' }));
       renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step, holdDone: true, tapDone: false, mode: 'tap', modelId: 'whisper-base.en', shortcut: 'Ctrl + Shift + Space' }), write: vi.fn() }} />);
       const alert = await screen.findByRole('alert');
       expect(screen.getAllByRole('alert')).toHaveLength(1);
       expect(alert).toHaveTextContent('Missing');
-      expect(alert.closest('.guided-content')!.lastElementChild).toBe(alert);
+      if (step === 1) expect(alert.parentElement).toContainElement(screen.getByRole('button', { name: 'Download voice pack' }));
+      else expect(alert.closest('.guided-content')!.lastElementChild).toBe(alert);
       expect(screen.queryByText('Access or the voice pack needs attention before you finish.')).not.toBeInTheDocument();
     });
     it('Escape on step 4 still closes the window', async () => {
@@ -196,14 +220,26 @@ describe('B guided setup', () => {
       expect(screen.queryByRole('button', { name: 'Skip setup' })).not.toBeInTheDocument();
     });
   });
+  it('resuming with everything connected shows confirmations and the next step, not permission or download instructions', async () => {
+    const io = setupBoundary();
+    renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 1 }), write: vi.fn() }} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled());
+    expect(screen.getByRole('heading', { name: 'You’re connected.' })).toBeVisible();
+    expect(screen.getByText(/Choose Continue to set your dictation shortcut/)).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Connection checks' })).toHaveTextContent('Verified');
+    expect(screen.queryByText(/Enable Voxloom in System Settings|Interrupted downloads restart/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Check again' })).not.toBeInTheDocument();
+    expect(io.request).not.toHaveBeenCalled();
+    expect(io.download).not.toHaveBeenCalled();
+  });
   it('requires only Microphone and Accessibility and a ready pack before the accepted shortcut and writable two-try note', async () => {
     const user = userEvent.setup();
     const io = setupBoundary();
     vi.mocked(io.query).mockResolvedValue({ microphone: 'authorized', accessibility: 'not-granted' });
     renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={storage()} />);
     await user.click(screen.getByRole('button', { name: /Start setup/ }));
-    expect(screen.getByRole('heading', { name: /A few permissions/ })).toBeInTheDocument();
-    expect(screen.getByText(/Two permissions connect/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Turn on Accessibility.' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Allow Microphone' })).not.toBeInTheDocument();
     expect(screen.queryByText(/Input Monitoring/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Continue/ })).toBeDisabled();
     expect(screen.getByText(/Accessibility lets Voxloom insert words/)).toHaveTextContent(/Esc/);
@@ -212,6 +248,8 @@ describe('B guided setup', () => {
     vi.mocked(io.query).mockResolvedValue({ microphone: 'authorized', accessibility: 'authorized' });
     await user.click(screen.getByRole('button', { name: 'Check again' }));
     await waitFor(() => expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled());
+    expect(screen.getByRole('heading', { name: 'You’re connected.' })).toHaveFocus();
+    expect(screen.queryByText(/If macOS asks you/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Continue/ }));
     expect(screen.getByRole('heading', { name: /Your shortcut/ })).toBeInTheDocument();
     expect(screen.getByText(/press just one key/)).toHaveTextContent('Accessibility access you allowed in step 1');
@@ -229,11 +267,13 @@ describe('B guided setup', () => {
     const user = userEvent.setup();
     renderWithApp(<Onboarding boundary={setupBoundary()} onClose={vi.fn()} progressStorage={{ read: () => JSON.stringify({ version: 1, step: 2 }), write: vi.fn() }} />);
     expect(screen.getByRole('heading', { name: /Your shortcut/ })).toBeInTheDocument();
-    expect(screen.getByText('Hold these keys and talk, and Voxloom types your words where you’re writing. Keep them, or pick your own.')).toBeInTheDocument();
+    expect(screen.getByText('Voxloom types what you say wherever you’re writing. Keep these keys, or pick your own.')).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Your shortcut Default' })).toBeInTheDocument();
     expect(screen.getAllByText('Control Shift Space')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Change shortcut' })).toHaveAccessibleDescription('Hold the keys while you talk. Let go when you’re done.');
-    expect(screen.getByText('More ways to use it')).toBeInTheDocument();
+    // ui-iter-37: the two ways sit beside the keys, not in a disclosure.
+    const ways = screen.getByRole('region', { name: 'Two ways to use it' });
+    expect(within(ways).getAllByRole('listitem').map((item) => item.querySelector('strong')?.textContent)).toEqual(['Hold to talk', 'Hands-free']);
     expect(screen.getByText('You can change this later in Settings.')).toBeInTheDocument();
     for (const gone of [/Global shortcut/, /Registered:/, /latch/i, /native binding/, /Reset to default/, /Prefer a single key/, /AltRight/]) {
       expect(screen.queryByText(gone)).not.toBeInTheDocument();
@@ -255,7 +295,9 @@ describe('B guided setup', () => {
       await waitFor(() => expect(screen.getByRole('button', { name: /Continue/ })).toBeEnabled());
       expect(screen.getByText('Not needed on Windows.')).toBeInTheDocument();
       expect(screen.getByText('Checked when you first dictate.')).toBeInTheDocument();
-      expect(screen.queryByText('✓ Allowed')).not.toBeInTheDocument();
+      expect(screen.queryByText('Allowed')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Ready to continue.' })).toBeVisible();
+      await userEvent.click(screen.getByText('Microphone access on Windows'));
       expect(screen.getByText(/Windows has no typing permission to turn on/)).toBeInTheDocument();
       expect(screen.getByText(/open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone\./)).toBeInTheDocument();
       expect(screen.queryByText(/System Settings|macOS/)).not.toBeInTheDocument();
@@ -267,9 +309,9 @@ describe('B guided setup', () => {
       const io = setupBoundary();
       vi.mocked(io.query).mockResolvedValue({ microphone: 'denied', accessibility: 'not-granted' });
       renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={atPermissions} />);
-      await waitFor(() => expect(screen.getByText('Access is off or has not been granted.')).toBeInTheDocument());
-      expect(screen.getByText(/Two permissions connect/)).toBeInTheDocument();
-      expect(screen.getByText(/Enable Voxloom in System Settings → Privacy & Security/)).toBeInTheDocument();
+      expect(await screen.findByText('Not granted')).toBeVisible();
+      expect(screen.getByRole('heading', { name: 'Allow microphone access.' })).toBeVisible();
+      expect(screen.getByText(/In System Settings → Privacy & Security → Microphone/)).toBeVisible();
       expect(screen.queryByText(/Windows/)).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Allow Microphone' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Open Microphone Settings' })).toBeInTheDocument();

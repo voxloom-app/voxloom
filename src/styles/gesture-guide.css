@@ -1,0 +1,87 @@
+/* A timing score on a perforated strip of paper, inside the welcome foldout. */
+
+.gesture-guide {
+  --stock: var(--field);
+  --inset: 24px;
+  background: var(--stock);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 2px 2px rgb(0 0 0 / .08), 0 14px 25px -18px rgb(0 0 0 / .45);
+  padding: var(--s-7) var(--inset) 0;
+  position: relative;
+}
+/* Sprocket holes run down the margins and through the tear-off output slip. */
+.gesture-guide::before, .gesture-guide::after {
+  background: radial-gradient(ellipse 2px 3px at center, var(--ctl-line) 90%, transparent) center top / 8px 14px repeat-y;
+  bottom: 0;
+  content: "";
+  opacity: .42;
+  position: absolute;
+  top: 0;
+  width: 8px;
+}
+.gesture-guide::before { left: 3px; }
+.gesture-guide::after { right: 3px; }
+.gesture-guide__head { align-items: center; display: flex; flex-wrap: wrap; gap: 5px 12px; justify-content: space-between; }
+.gesture-guide__head h3 { font-size: var(--fs-sheet); letter-spacing: -.025em; margin: 0; }
+.gesture-guide__head .seg { flex: none; }
+.gesture-guide .seg__item { min-height: 30px; }
+.gesture-guide .seg__item:focus-visible { outline-color: var(--focus); z-index: 1; }
+.gesture-score {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 14px;
+  align-items: center;
+  padding-top: 18px;
+  margin-top: 10px;
+}
+.gesture-score__label, .gesture-guide__print > span {
+  color: var(--mut); font: 600 var(--fs-micro)/1.2 var(--mono); letter-spacing: .07em; text-transform: uppercase;
+}
+.gesture-score__keys, .gesture-score__voice {
+  background: repeating-linear-gradient(90deg, var(--line) 0 1px, transparent 1px 5%);
+  height: 36px; position: relative;
+}
+.gesture-score__keys::before, .gesture-score__voice::before {
+  background: var(--ctl-line); content: ""; height: 1px; inset: 50% 0 auto; opacity: .65; position: absolute;
+}
+/* The shared playhead shows which presses coincide with the voice. Each row draws its
+   own segment to keep the alignment at every width. The setup reduced-motion rule stills both. */
+.gesture-score[data-playing] :is(.gesture-score__keys, .gesture-score__voice)::after {
+  animation: gesture-trace var(--trace-duration) linear both; background: var(--fg); content: "";
+  position: absolute; top: 0; bottom: 0; width: 2px;
+}
+@keyframes gesture-trace { from { left: 0; } to { left: calc(100% - 2px); } }
+@media (prefers-reduced-motion: reduce) {
+  .gesture-score[data-playing] :is(.gesture-score__keys, .gesture-score__voice)::after { display: none; }
+}
+.gesture-score__cue { color: var(--fg); font: 550 var(--fs-label)/1.2 var(--font); left: 8%; position: absolute; top: -16px; }
+.gesture-score__cue.end { left: 86%; transform: translateX(-50%); white-space: nowrap; }
+.gesture-score__keys i {
+  background: repeating-linear-gradient(110deg, transparent 0 3px, color-mix(in srgb, var(--brand-a) 35%, transparent) 3px 5px), var(--stock);
+  border: 1.5px solid var(--brand-a); border-radius: 2px; height: 14px; position: absolute; top: calc(50% - 7px);
+}
+.gesture-score__voice svg { color: var(--brand-b); height: 32px; left: var(--voice-start); position: absolute; top: calc(50% - 16px); width: calc(86% - var(--voice-start)); }
+.gesture-score__voice path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
+.gesture-guide p.gesture-guide__instruction { color: var(--fg); font-size: var(--fs-secondary); margin: var(--s-5) 0 var(--s-7); }
+.gesture-guide__print { align-items: center; background: var(--panel); border-top: 1px dashed var(--ctl-line); display: flex; flex-wrap: wrap; gap: 6px 12px; margin-inline: calc(-1 * var(--inset)); padding: 12px var(--inset); }
+.gesture-guide__print p { color: var(--fg); font: 450 calc(var(--fs-bigkey) * 1.18)/1.15 var(--font-words); margin: 0; }
+.gesture-guide__print p::after { background: var(--brand-b); content: ""; display: inline-block; height: .85em; margin-left: 3px; vertical-align: -.05em; width: 2px; }
+
+.gesture-guide__print p[data-pending] { color: var(--mut); font-style: italic; }
+.gesture-guide__watch { align-items: center; border: 1px solid var(--ctl-line); color: var(--fg); display: inline-flex; font-size: var(--fs-label); gap: 6px; margin-left: auto; min-height: 32px; padding: 4px 10px; }
+.gesture-guide__watch:hover { background: var(--segon); }
+.gesture-guide__watch span { color: var(--accfg); }
+
+@container (max-width: 600px) {
+  .gesture-guide__print { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; }
+  .gesture-guide__print p { grid-column: 1; }
+  .gesture-guide__watch { grid-column: 2; grid-row: 1 / 3; }
+}
+@media (max-height: 680px) {
+  .gesture-guide { padding-top: 8px; }
+  .gesture-score { margin-top: 4px; }
+  .gesture-score__keys, .gesture-score__voice { height: 28px; }
+  .gesture-guide p.gesture-guide__instruction { margin: 5px 0 8px; }
+  .gesture-guide__print { padding-block: 7px; }
+}

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app/App';
@@ -19,6 +19,8 @@ import {
   createSettingsStore,
   serializeSettingsFile,
 } from '../../src/services/settings';
+
+const terms = () => screen.findByRole('list', { name: 'Dictionary words, alphabetical' });
 
 describe('durable dictionary persistence', () => {
   it('hydrates words from dictionary.json on boot', async () => {
@@ -52,7 +54,8 @@ describe('durable dictionary persistence', () => {
       expect(screen.queryByRole('main', { name: 'Set up Voxloom' })).not.toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    expect(await screen.findByText('PersistedWord')).toBeInTheDocument();
+    // The list, not the guide's example, which also shows one of your words.
+    expect(await within(await terms()).findByText('PersistedWord')).toBeInTheDocument();
   });
 
   it('persists add and rolls back delete when save fails', async () => {
@@ -78,7 +81,7 @@ describe('durable dictionary persistence', () => {
       expect(screen.queryByRole('main', { name: 'Set up Voxloom' })).not.toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     await user.type(screen.getByLabelText('Word'), 'Durable');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {
@@ -93,7 +96,7 @@ describe('durable dictionary persistence', () => {
       expect(screen.getByText(/Failed to save dictionary/i)).toBeInTheDocument();
     });
     await waitFor(() => {
-      expect(screen.getByText('Durable')).toBeInTheDocument();
+      expect(within(screen.getByRole('list', { name: 'Dictionary words, alphabetical' })).getByText('Durable')).toBeInTheDocument();
     });
     saveSpy.mockRestore();
   });

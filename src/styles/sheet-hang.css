@@ -1,0 +1,147 @@
+/* Interruptions hang from the loom (ui-iter-19). Dialogs stopped floating mid-window as
+   generic cards: each one is a sheet of cloth that drops from the window's top edge on two
+   threads, the way a macOS sheet drops from its title bar (no toolbar since ui-iter-27). A
+   lit rod carries it (the rail's Today beam, pegs and all), the cloth holds the content, and
+   its warp hangs loose below as a fringe of lime and cyan. Behind it the window pauses: a dim with the warp showing through.
+   Toasts hang from the same beam as tags (toast-tag.css). */
+
+.overlay {
+  --beam-y: 0px;        /* the window's top edge: neither window has a toolbar */
+  --drop: var(--s-11);  /* thread length from the beam to the rod */
+  --sheet-max: 500px;
+  --sheet-room: calc(100dvh - var(--beam-y) - var(--drop) - var(--s-11) * 2);
+  align-items: flex-start;
+  background: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--beam-y) + var(--drop)) var(--s-10) var(--s-11);
+}
+/* In the main window the sheet hangs over the page column, and only reaches over the rail
+   when the page column is too narrow for it. */
+#root:has(.app:not([hidden])) ~ .overlay {
+  padding-left: clamp(var(--s-10), 100vw - var(--sheet-max) - var(--s-10), var(--side-w));
+}
+
+/* The window pauses: one dim, and the warp showing through it under the beam. */
+.overlay::before,
+.overlay::after { animation: overlay-dim .18s ease-out both; content: ""; inset: 0; pointer-events: none; position: fixed; z-index: -1; }
+.overlay::before { background: linear-gradient(180deg, rgb(4 6 10 / 58%), rgb(4 6 10 / 80%) 70%); }
+.overlay::after {
+  -webkit-mask-image: linear-gradient(180deg, #000 var(--beam-y), transparent 75%);
+  mask-image: linear-gradient(180deg, #000 var(--beam-y), transparent 75%);
+  background: repeating-linear-gradient(90deg, transparent 0 23px, rgb(255 255 255 / 4%) 23px 24px);
+}
+
+/* ---- The hanging sheet ---- */
+.overlay__hang {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: min(var(--sheet-max), 100%);
+}
+/* Two threads from the beam to the rod, knotted where they are tied on: voice in on the
+   left, text out on the right. */
+.overlay__hang::before {
+  background:
+    radial-gradient(circle at 3px 3px, var(--brand-a) 0 2px, transparent 2.6px),
+    radial-gradient(circle at calc(100% - 3px) 3px, var(--brand-b) 0 2px, transparent 2.6px),
+    linear-gradient(var(--brand-a), var(--brand-a)) 2.25px 0 / 1.5px 100% no-repeat,
+    linear-gradient(var(--brand-b), var(--brand-b)) calc(100% - 2.25px) 0 / 1.5px 100% no-repeat;
+  content: "";
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--brand-b) 45%, transparent));
+  height: calc(var(--drop) + 2px);
+  inset-inline: calc(16% - 3px);
+  position: absolute;
+  top: calc(var(--drop) * -1 - 1px);
+}
+/* The beam itself: a lit run along the window's edge where the threads are tied. */
+.overlay__hang::after {
+  background: linear-gradient(90deg, transparent, var(--brand-a) 30%, var(--brand-b) 70%, transparent);
+  content: "";
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-b) 60%, transparent));
+  height: 1px;
+  inset-inline: -12%;
+  position: absolute;
+  top: calc(var(--drop) * -1 - 1px);
+}
+/* The rod, with a peg at each end (the rail's Today beam). */
+.overlay__rod {
+  background:
+    radial-gradient(circle at 4px 50%, #f6f6f9 0 1.5px, var(--brand-a) 2.5px 4px, transparent 4.5px),
+    radial-gradient(circle at calc(100% - 4px) 50%, #f6f6f9 0 1.5px, var(--brand-b) 2.5px 4px, transparent 4.5px),
+    linear-gradient(90deg, transparent 3px, var(--brand-a) 3px, var(--brand-b) calc(100% - 3px), transparent calc(100% - 3px)) 0 50% / 100% 2px no-repeat;
+  display: block;
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-a) 45%, transparent));
+  flex: none;
+  height: 8px;
+  margin: 0 calc(var(--s-4) * -1) -4px;
+  position: relative;
+  z-index: 1;
+}
+/* The cloth unrolls from the rod: its height opens downward (nothing is squashed), and the
+   fringe rides down on its lower edge. */
+.overlay__cloth {
+  animation: cloth-unroll .42s cubic-bezier(.45, .05, .55, .95) both;
+  border-radius: 0 0 2px 2px;
+  box-shadow: 0 34px 70px -24px rgb(0 0 0 / 75%), 0 0 0 1px rgb(0 0 0 / 30%);
+  overflow: clip; /* not hidden: focusing the close button must not scroll the rolled cloth */
+}
+/* The cloth: square to the rod, a faint plain weave, the page's sheet colour beneath it. */
+.overlay__panel {
+  background:
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 1.5%) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 1.5%) 0 1px, transparent 1px 3px),
+    var(--sheet);
+  border: 1px solid var(--line);
+  border-radius: 0 0 2px 2px;
+  border-top: 0;
+  max-height: var(--sheet-room);
+  min-height: 0;
+  max-width: none;
+  overflow: auto;
+  padding: var(--s-10) var(--s-11) var(--s-10);
+  width: 100%;
+}
+.overlay__panel h2 {
+  font: 400 calc(var(--fs-sheet) * 1.35)/1.15 var(--font-words);
+  letter-spacing: -.01em;
+  margin: 0 0 var(--s-5);
+  padding-right: var(--s-11);
+}
+.overlay__panel .xbtn { background: transparent; border: 1px solid var(--line); right: var(--s-6); top: var(--s-7); }
+.overlay__panel .xbtn:is(:hover, :focus-visible) { border-color: var(--ctl-line); }
+/* Footers sit on the selvedge: a dashed edge, like a hem, above the actions. */
+.overlay__panel :is(.sheet-acts, .editor-actions, .overlay__actions) {
+  border-top: 1px dashed var(--line);
+  margin-top: var(--s-8);
+  padding-top: var(--s-8);
+}
+/* The warp, left loose below the cloth: alternate lime and cyan ends. */
+.overlay__fringe {
+  -webkit-mask-image: linear-gradient(180deg, #000 20%, transparent);
+  mask-image: linear-gradient(180deg, #000 20%, transparent);
+  background: repeating-linear-gradient(90deg, var(--brand-a) 0 1px, transparent 1px 5px, var(--brand-b) 5px 6px, transparent 6px 10px);
+  display: block;
+  flex: none;
+  height: var(--s-7);
+  margin: 0 var(--s-2);
+  opacity: .75;
+}
+@keyframes overlay-dim { from { opacity: 0; } }
+@keyframes cloth-unroll { from { max-height: 0; } to { max-height: var(--sheet-room); } }
+
+/* Light: a warm dim instead of night, a white cloth, and threads dyed to read on it. */
+[data-appearance-resolved="light"] .overlay { --brand-a: #548a00; --brand-b: #008a9e; }
+[data-appearance-resolved="light"] .overlay::before { background: linear-gradient(180deg, rgb(52 44 30 / 28%), rgb(40 34 22 / 44%) 70%); }
+[data-appearance-resolved="light"] .overlay::after { background: repeating-linear-gradient(90deg, transparent 0 23px, rgb(255 255 255 / 9%) 23px 24px); }
+[data-appearance-resolved="light"] .overlay__cloth { box-shadow: 0 34px 70px -24px rgb(40 30 10 / 45%), 0 0 0 1px rgb(40 30 10 / 10%); }
+[data-appearance-resolved="light"] .overlay__panel {
+  background:
+    repeating-linear-gradient(0deg, rgb(96 76 40 / 2.5%) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgb(96 76 40 / 2.5%) 0 1px, transparent 1px 3px),
+    var(--sheet);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay::before, .overlay::after, .overlay__cloth { animation: none; }
+}

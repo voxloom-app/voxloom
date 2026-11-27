@@ -1,0 +1,123 @@
+/* Steps 2–4 sit on the connection step's centred page edge, so the content and the
+   footer stay put as you move through setup (ui-iter-37). */
+.guided-setup:is([data-step="2"], [data-step="3"], [data-step="4"]) .guided-main {
+  --connection-edge: max(22px, min(4cqw, 56px), calc((100cqw - 64rem) / 2));
+  --gut-s: var(--connection-edge);
+  --gut-e: var(--connection-edge);
+}
+.guided-setup:is([data-step="2"], [data-step="3"], [data-step="4"]) :is(.guided-content, .guided-footer) { padding-inline: var(--connection-edge); }
+.guided-setup:is([data-step="2"], [data-step="3"]) .guided-content { display: flex; flex-direction: column; }
+.shortcut-step, .practice { margin-block: auto; padding-block: 18px; }
+
+/* A folio with a thread to the edge, as on the connection step. */
+.shortcut-step__folio, .practice__folio { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 0 0 36px; }
+.shortcut-step__folio .guided-kicker, .practice__folio .guided-kicker { margin: 0; }
+.shortcut-step__folio i, .practice__folio i { background: linear-gradient(90deg, var(--line), color-mix(in srgb, var(--brand-b) 40%, var(--line))); flex: 1 1 24px; height: 1px; }
+.guided-setup[data-step="4"] .guided-kicker { align-items: center; display: flex; gap: 18px; }
+.guided-setup[data-step="4"] .guided-kicker::after { background: linear-gradient(90deg, var(--line), color-mix(in srgb, var(--brand-b) 40%, var(--line))); content: ""; flex: 1; height: 1px; }
+.shortcut-step__spread, .practice__spread { align-items: start; display: grid; gap: clamp(24px, 6cqw, 84px); grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.shortcut-step__task, .practice__task { min-width: 0; }
+.guided-content :is(.shortcut-step__task, .practice__task) h2 {
+  font: 500 calc(var(--fs-hero) * 1.7)/1.04 var(--font-words);
+  letter-spacing: -.045em; margin: 0 0 16px; padding: 0; text-wrap: balance;
+}
+.shortcut-step .guided-intro { margin-bottom: 0; max-width: 46ch; }
+
+/* ---- Step 2: your keys on a plate, the two ways beside them ---- */
+.shortcut-step .shortcut-card {
+  background: linear-gradient(180deg, rgba(0, 0, 0, .3), rgba(0, 0, 0, .12));
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .5), 0 1px 0 rgba(255, 255, 255, .04);
+  gap: 12px;
+  margin: 24px 0 0;
+  padding: 18px 20px;
+}
+.shortcut-step .shortcut-card[data-state="recording"] { border-color: var(--accent); }
+.shortcut-step .shortcut-card__keys .kbd { font-size: calc(var(--fs-bigkey) * 1.1); height: 52px; min-width: 50px; }
+.shortcut-step .shortcut-card__keyname { color: var(--mut); }
+/* Going back to the default is an action: it looks like a button, not a link. */
+.shortcut-step .shortcut-card__link {
+  background: var(--field); border: 1px solid var(--ctl-line); border-radius: 8px; color: var(--fg);
+  min-height: 32px; padding: 4px 12px; text-decoration: none;
+}
+.shortcut-step .shortcut-card__link:hover { background: var(--segon); border-color: var(--mut); }
+.shortcut-ways { --stock: var(--field); min-width: 0; }
+.shortcut-ways__caption { align-items: baseline; border-bottom: 1px solid var(--ctl-line); display: flex; gap: 12px; justify-content: space-between; padding-bottom: 11px; }
+.shortcut-ways__caption h3 { font-size: var(--fs-emph); font-weight: 600; margin: 0; }
+.shortcut-ways__caption span { color: var(--mut); font: 500 var(--fs-label)/1.3 var(--mono); }
+.shortcut-ways ul { display: grid; list-style: none; margin: 0; padding: 0; }
+.shortcut-ways li { border-bottom: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; padding: 14px 0 12px; }
+.shortcut-ways li strong { font-size: var(--fs-secondary); font-weight: 600; }
+.shortcut-ways li > span { color: var(--mut); font-size: var(--fs-secondary); line-height: 1.45; }
+.shortcut-ways .gesture-score { column-gap: 10px; margin-top: 4px; padding-top: 20px; }
+.shortcut-ways :is(.gesture-score__keys, .gesture-score__voice) { height: 26px; }
+/* The last cue ends at its press, so a wide font never pushes it past the column. */
+.shortcut-ways .gesture-score__cue.end { left: 89%; transform: translateX(-100%); }
+.shortcut-ways__tip { color: var(--mut); font-size: var(--fs-label); line-height: 1.55; margin: 14px 0 0; }
+.shortcut-ways__tip b { color: var(--fg); font-weight: 600; }
+.shortcut-ways .guided-settings-note { color: var(--fg); }
+
+/* ---- Step 4: the two ways beside your keys ---- */
+.guided-setup[data-step="4"] .guided-hero h2 { font-family: var(--font-words); font-weight: 500; letter-spacing: -.045em; }
+.guided-shortcut { align-items: center; flex-flow: row wrap; gap: 14px 28px; max-width: 46rem; }
+.guided-setup[data-step="4"] .guided-mini { max-width: 46rem; }
+.guided-shortcut ul { display: grid; flex: 1 1 220px; font-size: var(--fs-secondary); gap: 4px; list-style: none; margin: 0; min-width: 0; padding: 0; }
+.guided-shortcut li b { font-weight: 600; }
+
+/* ---- Footer: a waiting primary says what it is waiting for ---- */
+.guided-footer__wait { color: var(--mut); font-size: var(--fs-label); line-height: 1.3; min-width: 0; text-align: end; }
+.guided-footer .btn.primary:disabled { background: transparent; border: 1px dashed var(--ctl-line); box-shadow: none; color: var(--mut); }
+@media (max-width: 760px) {
+  /* No room beside the buttons: the reason hangs on the footer's edge, over the primary. */
+  .guided-footer { position: relative; }
+  .guided-footer__wait:not(:empty) {
+    background: var(--wait-bg, #17171f); border: 1px dashed var(--ctl-line); border-radius: var(--r-pill); font-size: var(--fs-micro);
+    max-width: calc(100% - 44px); padding: 2px 10px; position: absolute; right: 22px; top: 0; transform: translateY(-50%); white-space: nowrap;
+  }
+}
+.guided-setup[data-step="3"] .guided-footer .btn.primary:not(:disabled) { animation: guided-ready 1.1s ease-out both; }
+@keyframes guided-ready {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-a) 65%, transparent); }
+  to { box-shadow: 0 0 0 12px color-mix(in srgb, var(--brand-a) 0%, transparent); }
+}
+
+@container (max-width: 720px) {
+  .shortcut-step__spread, .practice__spread { gap: 20px; grid-template-columns: minmax(0, 1fr); }
+  .shortcut-step__folio, .practice__folio { margin-bottom: 18px; }
+  .guided-content :is(.shortcut-step__task, .practice__task) h2 { font-size: calc(var(--fs-hero) * 1.25); }
+  .shortcut-ways ul { column-gap: 20px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* Two narrow tracks: smaller cues, the first at the track's start and the last at its end. */
+  .shortcut-ways .gesture-score__cue { font-size: var(--fs-micro); left: 0; }
+  .shortcut-ways .gesture-score__cue.end { left: auto; right: 0; transform: none; }
+}
+@media (max-height: 680px) {
+  .guided-setup:is([data-step="2"], [data-step="3"]) .guided-content { padding-block: 14px; }
+  .shortcut-step, .practice { padding-block: 0; }
+  .shortcut-step__folio, .practice__folio { margin-bottom: 12px; }
+  .guided-content :is(.shortcut-step__task, .practice__task) h2 { margin-bottom: 8px; }
+  .shortcut-step .shortcut-card { gap: 8px; margin-top: 14px; padding: 12px 16px; }
+  .shortcut-step .shortcut-card__keys .kbd { height: 46px; min-width: 44px; }
+  .shortcut-ways li { padding: 8px 0 6px; }
+  .shortcut-ways .gesture-score { padding-top: 18px; }
+  .shortcut-ways :is(.gesture-score__keys, .gesture-score__voice) { height: 20px; }
+  .shortcut-ways__caption { padding-bottom: 6px; }
+  .shortcut-ways__tip { line-height: 1.45; margin-top: 8px; }
+}
+@container (max-width: 720px) {
+  @media (max-height: 680px) {
+    .guided-setup[data-step="2"] .guided-content { padding-block: 10px; }
+    .shortcut-step__spread { gap: 12px; }
+    .guided-content .shortcut-step__task h2 { font-size: calc(var(--fs-hero) * 1.1); }
+    /* The heading already says "Two ways to talk": the caption stays for screen readers. */
+    .shortcut-ways__caption { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+    .shortcut-ways li > span { display: none; }
+    .shortcut-ways li { padding: 6px 0 4px; }
+    .shortcut-step .shortcut-card { gap: 6px; margin-top: 10px; padding: 10px 14px; }
+    /* So is "Your shortcut": the card keeps it as its group name, and shows it while recording. */
+    .shortcut-step .shortcut-card:not([data-state="recording"]) .shortcut-card__label { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+    /* Long or spelled-out keys keep Change shortcut on their row. */
+    .shortcut-step .shortcut-card__keys .kbd { font-size: var(--fs-bigkey); height: 42px; min-width: 42px; padding: 0 10px; }
+    .shortcut-step .shortcut-card__change { font-size: var(--fs-secondary); min-height: 38px; padding: 6px 12px; }
+  }
+}

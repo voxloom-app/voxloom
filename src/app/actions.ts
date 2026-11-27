@@ -5,6 +5,7 @@ import type {
   Settings,
   SettingUpdate,
 } from '../domain/types';
+import type { SettingsTab } from '../features/settings/SettingsTabs';
 
 export type SettingAction = SettingUpdate & { type: 'set-setting' };
 
@@ -54,7 +55,7 @@ export type AppAction =
   | { type: 'set-settings-error'; message: string | null }
   | { type: 'set-onboarding'; value: OnboardingState }
   | { changes: Partial<OnboardingState>; type: 'update-onboarding' }
-  | { type: 'set-screen'; screen: Screen }
+  | { type: 'set-screen'; screen: Screen; settingsTab?: SettingsTab }
   | SettingAction
   | { type: 'set-waveform'; value: 'silent' | 'speaking' }
   | { editing?: string; type: 'save-word'; word: string }

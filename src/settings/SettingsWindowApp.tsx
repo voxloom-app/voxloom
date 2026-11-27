@@ -7,7 +7,7 @@ import { Banner } from '../components/Banner';
 import { Settings } from '../features/settings/Settings';
 import { requestOnboarding } from '../services/settingsWindow';
 
-/** The window title follows the current tab ("Capture", "Models", …). */
+/** The window title follows the open pane ("Shortcut", "Speech", …). */
 function setWindowTitle(label: string) {
   document.title = label;
   if (isTauri()) void getCurrentWindow().setTitle(label).catch(() => {});

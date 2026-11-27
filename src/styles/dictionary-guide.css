@@ -1,0 +1,143 @@
+/* The facing page says what a saved word does (ui-iter-35, replacing the word
+   specimen and the sentence proof). Three knots on one thread: the always-on
+   spelling fix is tied, the two helpers that depend on Settings are rings. */
+.dictionary-guide {
+  --knot: 9px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--mut) 8%, transparent), transparent 13px);
+  border-inline-start: 1px solid var(--line);
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-9) max(var(--s-10), calc(var(--gutter) - var(--frame))) var(--s-10) var(--s-10);
+  scrollbar-width: thin;
+}
+.dictionary-guide__title {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--mut);
+  cursor: pointer;
+  display: flex;
+  font: 600 var(--fs-micro)/1.4 var(--mono);
+  gap: var(--s-3);
+  letter-spacing: .09em;
+  list-style: none;
+  margin: 0 0 var(--s-6);
+  min-height: 32px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+.dictionary-guide__title::-webkit-details-marker { display: none; }
+.dictionary-guide__title::after {
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  content: "";
+  height: 5px;
+  transform: translateY(-2px) rotate(45deg);
+  width: 5px;
+}
+.dictionary-guide:not([open]) .dictionary-guide__title { margin: 0; }
+.dictionary-guide:not([open]) .dictionary-guide__title::after { transform: rotate(-45deg); }
+.dictionary-guide__title:hover { color: var(--fg); }
+.guide-steps {
+  --gap: var(--s-8);
+  display: grid;
+  gap: var(--gap);
+  list-style: none;
+  margin: 0;
+  max-width: 46ch;
+  padding: 0;
+  position: relative;
+}
+.guide-steps li {
+  --center: calc(var(--fs-body) * .75);
+  display: grid;
+  gap: var(--s-1);
+  padding-left: calc(var(--knot) + var(--s-6));
+  position: relative;
+}
+/* The thread runs from knot to knot: lime where the voice comes in, cyan where text goes out. */
+.guide-steps li:not(:last-child)::after {
+  --mid: color-mix(in srgb, var(--brand-a) 50%, var(--brand-b));
+  background: linear-gradient(var(--brand-a), var(--mid));
+  content: "";
+  height: calc(100% + var(--gap) - var(--knot) - 8px);
+  left: calc(var(--knot) / 2 - .5px);
+  position: absolute;
+  top: calc(var(--center) + var(--knot) / 2 + 4px);
+  width: 1px;
+}
+.guide-steps li:nth-child(2)::after { background: linear-gradient(var(--mid), var(--brand-b)); }
+.guide-steps li::before {
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--brand-b);
+  content: "";
+  height: var(--knot);
+  left: 0;
+  position: absolute;
+  top: calc(var(--center) - var(--knot) / 2);
+  width: var(--knot);
+}
+.guide-steps li:nth-child(2)::before { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand-a) 50%, var(--brand-b)); }
+.guide-steps li:first-child::before { background: var(--brand-a); box-shadow: 0 0 10px color-mix(in srgb, var(--brand-a) 45%, transparent); }
+.guide-steps strong { color: var(--fg); font-size: var(--fs-body); font-weight: 650; line-height: 1.5; }
+.guide-steps li > span:not(.guide-fix) { color: var(--mut); font-size: var(--fs-secondary); line-height: 1.5; }
+
+/* One of your own words, as Voxloom fixes it: what came out, a thread, your spelling. */
+.guide-fix {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+  margin-top: var(--s-3);
+  min-width: 0;
+}
+.guide-fix__heard {
+  border-bottom: 1px dashed color-mix(in srgb, var(--brand-a) 50%, transparent);
+  color: var(--mut);
+  font: var(--fs-mono)/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+.guide-fix__thread {
+  align-self: center;
+  background: linear-gradient(90deg, var(--brand-a), var(--brand-b));
+  flex: none;
+  height: 1px;
+  position: relative;
+  width: var(--s-10);
+}
+.guide-fix__thread::after {
+  background: var(--brand-b);
+  border-radius: 50%;
+  content: "";
+  height: 5px;
+  position: absolute;
+  right: -2px;
+  top: -2px;
+  width: 5px;
+}
+.guide-fix__word {
+  color: var(--fg);
+  font-family: var(--font-words);
+  font-size: calc(var(--fs-body) * 1.2);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.dictionary-guide__foot {
+  border-top: 1px solid var(--line);
+  color: var(--mut);
+  font-size: var(--fs-secondary);
+  line-height: 1.5;
+  margin: var(--s-10) 0 0;
+  max-width: 52ch;
+  padding-top: var(--s-6);
+}
+
+/* Stacked under the list in narrow windows, with tighter spacing. */
+@media (max-width: 959px) {
+  .dictionary-guide { background: none; border-block-start: 1px solid var(--line); border-inline: 0; padding: var(--s-4) var(--s-8); }
+  .dictionary-guide__title { margin-bottom: var(--s-3); }
+  .guide-steps { --gap: var(--s-5); max-width: none; }
+  .guide-fix { margin-top: var(--s-1); }
+  .dictionary-guide__foot { margin-top: var(--s-6); padding-top: var(--s-4); }
+}

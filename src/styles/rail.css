@@ -1,0 +1,132 @@
+/* The warp rail (ui-iter-03): the sidebar becomes the window's frame, in the Home stage's
+   dark material in both themes (stage.css), so the stage, the History masthead, the app
+   tile and the HUD sit in one instrument. It stays put while pages scroll. A selvedge of
+   brand light runs down its edge; the open page lights the selvedge beside it.
+   Onboarding's setup rail wears the same material. Threads, today's weave and the
+   shortcut dock live in rail-loom.css. */
+.sidebar,
+.guided-rail {
+  /* Dark instrument tokens, as on .stage. The legacy aliases resolve where they are
+     declared, so they are re-declared too; otherwise children would inherit light values. */
+  color-scheme: dark;
+  --panel: #111118;
+  --field: #1a1a23;
+  --seg: #1c1c26;
+  --segon: #2c2c3a;
+  --line: #2a2a36;
+  --fg: #ececf1;
+  --mut: #a9a9b8;
+  --ctl-line: #6a6a80;
+  --sel-edge: #b6ff3c;
+  --seg-on-fg: #ececf1;
+  --navon: #2a2a38;
+  --mut-on-nav: #a9a9b8;
+  --accfg: var(--brand-a);
+  --ok: #7ff07a;
+  --info: #3cf0ff;
+  --warn: #ffc04d;
+  --err: #ff8585;
+  --focus: var(--brand-a);
+  --tag-bg: #2c2c3a;
+  --tag-fg: #9a9aa8;
+  --switch-off: #66667a;
+  --accent: var(--accfg);
+  --accent-soft: var(--navon);
+  --border: var(--line);
+  --danger: var(--err);
+  --identity: var(--info);
+  --muted: var(--mut);
+  --panel-2: var(--field);
+  --text: var(--fg);
+
+  background:
+    linear-gradient(180deg, transparent 4%, color-mix(in srgb, var(--brand-a) 55%, transparent) 32%,
+      color-mix(in srgb, var(--brand-b) 55%, transparent) 72%, transparent 97%) right / 1px 100% no-repeat,
+    radial-gradient(120% 34% at 0% 0%, color-mix(in srgb, var(--brand-a) 8%, transparent), transparent 70%),
+    linear-gradient(180deg, #17171f, #0a0a0e);
+  border-right: 0;
+  color: var(--fg);
+}
+
+/* Under the sticky rail the column stays dark to the foot of long pages (overscroll, captures). */
+.app { background: linear-gradient(#0a0a0e, #0a0a0e) 0 0 / var(--side-w) 100% no-repeat; }
+
+.sidebar {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-7);
+  grid-column: 1;
+  grid-row: 1;
+  height: 100vh;
+  height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--s-8) var(--s-5) var(--s-6);
+  position: sticky;
+  top: 0;
+}
+
+/* Brand: the tile, the name and a live status line with the mic's dot. */
+.brand { align-items: center; display: flex; gap: var(--s-5); padding: var(--s-2) var(--s-4) 0; }
+.brand__name { color: #f6f6f9; display: block; font-size: var(--fs-emph); letter-spacing: -.01em; }
+.brand__status { color: var(--mut); font-size: var(--fs-label); }
+.brand__dot {
+  background: var(--ctl-line);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .06);
+  display: inline-block;
+  flex: none;
+  height: 7px;
+  margin-right: 7px;
+  vertical-align: 1px;
+  width: 7px;
+}
+.sidebar[data-phase="listening"] .brand__dot,
+.sidebar[data-phase="speaking"] .brand__dot { animation: rec-pulse 1s ease-in-out infinite alternate; background: #ff453a; box-shadow: 0 0 0 3px rgba(255, 69, 58, .25); }
+.sidebar[data-phase="processing"] .brand__dot { animation: rec-pulse .5s ease-in-out infinite alternate; background: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent); }
+
+/* Nav: the open page is where the weft crosses the warp. */
+.sidebar nav { display: grid; gap: 2px; }
+
+.nav-button {
+  align-items: center;
+  border: 0;
+  border-radius: var(--r-tile);
+  color: var(--fg);
+  display: flex;
+  gap: 9px;
+  padding: var(--s-4) var(--s-5);
+  position: relative;
+  text-align: left;
+  width: 100%;
+}
+
+.nav-button .icon { color: var(--mut); }
+.nav-button kbd { color: var(--mut); font-size: var(--fs-micro); margin-left: auto; visibility: hidden; }
+.nav-button:hover kbd,
+.nav-button:focus-visible kbd { visibility: visible; }
+.nav-button:hover { background: rgba(255, 255, 255, .05); }
+
+.nav-button[aria-current="page"] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-a) 14%, transparent), color-mix(in srgb, var(--brand-a) 4%, transparent) 78%, transparent);
+  box-shadow: inset 3px 0 0 var(--sel-edge);
+  color: #f6f6f9;
+  font-weight: 600;
+}
+
+.nav-button[aria-current="page"] .icon { color: var(--accfg); }
+.nav-button[aria-current="page"] kbd { color: var(--mut-on-nav); }
+/* The selvedge lights up beside the open page. */
+.nav-button[aria-current="page"]::after {
+  background: var(--brand-a);
+  border-radius: 2px;
+  bottom: 24%;
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--brand-a) 70%, transparent);
+  content: "";
+  position: absolute;
+  right: calc(var(--s-5) * -1);
+  top: 24%;
+  width: 2px;
+}

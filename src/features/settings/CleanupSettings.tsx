@@ -73,7 +73,7 @@ export function CleanupSettings({ isNative, model }: { isNative: boolean; model:
   const offerDownload = download.supported && view.kind === 'status' && !view.status.available;
   const noteId = 'settings-cleanup-model-note';
   return <>
-    <div className="frow" ref={firstRow}>
+    <div className="frow" data-path-stop="cleanup" ref={firstRow}>
       <span className="frow__label">
         <span>{CLEANUP_LABEL}</span>
         <span className="tag">{CLEANUP_TAG}</span>

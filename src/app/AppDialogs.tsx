@@ -1,5 +1,8 @@
 import { Dialog } from '../components/Dialog';
-import { KeyCombo } from '../components/KeyCombo';
+import { Kbd, KeyCombo } from '../components/KeyCombo';
+import { isTauriEnv } from '../services/capture/captureService';
+import { ShortcutDemo } from './ShortcutDemo';
+import { navScreens } from './shell/screens';
 
 type ShortcutsProps = { shortcut: string; opener: HTMLElement | null; onClose: () => void };
 
@@ -7,16 +10,22 @@ export function ShortcutsDialog({ shortcut, opener, onClose }: ShortcutsProps) {
   return (
     <Dialog label="Keyboard shortcuts" onClose={onClose} opener={opener}>
       <h2>Keyboard shortcuts</h2>
-      <p>Hold or double-tap the shortcut in any app (global in the desktop app; only while focused in the browser preview).</p>
-      <div className="kv"><span>Dictate (hold / double-tap to latch)</span><KeyCombo combo={shortcut} /></div>
-      <div className="kv">
-        <span>Go to Home · History · Dictionary</span>
-        <span><KeyCombo combo="Alt+1" /> … <KeyCombo combo="Alt+3" /></span>
-      </div>
-      <div className="kv"><span>Settings</span><span><KeyCombo combo="CommandOrControl+," /> or <KeyCombo combo="Alt+4" /></span></div>
-      <div className="kv"><span>Show this sheet</span><KeyCombo combo="?" /></div>
-      <div className="sheet-acts">
-        <button className="btn primary" onClick={onClose} type="button">Done</button>
+      <div className="shortcut-guide">
+        <ShortcutDemo native={isTauriEnv()} shortcut={shortcut} />
+        <section aria-labelledby="window-keys-title" className="window-keys">
+          <h3 id="window-keys-title">In this window</h3>
+          <p className="shortcut-guide__scope">Hold <KeyCombo combo="Alt" /> and press a number to switch pages.</p>
+          <ol aria-label="Page shortcuts" className="window-keys__numbers" role="list">
+            {[...navScreens.map(({ label }) => label), 'Settings'].map((page, i) => (
+              <li key={page}><Kbd>{String(i + 1)}</Kbd><span>{page}</span></li>
+            ))}
+          </ol>
+          <dl className="window-keys__list">
+            <div><dt>Recall a dictation</dt><dd><KeyCombo combo="CommandOrControl+K" /><span>or</span><KeyCombo combo="/" /></dd></div>
+            <div><dt>Open Settings</dt><dd><KeyCombo combo="CommandOrControl+," /></dd></div>
+            <div><dt>Show this sheet</dt><dd><KeyCombo combo="?" /></dd></div>
+          </dl>
+        </section>
       </div>
     </Dialog>
   );

@@ -1,31 +1,3 @@
-/* Waveform, speech-model list, dogfood capture. */
-.wave {
-  align-items: center;
-  display: flex;
-  gap: 1px;
-  height: 14px;
-  justify-content: center;
-  width: 60px;
-}
-
-.wave i {
-  background: var(--accent);
-  border-radius: 2px;
-  flex: 0 0 1.5px;
-  height: var(--h);
-  opacity: .9;
-  transition: height 85ms ease-out;
-}
-
-[data-waveform="processing"] .wave i {
-  animation: waveform-processing 850ms ease-in-out infinite alternate;
-}
-
-@keyframes waveform-processing {
-  from { opacity: .35; }
-  to { opacity: .9; }
-}
-
 /* Models tab cards (UI PR 7): radio + label/id · size, status badge, action;
    error and selected notes span the card. */
 .stt-model-list { display: grid; gap: var(--s-4); list-style: none; margin: var(--s-6) 0 0; padding: 0; }

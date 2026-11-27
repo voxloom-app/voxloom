@@ -150,12 +150,13 @@ describe('boot hydrate polish', () => {
     expect(await screen.findByText('durable history row')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Settings' }));
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
     const retention = await screen.findByRole('radiogroup', { name: 'Transcript retention' });
     expect(within(retention).getByRole('radio', { name: 'Until deleted' })).toHaveAttribute('aria-checked', 'true');
 
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    expect(await screen.findByText('PersistedWord')).toBeInTheDocument();
+    const terms = await screen.findByRole('list', { name: 'Dictionary words, alphabetical' });
+    expect(await within(terms).findByText('PersistedWord')).toBeInTheDocument();
     expect(screen.queryByText('JSON')).not.toBeInTheDocument();
   });
 
@@ -219,7 +220,7 @@ describe('boot hydrate polish', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Settings' }));
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
     const retention = await screen.findByRole('radiogroup', { name: 'Transcript retention' });
     expect(within(retention).getByRole('radio', { name: '30 days' })).toHaveAttribute('aria-checked', 'true');
   });
@@ -234,7 +235,7 @@ describe('boot hydrate polish', () => {
     await user.click(screen.getByRole('button', { name: 'Set up later' }));
     await user.click(screen.getByRole('button', { name: 'Settings' }));
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
     expect(
       await screen.findByRole('radiogroup', { name: 'Transcript retention' }),
     ).toBeInTheDocument();

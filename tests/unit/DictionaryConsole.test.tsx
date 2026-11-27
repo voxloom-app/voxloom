@@ -37,9 +37,8 @@ describe('Dictionary compact list', () => {
     renderWithApp(<Dictionary />);
     const list = screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(initialWords.length);
-    expect(screen.getByText('Canonical spelling')).toBeInTheDocument();
-    expect(screen.getByText('A–Z')).toBeInTheDocument();
-    expect(screen.getByText('Alphabetical order')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Your words' })).toBeInTheDocument();
+    expect(screen.getByText('A–Z')).toHaveAttribute('title', 'Alphabetical order');
     expect(screen.getByText('JSON — TypeScript')).toBeInTheDocument();
     expect(within(list).getAllByRole('listitem')[0]).not.toHaveAttribute('tabindex');
     await user.type(screen.getByRole('searchbox'), 'post');
@@ -73,14 +72,14 @@ describe('Dictionary compact list', () => {
   it('focuses the Word field when the add/edit sheet opens', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     expect(screen.getByRole('textbox', { name: 'Word' })).toHaveFocus();
   });
 
   it('marks the field invalid and links the error', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     const field = screen.getByLabelText('Word');
     expect(field).toHaveAttribute('aria-invalid', 'true');

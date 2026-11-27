@@ -1,48 +1,23 @@
-/* Home (UI PR 3): hero, dictate card, recent dictations. */
-.home-hero {
-  align-items: center;
-  background: radial-gradient(500px 200px at 0% 50%, color-mix(in srgb, var(--accfg) 14%, transparent), transparent), var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-hero);
-  display: flex;
-  gap: 24px;
-  margin-bottom: var(--s-7);
-  padding: var(--s-10);
-}
-
-.home-hero__orb .app-tile {
-  border-radius: 24px;
-  box-shadow: var(--tile-shadow), 0 0 40px var(--tile-glow);
-  height: 92px;
-  width: 92px;
-}
+/* Home (UI PR 3): hero and recent dictations. The hero lives inside the voice stage
+   (stage.css), which sets its surface; Start dictating sits on its weft (loom-bar.css). */
+.home-hero { text-align: center; }
 
 .home-hero h1 {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  font-size: var(--fs-hero);
+  font-size: calc(var(--fs-hero) * 1.2);
   font-weight: 850;
-  gap: 8px;
-  letter-spacing: -.03em;
-  margin-bottom: 6px;
+  gap: 8px 14px;
+  justify-content: center;
+  letter-spacing: -.035em;
+  margin: 0;
 }
 
 .home-hero h1 .kbd { font-size: var(--fs-emph); min-width: 30px; padding: 7px 8px; }
-.home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 0 var(--s-6); }
-.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); }
+.home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 auto var(--s-8); }
 
 .fine { color: var(--mut); font-size: var(--fs-secondary); }
-
-.home-card { border-radius: var(--r-hero); margin-bottom: var(--s-7); }
-.home-card h2 { font-size: var(--fs-section); font-weight: 650; margin-bottom: var(--s-5); }
-.home-card .card__head { margin-bottom: var(--s-5); }
-.home-card .card__head h2 { margin: 0; }
-
-.capline { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-8); justify-content: space-between; }
-.capline .dogfood-capture-actions { margin-top: 0; }
-.cap-meta { color: var(--mut); display: grid; font-size: var(--fs-secondary); gap: 2px; text-align: right; }
-.cap-meta b { color: var(--fg); font-weight: 600; }
 
 .btn.primary {
   background: var(--brand);
@@ -60,36 +35,59 @@
 
 .note { color: var(--mut); font-size: var(--fs-secondary); margin: var(--s-6) 0 0; }
 
-.home-card .dogfood-transcript {
-  align-items: center;
-  background: var(--field);
-  border: 0;
-  border-radius: var(--r-tile);
-  display: flex;
-  gap: var(--s-6);
-  justify-content: space-between;
-}
-
-.home-card .dogfood-transcript p { margin: 2px 0; }
 .status { align-items: center; display: flex; font-weight: 500; gap: 6px; margin: var(--s-5) 0 0; }
 .status:not(.form-error) { color: var(--ok); }
 
 .link-button { border: 0; color: var(--accfg); font-size: var(--fs-secondary); min-height: 0; padding: 2px 4px; }
 
+/* Earlier dictations: knots on one thread, hanging under the weft on the open page
+   (ui-iter-29, home-page.css). There is no pill: the knot's shape says how the words ended,
+   filled typed, ring copied, dotted unconfirmed, and the key beneath names each once. */
+.home .recent-list {
+  --spool-time: calc(var(--fs-mono) * 5.6);
+  --row-lh: calc(var(--fs-body) * 1.08 * 1.55);
+  --knot-x: calc(var(--spool-time) + 19px);
+  --knot-y: calc(10px + var(--row-lh) / 2);
+  gap: 0;
+}
+/* Each row draws its piece of the thread, so it ends exactly at the first and last knots. */
+.home .recent-row::after {
+  background: color-mix(in srgb, var(--accfg) 40%, var(--line));
+  bottom: 0;
+  content: "";
+  left: var(--knot-x);
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+.home .recent-row:first-child::after { background: linear-gradient(transparent, color-mix(in srgb, var(--accfg) 40%, var(--line)) var(--knot-y)); }
+.home .recent-row:last-child::after { bottom: auto; height: var(--knot-y); }
 .home .recent-row {
-  border-top: 1px solid var(--line);
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  padding: 9px 4px;
+  align-items: baseline;
+  border-top: 0;
+  gap: 4px 14px;
+  grid-template-areas: "time knot text copy";
+  grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto;
+  padding: 10px 0;
+  position: relative;
 }
-
-.home .recent-row:first-child { border-top: 0; }
-.home .recent-list { gap: 0; }
-
-@media (max-width: 780px) {
-  .home-hero { flex-direction: column; align-items: flex-start; }
-  .home .recent-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .home .recent-row > .badge { display: none; }
+.home .recent-row::before {
+  align-self: start;
+  background: var(--ok);
+  border-radius: 50%;
+  content: "";
+  grid-area: knot;
+  height: 12px;
+  margin-top: calc((var(--row-lh) - 12px) / 2);
+  position: relative;
+  width: 12px;
+  z-index: 1;
 }
+.home .recent-row[data-status="copied"]::before { background: var(--panel); box-shadow: inset 0 0 0 2px var(--info); }
+.home .recent-row[data-status="unverified"]::before { border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); background: var(--panel); }
+.home .recent-row > .timestamp { grid-area: time; text-align: right; }
+.home .recent-row > p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); grid-area: text; letter-spacing: .003em; line-height: 1.55; }
+.home .recent-row > .ib { align-self: start; grid-area: copy; margin-top: calc((var(--row-lh) - 28px) / 2); }
 
 @media (prefers-reduced-motion: reduce) {
   .rec-dot { animation: none; }
@@ -103,6 +101,6 @@
 }
 
 /* BUS-229: why the Home writing-style picker is disabled, and the one fix. */
-.home-hero .hs-note { align-items: center; color: var(--mut); display: flex; flex-basis: 100%; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 4px 10px; line-height: 1.5; margin: -4px 0 0; }
-.home-hero .hs-note .btn.ghost { color: var(--fg); font-size: var(--fs-secondary); margin-left: -8px; min-height: 28px; padding: 3px 8px; text-decoration: underline; text-decoration-color: var(--ctl-line); text-underline-offset: 3px; }
-.home-hero .hs-note .bar { height: 5px; width: 160px; }
+.home-colophon .hs-note { align-items: center; color: var(--mut); display: flex; flex-basis: 100%; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 4px 10px; line-height: 1.5; margin: -4px 0 0; }
+.home-colophon .hs-note .btn.ghost { color: var(--fg); font-size: var(--fs-secondary); margin-left: -8px; min-height: 28px; padding: 3px 8px; text-decoration: underline; text-decoration-color: var(--ctl-line); text-underline-offset: 3px; }
+.home-colophon .hs-note .bar { height: 5px; width: 160px; }

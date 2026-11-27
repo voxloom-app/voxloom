@@ -1,0 +1,98 @@
+/* The voice path (ui-iter-04): the Settings header is the stage material (stage.css) in
+   both themes, so Settings shares the rail's, Home's and History's instrument. Since
+   ui-iter-13 the path is the Settings tablist (settings-panes.css). Since ui-iter-41 it is
+   said as one plain sentence: the joining words stay quiet, and each saved setting is a
+   bright, underlined part you pick to open its pane. The underlines run lime to cyan in
+   the order a dictation passes them, voice in to text out, as on the Home loom. */
+.settings-window__bar.stage {
+  align-items: stretch;
+  /* settings.css paints the old toolbar later in the cascade; restate the stage material. */
+  background:
+    linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat,
+    linear-gradient(180deg, #17171f, #0a0a0e);
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 0;
+  margin: 0;
+  padding: var(--s-9) var(--s-11) 0;
+}
+
+.settings-window__head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px var(--s-6); }
+.settings-window__bar.stage h1 { color: var(--fg); font-size: var(--fs-section); font-weight: 700; }
+.settings-window__head p { color: var(--mut); font-size: var(--fs-label); margin: 0; }
+
+/* The sentence reads like the transcripts: the words serif, set to a reading measure. */
+.path-sentence {
+  color: var(--mut);
+  font-family: var(--font-words);
+  font-size: calc(var(--fs-sheet) * 1.2);
+  line-height: 1.8;
+  margin: var(--s-6) 0 var(--s-8);
+  max-width: 44em;
+  text-wrap: pretty;
+}
+/* Appearance follows on its own line, smaller: it changes nothing a dictation does. */
+.path-sentence__look { font-size: var(--fs-emph); margin-top: var(--s-2); }
+
+/* Each setting: bright words on a dotted underline in its stop's slice of the thread.
+   Inline, so a long part wraps with the sentence; each line keeps its own plate. */
+.path-sentence__stop {
+  --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b));
+  --plate: color-mix(in srgb, var(--knot) 15%, transparent);
+  background: linear-gradient(var(--knot), var(--knot)) 50% 100% / 0 2px no-repeat;
+  border-radius: 5px 5px 2px 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: var(--fg);
+  cursor: pointer;
+  margin: 0 -.1em;
+  padding: .1em .16em .12em;
+  text-decoration: underline dotted color-mix(in srgb, var(--knot) 75%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: .3em;
+  transition: background-size .25s cubic-bezier(.2, .7, .2, 1), background-color .15s ease, text-decoration-color .15s ease;
+}
+.path-sentence__stop[data-stop="appearance"] { --knot: var(--fg); --plate: rgba(255, 255, 255, .1); }
+.path-sentence__stop:hover { background-color: rgba(255, 255, 255, .045); text-decoration-color: var(--knot); }
+.path-sentence__stop:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* The open setting is tied: a plate, and its dotted thread drawn solid along the foot. */
+.path-sentence__stop[data-current] {
+  background-color: var(--plate);
+  background-size: 100% 2px;
+  color: #f6f6f9;
+  text-decoration-color: transparent;
+}
+
+/* The shortcut shows small key caps, the rail's material, sitting on the line. */
+.path-sentence__stop .key-combo__caps { display: inline-flex; gap: 3px; vertical-align: .12em; }
+.path-sentence__stop .kbd {
+  background: linear-gradient(180deg, #32323f, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-bottom-color: rgba(255, 255, 255, .04);
+  border-radius: 6px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 0 #050508;
+  color: #f6f6f9;
+  font-family: var(--font);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  min-width: 22px;
+  padding: 0 6px;
+}
+.path-sentence__stop[data-inactive] .kbd { color: var(--mut); }
+.path-sentence__note { color: var(--mut); font-family: var(--font); font-size: var(--fs-label); margin-left: .4em; }
+
+/* Keyboard focus in a pane's rows wears a lime selvedge. */
+.settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
+
+/* Narrow windows: the same sentence, a size down, so it keeps to a few lines. */
+@media (max-width: 760px) {
+  .path-sentence { font-size: var(--fs-sheet); line-height: 1.7; margin-bottom: var(--s-7); }
+  .path-sentence__look { font-size: var(--fs-body); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The open setting's thread is simply there. */
+  .path-sentence__stop { transition: none; }
+}

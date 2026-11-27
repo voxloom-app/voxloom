@@ -1,0 +1,79 @@
+/* The Dictionary masthead, and the Add sheet's check: type a mistake you've
+   seen and preview what Voxloom writes once the word is saved (ui-iter-35). */
+/* The masthead is a running head like History's and Settings' (ui-iter-31). */
+.dictionary-stage { flex-shrink: 0; padding: var(--s-9) var(--stage-pad) 0; }
+.dictionary-stage__top { align-items: center; display: flex; gap: var(--s-8) var(--s-11); justify-content: space-between; }
+.dictionary-stage__title { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px var(--s-6); min-width: 0; }
+.dictionary-stage h1 { color: #f6f6f9; font-size: var(--fs-section); font-weight: 700; letter-spacing: 0; margin: 0; }
+.dictionary-stage__lede { color: var(--mut); font-size: var(--fs-label); margin: 0; max-width: 64ch; }
+.dictionary-stage__top > .btn { flex-shrink: 0; white-space: nowrap; }
+
+/* Labels in the word sheet read as plain questions, not small caps. */
+.editor-form label { color: var(--fg); letter-spacing: 0; text-transform: none; }
+.editor-form .field__hint { color: var(--mut); font-size: var(--fs-secondary); margin: 0; }
+.word-check { display: grid; gap: 7px; }
+.word-check__optional { color: var(--mut); font-weight: 500; margin-inline-start: .5ch; }
+.word-check input { font-family: var(--mono); font-size: var(--fs-mono); }
+.word-check input::placeholder { color: var(--mut); opacity: 1; }
+
+/* The preview hangs from a thread that lights from lime to cyan once something is fixed. */
+.word-check__preview {
+  border-inline-start: 2px solid var(--line);
+  display: grid;
+  gap: 2px;
+  margin-top: var(--s-2);
+  padding: var(--s-2) 0 var(--s-2) var(--s-6);
+}
+.word-check[data-state="fixed"] .word-check__preview { border-image: linear-gradient(var(--brand-a), var(--brand-b)) 1; }
+.word-check__label { color: var(--mut); font: 600 var(--fs-micro)/1.4 var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+/* Sheets mute every paragraph; what Voxloom writes is set in the words face (ui-iter-09). */
+.word-check .word-check__typed {
+  color: var(--fg);
+  font-family: var(--font-words);
+  font-size: calc(var(--fs-sheet) * 1.1);
+  line-height: 1.5;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.word-check .word-check__typed[data-empty] { color: var(--mut); font-family: var(--font); font-size: var(--fs-secondary); }
+
+/* A replaced stretch: the mark sits on the line, what you typed hangs from it. */
+.word-check__catch { align-items: center; display: inline-flex; flex-direction: column; margin: 0 1px; vertical-align: baseline; }
+.word-check__fix {
+  animation: check-tie .5s ease-out both;
+  background: color-mix(in srgb, var(--brand-a) 9%, transparent);
+  border-radius: 6px;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--brand-a) 70%, transparent);
+  color: var(--accfg);
+  padding: 0 4px;
+}
+.word-check__was {
+  border-top: 1px dashed color-mix(in srgb, var(--brand-a) 50%, transparent);
+  color: var(--mut);
+  font: var(--fs-micro)/1.6 var(--mono);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+@keyframes check-tie {
+  from { box-shadow: inset 0 -2px 0 transparent, 0 0 0 5px color-mix(in srgb, var(--brand-a) 30%, transparent); }
+}
+.word-check__verdict { color: var(--mut); font-size: var(--fs-secondary); }
+.word-check__verdict:empty { display: none; }
+.word-check[data-state="fixed"] .word-check__verdict { color: var(--accfg); font-weight: 650; }
+.word-check .word-check__note { font-size: var(--fs-secondary); margin: 0; }
+
+@media (max-width: 780px) {
+  .dictionary-stage { --stage-pad: var(--s-9); }
+  .dictionary-stage__lede { display: none; }
+}
+
+/* The list and the guide share the available height in short windows. */
+@media (max-height: 700px) {
+  .dictionary-stage { padding-top: var(--s-8); }
+  .dictionary-stage__lede { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-check__fix { animation: none; }
+}

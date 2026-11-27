@@ -1,21 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import { toDisplayLevel, WAVEFORM_BARS } from '../components/Waveform';
+import { useEffect, useState } from 'react';
+import { toDisplayLevel, WAVEFORM_SAMPLES } from '../components/Waveform';
 import type { CaptureEvent } from '../services/capture/types';
 import type { OverlayResult, OverlayWaveform } from '../services/shortcut/overlayVisibility';
 import { OverlayWaveformView } from './OverlayWaveformView';
 
-const emptyLevels = () => Array<number>(WAVEFORM_BARS).fill(0);
+const emptyLevels = () => Array<number>(WAVEFORM_SAMPLES).fill(0);
 
 /** Separate, non-focusable Tauri window. Only level metadata crosses IPC. */
 export function OverlayApp() {
   const [waveform, setWaveform] = useState<OverlayWaveform>('silent');
   const [result, setResult] = useState<OverlayResult | null>(null);
   const [levels, setLevels] = useState(emptyLevels);
-  const waveformRef = useRef<OverlayWaveform>('silent');
-  const sessionRef = useRef<{ generation: number; requestId: string } | null>(null);
 
   useEffect(() => {
     let disposed = false;
+    let phase: OverlayWaveform = 'silent';
+    let session: { generation: number; requestId: string } | null = null;
+    let trail = emptyLevels();
+    // A trailing pause can drain the live meter. Keep just the latest window
+    // ending in activity for the printed trace; never store audio or words.
+    let imprint = trail;
     const unlisteners: (() => void)[] = [];
     void (async () => {
       try {
@@ -23,45 +27,37 @@ export function OverlayApp() {
         const overlayUnlisten = await listen<{ result?: OverlayResult; waveform: OverlayWaveform }>(
           'overlay:waveform',
           (event) => {
-            waveformRef.current = event.payload.waveform;
-            setWaveform(event.payload.waveform);
+            phase = event.payload.waveform;
+            setWaveform(phase);
             setResult(event.payload.result ?? null);
-            if (event.payload.waveform === 'silent') {
-              sessionRef.current = null;
-              setLevels(emptyLevels());
+            if (phase === 'processing') setLevels(imprint);
+            if (phase === 'silent' || phase.startsWith('result-')) {
+              session = null;
+              trail = imprint = emptyLevels();
+              setLevels(trail);
             }
           },
         );
         if (disposed) overlayUnlisten();
         else unlisteners.push(overlayUnlisten);
 
-        const captureUnlisten = await listen<CaptureEvent>(
-          'capture:event',
-          (event) => {
-            const capture = event.payload;
-            if (capture.kind === 'capture-started') {
-              sessionRef.current = {
-                generation: capture.generation,
-                requestId: capture.request_id,
-              };
-              setLevels(emptyLevels());
-              return;
-            }
-            if (capture.kind !== 'capture-level'
-                || waveformRef.current === 'processing') return;
-            const session = sessionRef.current;
-            if (session && (session.generation !== capture.generation
-                || session.requestId !== capture.request_id)) return;
-            if (!session) {
-              sessionRef.current = {
-                generation: capture.generation,
-                requestId: capture.request_id,
-              };
-            }
-            const level = toDisplayLevel(capture.level);
-            setLevels((previous) => [...previous.slice(1), level]);
-          },
-        );
+        const captureUnlisten = await listen<CaptureEvent>('capture:event', (event) => {
+          const capture = event.payload;
+          const listening = phase === 'silent' || phase === 'speaking';
+          if (capture.kind === 'capture-started') {
+            session = { generation: capture.generation, requestId: capture.request_id };
+            trail = imprint = emptyLevels();
+            if (listening) setLevels(trail);
+            return;
+          }
+          if (!listening || capture.kind !== 'capture-level') return;
+          if (session && (session.generation !== capture.generation || session.requestId !== capture.request_id)) return;
+          session ??= { generation: capture.generation, requestId: capture.request_id };
+          const level = toDisplayLevel(capture.level);
+          trail = [...trail.slice(1), level];
+          if (level > 0) imprint = trail;
+          setLevels(trail);
+        });
         if (disposed) captureUnlisten();
         else unlisteners.push(captureUnlisten);
       } catch {

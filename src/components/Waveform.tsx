@@ -1,33 +1,40 @@
-import type { CSSProperties } from 'react';
-import type { OverlayWaveform } from '../services/shortcut/overlayVisibility';
+/** One bar per 50ms RMS sample: a short, readable trail, newest on the right. */
+export const WAVEFORM_SAMPLES = 17;
 
-export const WAVEFORM_BARS = 24;
-
-/** Per-frame RMS is metadata only; map speech into a legible display range. */
+/** Lift conversational levels above the floor without flattening louder syllables. */
 export function toDisplayLevel(level: number): number {
-  if (!Number.isFinite(level) || level <= 0) return 0;
-  return Math.min(1, Math.max(0, (Math.sqrt(level) - 0.04) / 0.4));
+  const floor = 0.0015;
+  if (!Number.isFinite(level) || level <= floor) return 0;
+  const rms = (Math.min(1, level) - floor) / (1 - floor);
+  // Half the scale resolves quiet syllables; the linear half retains differences
+  // between normal speech and louder peaks instead of pegging the meter.
+  const knee = 0.012;
+  const sensitive = (1 + knee) * rms / (rms + knee);
+  return (sensitive + rms) / 2;
 }
 
-interface Props {
-  levels: readonly number[];
-  waveform: OverlayWaveform;
-}
+type Form = 'meter' | 'ink' | 'knot';
 
-export function Waveform({ levels, waveform }: Props) {
-  return (
-    <div
-      aria-label={waveform === 'processing' ? 'Transcribing' : 'Microphone level'}
-      className="wave"
-      role="img"
-    >
-      {Array.from({ length: WAVEFORM_BARS }, (_, index) => {
-        const level = levels[index] ?? 0;
-        return <i
-          key={index}
-          style={{ '--h': `${1 + Math.round(level * 12)}px` } as CSSProperties}
-        />;
-      })}
-    </div>
-  );
+/** Same marks throughout: live bars, two lines of ink, then a single point
+ * inside the result well. Ink lengths describe level, never recognized words. */
+export function Waveform({ levels, form = 'meter' }: { levels: readonly number[]; form?: Form }) {
+  const meter = form === 'meter';
+  let lineWidth = 0;
+  return <span aria-label={meter ? 'Microphone level' : undefined} aria-hidden={meter ? undefined : true}
+    className="wave" data-form={form} role={meter ? 'img' : undefined}>
+    {levels.map((level, i) => {
+      // Listening centers are 6px apart (4px bar + 2px gap).
+      let transform = `scaleY(${(3 + 15 * level) / 18})`;
+      if (form === 'ink') {
+        if (i === 9) lineWidth = 0;
+        const length = 3 + 5 * level;
+        const x = lineWidth + length / 2 - (6 * i + 2);
+        transform = `translate(${x}px, ${i < 9 ? 4 : 10}px) rotate(90deg) scale(.63, ${length / 18})`;
+        lineWidth += length + 2;
+      } else if (form === 'knot') {
+        transform = `translateX(${-20 - i * 6}px) scale(.45, .1)`;
+      }
+      return <i key={i} style={{ transform, animationDelay: form === 'ink' ? `${i * 65}ms` : undefined }} />;
+    })}
+  </span>;
 }

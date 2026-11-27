@@ -1,89 +1,99 @@
-/* Dictionary: one compact alphabetical list, dialog errors; boot-loading spinner. */
-.dictionary {
+/* The word list is the page (ui-iter-35). Thumb letters mark the beginning of
+   each run; each row says what its word replaces. The facing page explains
+   what a saved word does. Both lie open on the page (ui-iter-31). */
+.word-index {
   display: flex;
   flex-direction: column;
-  max-height: calc(100dvh - 40px - var(--s-10) - var(--pad-x));
   min-height: 0;
+  min-width: 0;
+  padding: var(--s-10) var(--s-8) var(--s-10) max(var(--s-8), calc(var(--gutter) - var(--frame)));
 }
-
-.dictionary > :not(.term-grid) { flex-shrink: 0; }
-.dictionary .page-head { margin-bottom: 24px; }
-.dictionary .page-head h1 { margin-bottom: var(--s-4); }
-.dictionary .history-tools { flex-wrap: nowrap; margin-bottom: var(--s-8); }
-.dictionary .search { height: 34px; min-width: 0; }
-.dictionary .history-tools .fine { white-space: nowrap; }
-
-.page-head--action {
-  align-items: flex-start;
-  display: flex;
-  gap: var(--s-8);
-  justify-content: space-between;
-}
-
-.dictionary-list-head,
-.dictionary-list-foot {
-  align-items: center;
-  color: var(--mut);
-  display: flex;
-  gap: var(--s-5);
-  justify-content: space-between;
-}
-
-.dictionary-list-head { font-size: var(--fs-label); padding: 0 var(--s-7) var(--s-5); }
-.dictionary-list-sort { flex: none; }
-.dictionary-list-foot { align-items: flex-start; font-size: var(--fs-micro); padding-top: var(--s-5); }
-/* Keep the non-shrinking range bounded so long valid terms cannot consume the list. */
-.dictionary-list-foot > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dictionary-list-foot > :last-child { flex: none; }
-
+.word-index__head { align-items: baseline; display: grid; gap: var(--s-6) var(--s-4); grid-template-columns: minmax(0, 1fr) auto; margin-bottom: var(--s-6); }
+.word-index__head h2 { font-family: var(--font-words); font-size: calc(var(--fs-section) * 1.4); font-weight: 500; margin: 0; }
+.word-index__head .fine { color: var(--mut); font-size: var(--fs-label); }
+.dictionary .search { grid-column: 1 / -1; height: 34px; min-width: 0; }
+.word-index .search input::placeholder { color: var(--mut); opacity: 1; }
 .dictionary .term-grid {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-tile);
+  border-block: 1px solid var(--line);
   display: flex;
   flex-direction: column;
   flex: 0 1 auto;
-  gap: 0;
   min-height: 0;
   overflow: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
-
 .dictionary .term-row {
   border: 0;
   border-bottom: 1px solid var(--line);
   flex: none;
-  gap: var(--s-5);
+  gap: var(--s-2);
+  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 44px;
-  padding: var(--s-2) var(--s-4) var(--s-2) var(--s-7);
+  padding: 0 var(--s-2) 0 0;
 }
-
 .dictionary .term-row:last-child { border-bottom: 0; }
-.dictionary .term-row strong { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
-.dictionary .term-row__actions { gap: var(--s-1); opacity: 1; visibility: visible; }
-.dictionary .term-row__actions .ib { height: 32px; width: 32px; }
-.dictionary .term-row:hover,
-.dictionary .term-row:focus-within { background: color-mix(in srgb, var(--navon) 35%, var(--panel)); }
-.dictionary .term-row:first-child { border-radius: var(--r-tile) var(--r-tile) 0 0; }
-.dictionary .term-row:last-child { border-radius: 0 0 var(--r-tile) var(--r-tile); }
-
-@media (max-width: 780px) {
-  .dictionary { max-height: calc(100dvh - 40px - var(--s-10) - 60px); }
-  .dictionary-list-foot > :last-child { display: none; }
+.term-row__word {
+  align-content: center;
+  align-items: baseline;
+  align-self: stretch;
+  display: grid;
+  gap: 0 var(--s-4);
+  grid-template-columns: 1.7em minmax(0, max-content) minmax(0, 1fr);
+  min-width: 0;
+  padding: var(--s-3) 0 var(--s-3) var(--s-1);
 }
+/* What the row replaces gives way to the word: it shortens, then disappears. */
+.term-row__replaces {
+  color: var(--mut);
+  font: var(--fs-micro)/1.5 var(--mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.term-row__verb { font-family: var(--font); font-style: italic; }
+.term-row__initial {
+  align-self: start;
+  border-inline-end: 1px solid var(--line);
+  color: var(--mut);
+  font: 500 var(--fs-label)/1.55 var(--mono);
+  text-align: center;
+}
+.dictionary .term-row strong { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); font-weight: 650; min-width: 0; overflow-wrap: anywhere; }
+.dictionary .term-row__actions { gap: 0; opacity: 1; visibility: visible; }
+.dictionary .term-row__actions .ib { height: 32px; width: 32px; }
+.dictionary .term-row:is(:hover, :focus-within) { background: var(--panel); }
+.dictionary .term-row[data-saved] { background: color-mix(in srgb, var(--accfg) 8%, var(--bg)); box-shadow: inset 3px 0 var(--accfg); }
+.dictionary-list-foot {
+  align-items: baseline;
+  color: var(--mut);
+  display: flex;
+  flex: none;
+  font: var(--fs-micro)/1.5 var(--mono);
+  gap: 1ch;
+  justify-content: space-between;
+  padding-top: var(--s-4);
+}
+.dictionary-list-foot > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dictionary-list-foot abbr { text-decoration: none; white-space: nowrap; }
 
+@media (max-width: 959px) {
+  .word-index { padding: var(--s-6) var(--s-8); }
+  .word-index__head { align-items: center; grid-template-columns: auto minmax(0, 1fr) auto; margin-bottom: var(--s-4); }
+  .word-index__head h2 { font-size: var(--fs-sheet); }
+  .word-index__head .fine { grid-column: 3; }
+  .dictionary .search { grid-column: 2; grid-row: 1; }
+}
 @media (pointer: coarse) {
-  .dictionary .term-row__actions .ib { height: 44px; width: 44px; }
+  .dictionary .term-row__actions .ib { min-height: 44px; min-width: 44px; }
 }
 
 .editor-form input[aria-invalid="true"] {
   border-color: var(--err);
   box-shadow: 0 0 0 1px var(--err);
 }
-
 .editor-form .form-error { color: var(--err); }
-
 .spin {
   animation: spin 900ms linear infinite;
   border: 2px solid var(--line);
@@ -92,12 +102,5 @@
   height: 18px;
   width: 18px;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
-
-@media (prefers-reduced-motion: reduce) {
-  .spin { animation: none; }
-}
-
-/* Keep "Add term" on one line; never squeezed by the heading (BUS-47 nit). */
-.page-head--action > .btn { flex-shrink: 0; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }

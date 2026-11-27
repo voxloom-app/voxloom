@@ -108,7 +108,7 @@ For the storage format and recovery rules, see
 ## Deleting transcripts
 
 - **One transcript:** History → the row's **Delete transcript** (trash) button.
-- **Clear active history, and stop keeping new transcripts:** Settings → Privacy →
+- **Clear active history, and stop keeping new transcripts:** Settings → Transcripts →
   **Transcript retention → Off** rewrites the active history with no records
   (encrypted on macOS and Windows). Already-loaded transcripts remain visible in History
   and Home, in memory only, until restart. Off does not delete the history key

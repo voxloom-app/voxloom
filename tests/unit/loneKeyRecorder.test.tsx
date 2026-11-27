@@ -36,11 +36,11 @@ describe('lone modifier capture', () => {
   it('previews a right-hand modifier while held, saves it on a clean keyup', async () => {
     const onChange = await record();
     down('AltRight', 'Alt', { altKey: true });
-    expect(field()).toHaveTextContent('(right)');
+    expect(field()).toHaveTextContent('Right Option');
     expect(onChange).not.toHaveBeenCalled();
     up('AltRight', 'Alt');
     expect(onChange).toHaveBeenCalledWith('AltRight');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Right Option');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Right Option. Change keys');
   });
 
   it.each([

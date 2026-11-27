@@ -1,65 +1,93 @@
-/* HUD (UI PR 8, SPEC § HUD behavior rules; mocks hud.html, hud-transcribing.html).
-   The HUD is the same dark pill on any wallpaper, so it doesn't follow the app theme. */
-
-/* Option A: the bars settle into an even row; the gradient shimmers and pulses (1.6 s). */
-/* Listening and transcribing share one 118px row in a 136px pill, so nothing jumps. */
-.recording--overlay .wave { gap: 2px; width: 118px; }
-.recording--overlay .wave i { flex-basis: 3px; }
-
-/* 24 rounded 3px bars on a 5px pitch (exactly 118px, full caps at both ends). */
-.hud-transcribing {
-  animation: hud-pulse 1.6s ease-in-out infinite;
-  height: 6px;
-  margin: 4px 0;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='6'%3E%3Crect width='3' height='6' rx='1.5'/%3E%3C/svg%3E") 0 0 / 5px 6px repeat-x;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='5' height='6'%3E%3Crect width='3' height='6' rx='1.5'/%3E%3C/svg%3E") 0 0 / 5px 6px repeat-x;
-  overflow: hidden;
-  width: 118px;
-}
-
-/* Shimmer is a compositor-only transform: a 2× wide repeating gradient slides by half. */
-.hud-transcribing i {
-  animation: hud-shimmer 1.6s linear infinite;
-  background: linear-gradient(90deg, var(--brand-a), var(--brand-b), var(--brand-a), var(--brand-b), var(--brand-a));
-  display: block;
-  height: 100%;
-  width: 200%;
-  will-change: transform;
-}
-
-@keyframes hud-shimmer { to { transform: translateX(-50%); } }
-@keyframes hud-pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-
-@keyframes hud-breathe { 0%, 100% { opacity: .6; } 50% { opacity: .9; } }
-
-/* Reduce Motion (BUS-50): no shimmer, a slow 3 s opacity breathe. */
-@media (prefers-reduced-motion: reduce) {
-  .hud-transcribing { animation: hud-breathe 3s ease-in-out infinite; }
-  .hud-transcribing i { animation: none; will-change: auto; }
-}
-
-/* Result states: ~2.5 s each (timed by overlayBridge). */
-.hud-result {
+/* One opaque instrument face on any desktop. The light inner edge and dark
+   outer edge separate it from both dark windows and busy light backgrounds. */
+.hud-capsule {
+  --hud-tone: var(--brand-a);
   align-items: center;
-  background: #0e0e14;
-  border-radius: 14px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-a) 35%, transparent), 0 0 0 .5px rgba(0, 0, 0, .6), 0 0 18px color-mix(in srgb, var(--brand-b) 14%, transparent);
-  color: #ececf1;
+  background: linear-gradient(#292d30, #171b1e);
+  border: 1px solid #73787a;
+  border-bottom-color: #53595c;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px #101316, 0 2px 4px rgb(0 0 0 / .32);
+  color: #f1f4f5;
   display: flex;
-  font-size: 12.5px;
-  font-weight: 600;
-  gap: 7px;
-  height: 30px;
+  gap: 8px;
+  height: 28px;
+  padding: 0 9px 0 3px;
+  pointer-events: none;
+  width: 142px;
+}
+
+.overlay-document .hud-capsule {
   left: 50%;
-  padding: 0 14px;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
+  transition: width 260ms ease-out, height 260ms ease-out, border-radius 260ms ease-out;
+}
+
+/* A slip of blue paper opens to the right of the original signal well.
+   Its perforated stub records time spent waiting, not remaining work. */
+.overlay-document .hud-capsule::before {
+  background: #cdebed;
+  border-radius: 2px 8px 8px 2px;
+  content: "";
+  inset: 2px 2px 2px 26px;
+  opacity: 0;
+  position: absolute;
+  transform: scaleX(.06);
+  transform-origin: left;
+  transition: opacity 180ms, transform 260ms ease-out;
+}
+.overlay-document [data-waveform="processing"] {
+  border-radius: 12px;
+  height: 42px;
+  width: 168px;
+}
+.overlay-document [data-waveform="processing"]::before { opacity: 1; transform: none; }
+.hud-caption, .hud-clock {
+  animation: hud-settle 220ms ease-out both;
+  color: #15383e;
+  position: absolute;
+}
+.hud-caption { font-size: 12.5px; font-weight: 700; left: 32px; line-height: 1; top: 6px; }
+.hud-clock {
+  align-items: center;
+  border-left: 1px dashed #64878c;
+  bottom: 5px;
+  display: flex;
+  font: 600 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  justify-content: center;
+  min-width: 39px;
+  right: 3px;
+  top: 5px;
+}
+
+.hud-capsule[data-waveform="processing"],
+.hud-result { --hud-tone: var(--brand-b); }
+.hud-result--unverified { --hud-tone: #ffc04d; }
+.hud-result--failed { --hud-tone: #ff9292; }
+
+/* Only the result needs a longer face. Size to the actual font metrics,
+   not a fixed shuttle mask. The words keep at least 20px at either end. */
+.hud-result {
+  max-width: calc(100vw - 8px);
+  min-width: 142px;
+  padding-right: 21px;
+  width: max-content;
+}
+
+.hud-label {
+  animation: hud-settle 150ms ease-out;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.hud-result--copied .icon { color: var(--brand-a); }
-.hud-result--failed { box-shadow: inset 0 0 0 1px rgba(255, 107, 107, .5), 0 0 0 .5px rgba(0, 0, 0, .6); }
-.hud-result--failed .icon { color: #ff6b6b; }
-.hud-result--unverified { box-shadow: inset 0 0 0 1px rgba(255, 176, 32, .5), 0 0 0 .5px rgba(0, 0, 0, .6); }
-.hud-result--unverified .icon { color: #ffb020; }
+@keyframes hud-settle { from { opacity: 0; transform: translateX(-2px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-label, .hud-caption, .hud-clock { animation: none; }
+  .overlay-document .hud-capsule, .overlay-document .hud-capsule::before { transition: none; }
+}

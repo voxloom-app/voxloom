@@ -6,6 +6,7 @@ import {
   CLEANUP_DOWNLOAD, CLEANUP_DOWNLOAD_CANCEL, type CleanupModelView,
 } from '../settings/cleanupCopy';
 import { chosenCleanupModel, chosenModelReady } from '../settings/cleanupModelChoice';
+import { SettingsStopLink } from '../settings/SettingsStopLink';
 import { useCleanupDownload } from '../settings/useCleanupDownload';
 import { cleanupShown, type CleanupModel } from '../settings/useCleanupModel';
 import {
@@ -67,7 +68,7 @@ export function HomeStyle({ isNative, model }: { isNative: boolean; model: Clean
     </button>
   );
   return (
-    <div className="home-hero__style" ref={rootRef}>
+    <div className="home-style" ref={rootRef}>
       <span className="fine">
         {kind === 'browser' || !enabled ? HOME_STYLE_CAPTION : HOME_STYLE_CAPTION_ON}
       </span>
@@ -87,7 +88,7 @@ export function HomeStyle({ isNative, model }: { isNative: boolean; model: Clean
             id={NOTE_TEXT_ID}
             role="status"
           >
-            {note}
+            {note}{kind === 'failed' && <> You can also add it in Settings → <SettingsStopLink tab="cleanup">Cleanup</SettingsStopLink>.</>}
           </span>
           {kind === 'downloading' && (
             <span

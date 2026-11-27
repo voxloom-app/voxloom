@@ -24,7 +24,7 @@ describe('History empty states (UI PR 4)', () => {
 
   it('names the real Settings section in the retention line', () => {
     renderWithApp(<History onToast={vi.fn()} />);
-    expect(screen.getByText(/\(Settings › Privacy\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Transcripts' }).parentElement).toHaveTextContent('Kept for 30 days · Settings › Transcripts');
   });
 });
 
@@ -33,12 +33,13 @@ describe('History segmented filter (UI PR 4)', () => {
     renderWithApp(<History onToast={vi.fn()} />);
     expect(rows()).toHaveLength(initialRecords.length);
     for (const status of statuses) {
-      fireEvent.click(screen.getByRole('radio', { name: status[0].toUpperCase() + status.slice(1) }));
+      fireEvent.click(screen.getByRole('radio', { name: new RegExp(`^${status[0].toUpperCase()}${status.slice(1)} \\d+$`) }));
       const expected = initialRecords.filter((r) => r.status === status).length;
       expect(rows(), status).toHaveLength(expected);
-      rows().forEach((row) => expect(row.querySelector('.badge')?.getAttribute('data-status')).toBe(status));
+      rows().forEach((row) => expect(within(row).getByRole('button', { name: /^Recording details/ }))
+        .toHaveAccessibleName(new RegExp(`${status}$`, 'i')));
     }
-    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
+    fireEvent.click(screen.getByRole('radio', { name: /^All \d+$/ }));
     expect(rows()).toHaveLength(initialRecords.length);
   });
 
@@ -52,18 +53,20 @@ describe('History segmented filter (UI PR 4)', () => {
     expect(screen.queryByText('No dictations yet')).not.toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(rows()).toHaveLength(initialRecords.length);
-    screen.getByRole('radio', { name: 'All' }).focus();
+    screen.getByRole('radio', { name: /^All \d+$/ }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('radio', { name: 'Inserted' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /^Inserted \d+$/ })).toHaveAttribute('aria-checked', 'true');
     expect(rows()).toHaveLength(initialRecords.filter((r) => r.status === 'inserted').length);
   });
 
-  it('renders badge, meta and notes per row; Retry only in the browser', () => {
+  it('keeps the failure note on the page and its badge in the recording slip; Retry only in the browser', () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     renderWithApp(<History onToast={vi.fn()} />);
-    expect(screen.getByText(/Audio isn’t saved/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('radio', { name: 'Failed' }));
+    // Said once, on the failed row that needs it, not in the masthead too (ui-iter-39).
+    expect(screen.queryByText(/Audio isn’t saved/)).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: /^Failed \d+$/ }));
     const row = rows()[0];
+    fireEvent.click(within(row).getByRole('button', { name: /Recording details.*Failed/ }));
     expect(within(row).getByText('Failed')).toHaveClass('badge');
     expect(within(row).getByText(/No audio retry available/)).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: 'Retry transcription' })).toBeNull();
@@ -72,10 +75,15 @@ describe('History segmented filter (UI PR 4)', () => {
 });
 
 describe('History heading order', () => {
-  it('uses h2 for row text directly under the h1 (axe heading-order)', () => {
+  it('nests row text (h3) under its day (h2) under the h1, never skipping a level (axe heading-order)', () => {
     renderWithApp(<History onToast={() => {}} />);
-    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
-    expect(screen.getAllByRole('heading', { level: 2 }).length).toBeGreaterThan(0);
+    const levels = screen.getAllByRole('heading').map((h) => Number(h.tagName.slice(1)));
+    expect(levels[0]).toBe(1);
+    levels.slice(1).forEach((level, i) => expect(level - levels[i]).toBeLessThanOrEqual(1));
+    // The fixed test clock can fall just after midnight in some time zones.
+    for (const day of screen.getAllByRole('heading', { level: 2 })) expect(day).toHaveTextContent(/^(Today|Yesterday)$/);
+    expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(initialRecords.length);
+    for (const row of rows()) expect(within(row).queryByRole('heading', { level: 2 })).toBeNull();
   });
 });
 
@@ -84,10 +92,12 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     const user = userEvent.setup();
     renderWithApp(<History onToast={() => {}} />);
     const row = screen.getAllByRole('article')[0];
-    const text = within(row).getByRole('heading', { level: 2 }).textContent ?? '';
+    const text = within(row).getByRole('heading', { level: 3 }).textContent ?? '';
     // No aria-labelledby on the row: VoiceOver would read the transcript twice.
     expect(row).not.toHaveAttribute('aria-labelledby');
     row.focus();
+    await user.tab();
+    expect(within(row).getByRole('button', { name: /^Recording details/ })).toHaveFocus();
     await user.tab();
     const first = within(row).getByRole('button', { name: 'Copy transcript' });
     expect(first).toHaveFocus();
@@ -106,14 +116,16 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     expect(css).not.toMatch(/\.history-list \.action-group \{[^}]*visibility: hidden/);
   });
 
-  it('keeps actions always visible on Failed and Unverified rows (designer)', async () => {
+  it('keeps actions always visible on Failed rows; Unverified ones show on hover or focus (ui-iter-39)', async () => {
     const { readFileSync } = await import('node:fs');
     const css = readFileSync('src/styles/lists.css', 'utf8');
-    expect(css).toMatch(/\.recent-row\[data-status="failed"\] \.action-group,\s*\.history-list \.recent-row\[data-status="unverified"\] \.action-group \{ opacity: 1; \}/);
+    expect(css).toMatch(/\.history-list \.recent-row\[data-status="failed"\] \.action-group \{ opacity: 1; \}/);
+    // The day says its Unverified caution once, so 38 such rows don't show 76 icons.
+    expect(css).not.toMatch(/\[data-status="unverified"\] \.action-group/);
     renderWithApp(<History onToast={() => {}} />);
     for (const row of screen.getAllByRole('article')) {
       expect(row).toHaveAttribute('data-status');
-      expect(within(row).queryByRole('heading', { level: 3 })).toBeNull();
+      expect(within(row).getAllByRole('heading')).toHaveLength(1);
     }
   });
 });
@@ -130,7 +142,7 @@ describe('may-have-inserted History rows (Review #44)', () => {
       recoveryExpiresAt: null, status: 'unverified' as const, style: 'formal' as const, text: 'hi',
     };
     render(<HistoryRow canStart currentTime={2_000} isNative onCopy={() => {}} onDelete={() => {}} onRetry={() => {}} record={record} />);
-    expect(screen.getByText('Unverified')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Recording details.*Unverified/ })).toBeVisible();
     expect(screen.queryByText(/^(Failed|Copied)$/)).toBeNull();
     expect(screen.getByText(note, { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/copy the text to recover it/)).toBeNull();

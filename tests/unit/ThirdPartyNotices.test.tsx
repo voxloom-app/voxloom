@@ -19,10 +19,10 @@ function renderSettings() {
 }
 
 describe('Third-party notices', () => {
-  it('opens the bundled notices from Privacy with keyboard access and restores focus', async () => {
+  it('opens the bundled notices from Transcripts & privacy with keyboard access and restores focus', async () => {
     const user = userEvent.setup();
     renderSettings();
-    await user.click(screen.getByRole('tab', { name: 'Privacy' }));
+    await user.click(screen.getByRole('tab', { name: /^Transcripts/ }));
     const opener = screen.getByRole('button', { name: 'Third-Party Notices' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     opener.focus();

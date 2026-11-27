@@ -1,0 +1,132 @@
+/* The loom by daylight (ui-iter-10). Light appearance gets its own material instead of the
+   night loom: the frame (rail, every page's beam and setup) is woven linen, text is
+   ink, and the threads are dyed deep enough to read on it (lime #548a00, cyan #008a9e, both
+   3:1+ as graphics). The vivid brand stays where it is lit: primary buttons, the app tile,
+   the shuttle, and the voice glows, which become sunlight through dyed thread. Dark keeps
+   the night loom unchanged. Page surfaces live in daylight-pages.css. Loaded last. */
+
+/* Dyed threads everywhere in the light window; the lit things keep the vivid brand. */
+[data-appearance-resolved="light"] :is(.app, .settings-window-root, .setup-window) {
+  --brand-a: #548a00;
+  --brand-b: #008a9e;
+  --linen: #f4f1ea;
+  --linen-low: #e9e4da;
+  --weave: rgba(96, 76, 40, .035);
+  /* A faint plain weave over a warm daylight fall-off. */
+  --linen-bg: repeating-linear-gradient(0deg, var(--weave) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, var(--weave) 0 1px, transparent 1px 3px),
+    linear-gradient(180deg, var(--linen), var(--linen-low) 100vh) var(--linen-low);
+}
+[data-appearance-resolved="light"] :is(.btn.primary, .app-tile, .guided-mark, .hud-preview) {
+  --brand-a: #b6ff3c;
+  --brand-b: #3cf0ff;
+}
+
+/* Daylight tokens for every frame surface (each re-declares the night set), including the
+   open pages (Home since ui-iter-29, every page since ui-iter-31). Text holds AA over the
+   frame's darkest stop, the sunlit glows, the selected nav and the segmented track. */
+[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head, .main .page-body, .settings-window > .settings-panel, section[aria-busy] > .boot-loading, .main .home-page) {
+  color-scheme: light;
+  --panel: #efebe3;
+  --field: #fbfaf7;
+  --seg: #e3ded3;
+  --segon: #ffffff;
+  --line: #d8d1c3;
+  --fg: #17191f;
+  --mut: #565a61;
+  --ctl-line: #807a6d;
+  --sel-edge: #4c8a00;
+  --seg-on-fg: #17191f;
+  --navon: #dfe4c9;
+  --mut-on-nav: #4f535a;
+  --accfg: #376b00;
+  --ok: #156d2b;
+  --info: #00636d;
+  --warn: #8a5000;
+  --err: #b4272d;
+  --focus: #376b00;
+  --tag-bg: #e3ded3;
+  --tag-fg: #4f535a;
+  --switch-off: #807a6d;
+}
+
+/* The frame is linen. Setup's column lets the window's linen through under its top selvedge. */
+[data-appearance-resolved="light"] :is(.app, .settings-window-root, .setup-window) { background: var(--linen-bg); }
+[data-appearance-resolved="light"] .guided-main.stage {
+  background: linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat;
+}
+[data-appearance-resolved="light"] :is(.main, .settings-window-root) > section[aria-busy] > .page-head h1 { color: var(--fg); }
+
+/* The open pages lie on the linen too (ui-iter-31): the surface they fill knots and tints
+   with is the linen itself, not the night sheet. */
+[data-appearance-resolved="light"] :is(.main .page-body, .main .home-page, .settings-window > .settings-panel, section[aria-busy] > .boot-loading) { --bg: var(--linen); }
+
+/* ---- The rail by daylight ---- */
+[data-appearance-resolved="light"] :is(.sidebar, .guided-rail) {
+  background:
+    linear-gradient(180deg, transparent 4%, color-mix(in srgb, var(--brand-a) 55%, transparent) 32%,
+      color-mix(in srgb, var(--brand-b) 55%, transparent) 72%, transparent 97%) right / 1px 100% no-repeat,
+    radial-gradient(120% 34% at 0% 0%, color-mix(in srgb, #b6ff3c 22%, transparent), transparent 70%),
+    var(--linen-bg);
+}
+[data-appearance-resolved="light"] .brand__name,
+[data-appearance-resolved="light"] .rail-today__head b,
+[data-appearance-resolved="light"] .nav-button[aria-current="page"] { color: var(--fg); }
+[data-appearance-resolved="light"] :is(.brand__dot, .stage__mic i) { box-shadow: 0 0 0 3px rgba(70, 56, 30, .08); }
+[data-appearance-resolved="light"] .nav-button:hover { background: rgba(70, 56, 30, .06); }
+[data-appearance-resolved="light"] .nav-button[aria-current="page"] {
+  background: linear-gradient(90deg, color-mix(in srgb, #b6ff3c 34%, transparent), color-mix(in srgb, #b6ff3c 10%, transparent) 78%, transparent);
+}
+[data-appearance-resolved="light"] .rail-today:hover { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .6)); }
+[data-appearance-resolved="light"] .rail-today__day i { background: var(--fg); opacity: .32; }
+[data-appearance-resolved="light"] .rail-today__day i[data-newest] { box-shadow: none; opacity: .8; }
+[data-appearance-resolved="light"] .rail-key .kbd {
+  background: linear-gradient(180deg, #ffffff, #f3f0ea);
+  border-color: rgba(70, 56, 30, .18);
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 #cbc3b3;
+  color: var(--fg);
+}
+[data-appearance-resolved="light"] .sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 12px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+}
+
+/* ---- Key caps by daylight: white caps on a warm shadow, like the keyboard under your hands ---- */
+[data-appearance-resolved="light"] :is(.stage .home-hero h1, .path-sentence__stop, .guided-shortcut, .practice__beats, .shortcut-card__keys) .kbd {
+  --cap-edge: #cbc3b3;
+  background: linear-gradient(180deg, #ffffff, #f3f0ea);
+  border-color: rgba(70, 56, 30, .16);
+  border-bottom-color: rgba(70, 56, 30, .28);
+  box-shadow: inset 0 1px 0 #ffffff, 0 3px 0 var(--cap-edge), 0 10px 18px -8px rgba(70, 56, 30, .4);
+  color: var(--fg);
+}
+[data-appearance-resolved="light"] .path-sentence__stop .kbd { box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 var(--cap-edge); }
+[data-appearance-resolved="light"] .path-sentence__stop[data-inactive] .kbd { color: var(--mut); }
+/* Pressed while you speak: the cap sinks and the lime light spills out around it. */
+[data-appearance-resolved="light"] .stage:is([data-phase="listening"], [data-phase="speaking"]) .home-hero h1 .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 70%, transparent);
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 var(--cap-edge), 0 0 24px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+  color: var(--accfg);
+}
+
+/* ---- Buttons on the linen: the same shapes, with warm attached shadows ---- */
+[data-appearance-resolved="light"] .stage .btn.primary.big:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .7), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 1px 0 rgba(70, 56, 30, .28),
+    0 2px 4px -1px rgba(70, 56, 30, .3), 0 6px 18px -6px color-mix(in srgb, #3cf0ff 70%, transparent);
+}
+[data-appearance-resolved="light"] .stage .btn.primary.big:hover:not(:disabled) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .75), inset 0 -2px 0 rgba(0, 60, 40, .14), 0 2px 0 rgba(70, 56, 30, .28),
+    0 3px 6px -1px rgba(70, 56, 30, .32), 0 10px 24px -6px color-mix(in srgb, #3cf0ff 80%, transparent);
+}
+[data-appearance-resolved="light"] .stage .btn.primary.big:focus-visible:not(:disabled) {
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 5px var(--accfg), 0 2px 4px -1px rgba(70, 56, 30, .3);
+}
+[data-appearance-resolved="light"] .stage .btn:not(.primary):not(.ghost) {
+  background: linear-gradient(180deg, #ffffff, #f7f5f0);
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 rgba(70, 56, 30, .12), 0 1px 3px -1px rgba(70, 56, 30, .25);
+}
+[data-appearance-resolved="light"] .stage .btn:not(.primary):not(.ghost):hover {
+  box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 rgba(70, 56, 30, .16), 0 2px 6px -1px rgba(70, 56, 30, .3);
+}
+[data-appearance-resolved="light"] .stage .seg__item.on { box-shadow: inset 0 0 0 1px var(--sel-edge), 0 1px 2px rgba(70, 56, 30, .2); }
+[data-appearance-resolved="light"] .rail-settings:is(:hover, :focus-visible) { background: rgba(70, 56, 30, .06); }
+[data-appearance-resolved="light"] .rail-settings[aria-current="page"] { background: linear-gradient(90deg, color-mix(in srgb, #b6ff3c 34%, transparent), transparent); }

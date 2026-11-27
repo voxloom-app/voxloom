@@ -1,12 +1,13 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app/App';
 import { Switch } from '../../src/components/Switch';
 import { screenForAltDigit } from '../../src/app/shell/screens';
+import { RailTools } from '../../src/app/shell/RailTools';
 import { Sidebar } from '../../src/app/shell/Sidebar';
-import { TitleBar } from '../../src/app/shell/TitleBar';
 import { Home } from '../../src/features/home/Home';
+import { LoomBar } from '../../src/features/home/LoomBar';
 import { isTauriEnv } from '../../src/services/capture/captureService';
 import type { UseDogfoodCaptureResult } from '../../src/services/stt/useDogfoodCapture';
 import { renderWithApp } from './testUtils';
@@ -31,16 +32,25 @@ afterEach(() => vi.mocked(isTauriEnv).mockReturnValue(false));
 
 describe('App shell (UI PR 3)', () => {
   it('has three sidebar screens, the brand status line and the short hint', async () => {
-    await renderShell();
+    const user = await renderShell();
     const nav = screen.getByRole('navigation', { name: 'Voxloom screens' });
     expect(within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label')))
       .toEqual(['Home', 'History', 'Dictionary']);
     const status = document.querySelector('.brand__status')!;
-    expect(status).toHaveTextContent('Setup incomplete · ⌃⇧Space');
+    expect(status).toHaveTextContent('Setup incomplete');
     expect(status).not.toHaveAttribute('aria-label');
-    // <=909px: the shortcut moves to its own line as key caps (BUS-41 PR 2).
-    expect([...document.querySelectorAll('.brand__caps .kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
-    expect(screen.getByText(/Hold the shortcut in any app to dictate/)).toBeInTheDocument();
+    // ui-iter-17: Home's stage already shows the keys, so the rail says them only on other pages.
+    const rail = document.querySelector('aside.sidebar')!;
+    expect(rail.querySelector('.rail-key')).toBeNull();
+    expect(within(nav).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    await user.click(within(nav).getByRole('button', { name: 'History' }));
+    // ui-iter-03: the shortcut lives in the rail's dock as key caps, spoken for screen readers.
+    const dock = rail.querySelector('.rail-key')!;
+    expect([...dock.querySelectorAll('.kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
+    expect(dock).toHaveTextContent('Control Shift Space');
+    expect(dock).toHaveTextContent(/^Hold .* in any app to dictate$/);
+    // ui-iter-33: the keys and "Hold" share the first line, "in any app to dictate" the second.
+    expect(dock.querySelector('.rail-key__hold .key-combo')).not.toBeNull();
     expect(screen.queryByText(/Global hold\/latch snapshots/)).not.toBeInTheDocument();
   });
 
@@ -113,9 +123,9 @@ describe('App shell (UI PR 3)', () => {
     expect(fireEvent.keyDown(document, { altKey: true, code: 'Digit7', key: '¶' })).toBe(true);
   });
 
-  it('opens Settings from the title bar, ⌥4 and ⌘,', async () => {
+  it('opens Settings from the rail, ⌥4 and ⌘,', async () => {
     const user = await renderShell();
-    const settings = screen.getByRole('button', { name: 'Settings' });
+    const settings = within(document.querySelector('.sidebar') as HTMLElement).getByRole('button', { name: 'Settings' });
     await user.click(settings);
     expect(settings).toHaveAttribute('aria-current', 'page');
     expect(current()).toBeUndefined();
@@ -134,62 +144,177 @@ describe('App shell (UI PR 3)', () => {
 });
 
 describe('Home (UI PR 3)', () => {
-  it('shows a status badge on each recent row', () => {
+  it('shows a status badge on the last pick; earlier rows name theirs once, in the knot key', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const rows = document.querySelectorAll('.home .recent-row');
-    expect(rows).toHaveLength(5);
-    rows.forEach((row) => expect(row.querySelector('.badge')).not.toBeNull());
+    expect(rows).toHaveLength(4);
+    expect(document.querySelector('.home .pick .badge')).toHaveAttribute('data-status', 'inserted');
+    // ui-iter-29: no pill per row; each row keeps its status for screen readers.
+    rows.forEach((row) => {
+      expect(row.querySelector('.badge')).toBeNull();
+      expect(row.querySelector('.sr-only')?.textContent).toMatch(/^(Inserted|Copied|Unverified)$/);
+    });
+    expect(document.querySelector('.earlier__key')).toHaveTextContent('2 copied2 inserted');
   });
 
-  it('hides the browser-only Start capture note in the native app', () => {
+  it('keeps the writing style caption ahead of its control', () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
-    expect(screen.queryByText(/Native capture requires the Tauri shell/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start capture' })).toBeEnabled();
     const caption = screen.getByText('Writing style');
     // Caption precedes the segmented control.
     expect(caption.compareDocumentPosition(screen.getByRole('radiogroup', { name: 'Current writing style' })))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
+});
 
-  it('shows Stop/Cancel while recording and Transcribing… while busy', () => {
-    const { unmount } = renderWithApp(<Home dogfood={dogfood({ phase: 'recording' })} onToast={vi.fn()} />);
+describe('Start on the stage (ui-iter-21)', () => {
+  const bar = (over: Partial<UseDogfoodCaptureResult> = {}, isNative = true) => {
+    const run = dogfood(over);
+    render(<LoomBar capture={{ dogfood: run, isNative, onCopy: vi.fn() }} pick={null} />);
+    return run;
+  };
+
+  it('starts a run from the stage and says where the words may go', async () => {
+    const run = bar();
+    const start = screen.getByRole('button', { name: 'Start dictating' });
+    expect(start).toBeEnabled();
+    expect(start).toHaveAccessibleDescription('Starting here focuses Voxloom, so the words may be copied instead of inserted.');
+    expect(screen.queryByText(/needs the Voxloom desktop app/)).not.toBeInTheDocument();
+    await userEvent.setup().click(start);
+    expect(run.start).toHaveBeenCalledOnce();
+  });
+
+  it('is disabled with a note in the browser preview', () => {
+    bar({}, false);
+    expect(screen.getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    expect(screen.getByText('Dictating here needs the Voxloom desktop app.')).toBeInTheDocument();
+  });
+
+  it('shows Stop/Cancel while recording and Transcribing… while busy', async () => {
+    const user = userEvent.setup();
+    const run = bar({ phase: 'recording' });
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(run.stop).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(run.cancel).toHaveBeenCalledOnce();
+    cleanup();
+    bar({ phase: 'transcribing' });
+    expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('offers Stop for a latched or held run from the shortcut too', () => {
+    bar({ captureState: { device: 'Mic', generation: 1, kind: 'active', request_id: 'latch-1' } });
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    unmount();
-    renderWithApp(<Home dogfood={dogfood({ phase: 'transcribing' })} onToast={vi.fn()} />);
-    expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
-    expect(screen.queryByRole('button', { name: 'Start capture' })).not.toBeInTheDocument();
+    expect(document.querySelector('.dictate')).toHaveAttribute('data-state', 'recording');
   });
 
   it('shows Cleaning up… while local cleanup runs (BUS-16)', () => {
-    renderWithApp(<Home dogfood={dogfood({ phase: 'cleaning' })} onToast={vi.fn()} />);
+    bar({ phase: 'cleaning' });
     expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
-    expect(screen.queryByRole('button', { name: 'Start capture' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+  });
+
+  it('hangs a run\'s outcome beneath the capsule', () => {
+    bar({ message: 'Inserted into the focused app.', phase: 'success' });
+    expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
+    expect(screen.getByRole('status').closest('.loom-bar__hang')).not.toBeNull();
+  });
+
+  it('ties the outcome tag off with the HUD\'s knot for what happened (ui-iter-17)', () => {
+    const tag = () => screen.getByRole('status');
+    const knot = () => tag().querySelector('svg.run-tag__knot')!;
+    bar({ message: 'Inserted into the focused app.', phase: 'success' });
+    expect(tag()).toHaveAttribute('data-tone', 'ok');
+    expect(knot()).toHaveAttribute('aria-hidden', 'true');
+    expect(knot().querySelector('.knot__core')).not.toBeNull();
+    cleanup();
+    bar({ message: 'Copied — paste it where you need it.', phase: 'success' });
+    expect(tag()).toHaveAttribute('data-tone', 'warn');
+    cleanup();
+    // A cancelled run frays, and the words are spoken exactly as written.
+    bar({ message: 'Capture cancelled — nothing transcribed.', phase: 'cancelled' });
+    expect(tag()).toHaveAttribute('data-tone', 'err');
+    expect(knot().querySelector('.knot__fray')).not.toBeNull();
+    expect(tag().textContent).toBe('Capture cancelled — nothing transcribed.');
+  });
+
+  it('lives on Home\'s stage only; the rail carries no Start on any page', async () => {
+    const user = await renderShell();
+    const rail = () => document.querySelector('.sidebar') as HTMLElement;
+    const stage = document.querySelector('.home-hero') as HTMLElement;
+    expect(within(stage).getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    expect(within(rail()).queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    for (const page of ['History', 'Dictionary']) {
+      await user.click(within(screen.getByRole('navigation', { name: 'Voxloom screens' })).getByRole('button', { name: page }));
+      expect(current()).toBe(page);
+      expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('heading', { name: 'Dictate' })).not.toBeInTheDocument();
   });
 });
 
-describe('Title bar (designer: standard macOS title bar)', () => {
-  it('draws the app name only in the browser preview, never a fake inset', async () => {
+describe('Quiet rail foot (ui-iter-21)', () => {
+  const rail = (run: UseDogfoodCaptureResult, page: 'home' | 'history') => renderWithApp(
+    <Sidebar capture={{ dogfood: run, isNative: true, onCopy: vi.fn() }} onNavigate={() => {}} onReset={() => {}} screen={page} shortcut="Control+Shift+Space" status="Ready" />,
+  );
+
+  it('lets the outcome tag stand in for the keys hint on other pages (ui-iter-17)', () => {
+    rail(dogfood({ message: 'Inserted into the focused app.', phase: 'success' }), 'history');
+    expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
+    expect(document.querySelector('.rail-key')).toBeNull();
+  });
+
+  it('lets you finish a run from another page with Stop and Cancel', async () => {
+    const user = userEvent.setup();
+    const run = dogfood({ phase: 'recording' });
+    rail(run, 'history');
+    // Scoped to the foot: the Developer panel has its own synthetic Cancel.
+    const foot = document.querySelector('.rail-foot') as HTMLElement;
+    await user.click(within(foot).getByRole('button', { name: 'Stop' }));
+    expect(run.stop).toHaveBeenCalledOnce();
+    await user.click(within(foot).getByRole('button', { name: 'Cancel' }));
+    expect(run.cancel).toHaveBeenCalledOnce();
+    cleanup();
+    rail(dogfood({ phase: 'transcribing' }), 'history');
+    expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
+  });
+
+  it('stays out of the way on Home, where the stage holds the run', () => {
+    rail(dogfood({ message: 'Inserted into the focused app.', phase: 'recording' }), 'home');
+    const sidebar = document.querySelector('.sidebar') as HTMLElement;
+    expect(within(sidebar).queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole('status')).not.toBeInTheDocument();
+    expect(sidebar.querySelector('.rail-warp, .rail-cloth, .rail-shuttle')).toBeNull();
+  });
+});
+
+describe('No toolbar (ui-iter-27; designer: standard macOS title bar)', () => {
+  it('names the app once, in the rail, in the browser preview and natively', () => {
     const { unmount, container } = renderWithApp(<App />);
-    expect(container.querySelector('.titlebar__title')).toHaveTextContent('Voxloom');
+    expect(container.querySelector('#app-shell > header, .titlebar')).toBeNull();
+    expect(container.querySelector('.brand__name')).toHaveTextContent('Voxloom');
     unmount();
     vi.mocked(isTauriEnv).mockReturnValue(true);
     const native = renderWithApp(<App />);
-    expect(native.container.querySelector('.titlebar__title')).toBeNull();
+    expect(native.container.querySelector('#app-shell > header, .titlebar')).toBeNull();
+    expect(native.container.querySelectorAll('.brand__name')).toHaveLength(1);
   });
 });
 
 describe('off-Mac shell labels (QA #45)', () => {
-  it('title bar says Ctrl+, and the sidebar says Alt+1–3 and Ctrl+Shift+Space', () => {
+  it('the rail says Ctrl+,, Alt+1–3 and Ctrl+Shift+Space', () => {
     const spy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
     try {
-      render(<TitleBar onHelp={() => {}} onSettings={() => {}} settingsOpen={false} />);
+      render(<RailTools onHelp={() => {}} onSettings={() => {}} settingsOpen={false} />);
       expect(screen.getByRole('button', { name: 'Settings' })).toHaveTextContent('Settings… Ctrl+,');
       renderWithApp(
-        <Sidebar onNavigate={() => {}} onReset={() => {}} screen="home" shortcut="Control+Shift+Space" status="Ready" />,
+        <Sidebar onNavigate={() => {}} onReset={() => {}} screen="history" shortcut="Control+Shift+Space" status="Ready" />,
       );
-      expect(document.querySelector('.brand__status')).toHaveTextContent('Ready · Ctrl+Shift+Space');
+      expect(document.querySelector('.brand__status')).toHaveTextContent('Ready');
+      expect([...document.querySelectorAll('.rail-key .kbd')].map((k) => k.textContent)).toEqual(['Ctrl', 'Shift', 'Space']);
       expect(document.body.textContent).toContain('Alt+1');
       expect(document.body.textContent).not.toMatch(/[⌥⌘⌃⇧]/);
     } finally {

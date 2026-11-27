@@ -1,6 +1,7 @@
-import { useRef, type KeyboardEvent } from 'react';
+import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 
-export type SegmentOption<T extends string> = { value: T; label: string };
+/** A label can carry quiet extras (a knot, a count); its text is the radio's name. */
+export type SegmentOption<T extends string> = { value: T; label: ReactNode };
 
 type Props<T extends string> = {
   label: string;

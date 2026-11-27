@@ -6,7 +6,7 @@ for (const width of [1120, 640]) {
     await page.goto('/');
     await page.getByRole('button', { name: 'Set up later', exact: true }).click();
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    await page.getByRole('tab', { name: 'Models', exact: true }).click();
+    await page.getByRole('tab', { name: /^Speech:/ }).click();
     const turbo = page.getByRole('radio', { name: /Whisper Large v3 Turbo \(English\)/ });
     await expect(turbo).not.toBeChecked();
     await expect(page.getByRole('radio', { name: /Whisper Base/ })).toBeChecked();

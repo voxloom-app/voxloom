@@ -169,7 +169,7 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             if event.id() == settings_window::SETTINGS_MENU_ID {
-                let _ = settings_window::open_settings_window(app);
+                let _ = settings_window::show_main_page(app, settings_window::SETTINGS_OPEN_EVENT);
             }
         })
         .invoke_handler(tauri::generate_handler![

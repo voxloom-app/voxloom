@@ -125,7 +125,7 @@ describe('useShortcutRegistration before boot is ready', () => {
     const revert = vi.fn();
     const callbacksRef = { current: { onShortcutError: vi.fn(), onShortcutRevert: revert } };
     const hook = renderHook(
-      ({ shortcut, ready }) => useShortcutRegistration(shortcut, nativeRef, registeredRef, callbacksRef, async () => false, ready),
+      ({ shortcut, ready }) => useShortcutRegistration(shortcut, nativeRef, registeredRef, callbacksRef, () => false, ready),
       { initialProps: { ready: false, shortcut: 'Ctrl + Shift + Space' } },
     );
     hook.rerender({ ready: true, shortcut: SAVED });

@@ -12,7 +12,6 @@ import { SettingsWindowApp } from '../../src/settings/SettingsWindowApp';
 
 const bridge = vi.hoisted(() => ({
   onboarding: null as null | (() => void),
-  open: vi.fn().mockResolvedValue(undefined),
   request: vi.fn().mockResolvedValue(undefined),
   settings: null as null | ((p: { contents: string }) => void),
 }));
@@ -24,7 +23,6 @@ vi.mock('../../src/services/settingsWindow', async (importActual) => ({
     bridge.settings = h;
     return Promise.resolve(() => { bridge.settings = null; });
   },
-  openSettingsWindow: bridge.open,
   requestOnboarding: bridge.request,
 }));
 
@@ -49,7 +47,6 @@ function StyleProbe() {
 }
 
 beforeEach(() => {
-  bridge.open.mockClear();
   bridge.request.mockClear();
 });
 afterEach(() => vi.mocked(isTauriEnv).mockReturnValue(false));
@@ -79,19 +76,6 @@ describe('settings:changed sync', () => {
 });
 
 describe('main window in the native app', () => {
-  it('opens the Settings window from the title bar, ⌥4 and ⌘, instead of rendering in-page', async () => {
-    vi.mocked(isTauriEnv).mockReturnValue(true);
-    const user = userEvent.setup();
-    render(<AppProvider clock={() => 1_800_000_000_000}><App /></AppProvider>);
-    await user.click(screen.getByRole('button', { name: 'Set up later' }));
-    await user.click(screen.getByRole('button', { name: /Settings/ }));
-    await user.keyboard('{Alt>}4{/Alt}');
-    await user.keyboard('{Meta>},{/Meta}');
-    expect(bridge.open).toHaveBeenCalledTimes(3);
-    expect(screen.queryByRole('tablist', { name: 'Settings sections' })).toBeNull();
-    expect(screen.getByRole('heading', { level: 1 })).not.toHaveTextContent('Settings');
-  });
-
   it('opens onboarding when the Settings window asks (onboarding:open)', async () => {
     const user = userEvent.setup();
     render(<AppProvider clock={() => 1_800_000_000_000}><App /></AppProvider>);
@@ -103,7 +87,7 @@ describe('main window in the native app', () => {
 });
 
 describe('Settings window root', () => {
-  it('renders the tabbed Settings and routes "Set up shortcuts" to main', async () => {
+  it('renders the voice-path Settings and routes "Set up shortcuts" to main', async () => {
     const user = userEvent.setup();
     render(<AppProvider><SettingsWindowApp /></AppProvider>);
     expect(screen.getByRole('tablist', { name: 'Settings sections' })).toBeInTheDocument();
@@ -112,16 +96,16 @@ describe('Settings window root', () => {
   });
 });
 
-describe('Settings window title follows the tab (designer #42)', () => {
-  it('calls onTabTitle with the tab label', async () => {
+describe('Settings window title follows the open pane (designer #42)', () => {
+  it('calls onTabTitle with the pane title', async () => {
     const { Settings } = await import('../../src/features/settings/Settings');
     const { renderWithApp } = await import('./testUtils');
     const { default: userEvent } = await import('@testing-library/user-event');
     const { screen } = await import('@testing-library/react');
     const onTabTitle = vi.fn();
     renderWithApp(<Settings onSetup={() => {}} onTabTitle={onTabTitle} />);
-    expect(onTabTitle).toHaveBeenLastCalledWith('Capture');
-    await userEvent.setup().click(screen.getByRole('tab', { name: 'Models' }));
-    expect(onTabTitle).toHaveBeenLastCalledWith('Models');
+    expect(onTabTitle).toHaveBeenLastCalledWith('Shortcut');
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Speech/ }));
+    expect(onTabTitle).toHaveBeenLastCalledWith('Speech');
   });
 });

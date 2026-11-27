@@ -45,9 +45,6 @@
 .btn.ghost { background: transparent; border-color: transparent; color: var(--mut); }
 .btn.ghost:hover { color: var(--fg); }
 
-.kv { align-items: center; border-top: 1px solid var(--line); display: flex; gap: 12px; justify-content: space-between; padding: 8px 0; }
-.kv > span:last-child { align-items: center; display: inline-flex; gap: 4px; }
-
 .toast {
   align-items: center;
   background: var(--toast, #1c1c26);

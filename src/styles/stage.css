@@ -1,0 +1,157 @@
+/* Home voice stage (ui-iter-01): the hero and the last dictation make one dark instrument,
+   the same material as the app tile and the HUD, in both themes. VoiceLoom threads gather
+   into Start (voice in, left) and fan out of Copy (text out, right) on the stage's weft
+   (ui-iter-25, loom-bar.css); data-phase drives them, and at rest they hold still. */
+.stage {
+  /* Dark instrument tokens. The legacy aliases resolve where they are declared, so they are
+     re-declared here too; otherwise children would inherit the light theme's values. */
+  color-scheme: dark;
+  --panel: #111118;
+  --field: #1a1a23;
+  --seg: #1c1c26;
+  --segon: #2c2c3a;
+  --line: #2a2a36;
+  --fg: #ececf1;
+  --mut: #a9a9b8; /* 4.9:1 at the brightest glow, 8:1 on the base */
+  --ctl-line: #6a6a80;
+  --sel-edge: #70943a;
+  --seg-on-fg: #ececf1;
+  --navon: #2a2a38;
+  --mut-on-nav: #9a9aa8;
+  --accfg: var(--brand-a);
+  --ok: #7ff07a;
+  --info: #3cf0ff;
+  --warn: #ffc04d;
+  --err: #ff8585; /* 4.6:1 even under the brightest lime glow (#ff6b6b drops to 3.9) */
+  --focus: var(--brand-a);
+  --tag-bg: #2c2c3a;
+  --tag-fg: #9a9aa8;
+  --switch-off: #66667a;
+  --accent: var(--accfg);
+  --accent-soft: var(--navon);
+  --border: var(--line);
+  --danger: var(--err);
+  --identity: var(--info);
+  --muted: var(--mut);
+  --panel-2: var(--field);
+  --text: var(--fg);
+  --stage-pad: var(--s-11);
+
+  background:
+    linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat,
+    linear-gradient(180deg, #17171f, #0a0a0e);
+  border-radius: 22px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), inset 0 1px 0 rgba(255, 255, 255, .1),
+    0 1px 1px rgba(15, 23, 42, .2), 0 22px 44px -22px rgba(15, 23, 42, .6);
+  color: var(--fg);
+  isolation: isolate;
+  margin-bottom: var(--s-10);
+  overflow: hidden;
+  padding: var(--s-8) var(--stage-pad) 0;
+  position: relative;
+}
+
+[data-appearance-resolved="dark"] .stage {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .09), inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 30px 60px -30px color-mix(in srgb, var(--brand-b) 24%, transparent);
+}
+
+/* Voice in (lime, left) and text out (cyan, right) glows; each phase lights its side. */
+.stage::before,
+.stage::after {
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity .5s ease;
+  z-index: -1;
+}
+.stage::before { background: radial-gradient(42% 85% at 0% 45%, color-mix(in srgb, var(--brand-a) 18%, transparent), transparent 70%); opacity: .5; }
+.stage::after { background: radial-gradient(42% 85% at 100% 45%, color-mix(in srgb, var(--brand-b) 16%, transparent), transparent 70%); opacity: .55; }
+.stage[data-phase="listening"]::before,
+.stage[data-phase="speaking"]::before,
+.stage[data-phase="processing"]::after { opacity: 1; }
+.stage[data-phase="processing"]::before { opacity: .3; }
+
+/* Title band. No mic readout above it since ui-iter-25: Start and the rail say the state. */
+.stage .home-hero__title { padding: 30px 0 26px; }
+.stage .home-hero__lede { margin-top: 0; }
+.stage .home-hero h1 { color: #f6f6f9; }
+.banner + .home { margin-top: var(--s-6); }
+
+/* The loom's threads (placed on the weft in loom-bar.css). At rest they hold still; a light
+   travels them only while you speak (in) or Voxloom writes (out). */
+.loom path { fill: none; stroke-linecap: round; transition: opacity .4s ease; vector-effect: non-scaling-stroke; }
+.loom__warp { opacity: .26; stroke-width: 1.25; }
+/* The static offset staggers the pulses when animation is off or paused. */
+.loom__pulse { animation: loom-flow 8s linear infinite; animation-delay: calc(var(--i) * -1.15s); opacity: 0; stroke-dasharray: 12 88; stroke-dashoffset: calc(var(--i) * 14); stroke-width: 2.25; }
+.loom__side { transform-box: view-box; transform-origin: 50% 50%; }
+@keyframes loom-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes loom-swell { from { transform: scaleY(1); } to { transform: scaleY(1.32); } }
+
+/* Listening: voice flows in fast and bright; the output side rests. */
+.stage[data-phase="listening"] .loom__side--in .loom__warp,
+.stage[data-phase="speaking"] .loom__side--in .loom__warp,
+.stage[data-phase="processing"] .loom__side--out .loom__warp { opacity: .55; }
+.stage[data-phase="listening"] .loom__side--in .loom__pulse,
+.stage[data-phase="processing"] .loom__side--out .loom__pulse { animation-duration: 1.7s; opacity: 1; }
+.stage[data-phase="speaking"] .loom__side--in .loom__pulse { animation-duration: 1s; opacity: 1; }
+.stage[data-phase="speaking"] .loom__side--in { animation: loom-swell .42s ease-in-out infinite alternate; }
+.stage[data-phase="listening"] .loom__side--out path,
+.stage[data-phase="speaking"] .loom__side--out path,
+.stage[data-phase="processing"] .loom__side--in path { opacity: .12; }
+
+/* The shortcut as real key caps; they press down while you hold it. */
+.stage .home-hero h1 .key-combo__caps { gap: 8px; }
+.stage .home-hero h1 .kbd {
+  background: linear-gradient(180deg, #32323f, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-bottom-color: rgba(255, 255, 255, .04);
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 4px 0 #050508, 0 12px 20px -6px rgba(0, 0, 0, .8);
+  color: #f6f6f9;
+  display: inline-grid;
+  font-size: var(--fs-bigkey);
+  height: var(--bigkey);
+  letter-spacing: 0;
+  margin-bottom: 4px;
+  min-width: var(--bigkey);
+  padding: 0 14px;
+  place-items: center;
+  text-shadow: none;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease, border-color .12s ease;
+}
+.stage[data-phase="listening"] .home-hero h1 .kbd,
+.stage[data-phase="speaking"] .home-hero h1 .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 #050508, 0 0 26px -4px color-mix(in srgb, var(--brand-a) 55%, transparent);
+  color: var(--brand-a);
+  transform: translateY(3px);
+}
+
+/* The stage ends on the weft and its tag; the earlier dictations hang beneath (ui-iter-29). */
+.home > .stage { padding-bottom: var(--s-4); }
+/* Manual recovery: the run's own transcript, only when History didn't keep it. Dictating
+   from the window starts on the stage's weft (ui-iter-21, loom-bar.css). */
+.stage .stage__recovery {
+  align-items: center;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  gap: var(--s-6);
+  justify-content: space-between;
+  margin: var(--s-9) auto 0;
+  max-width: 44rem;
+}
+.stage .stage__recovery .dogfood-transcript__label + p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); }
+
+@media (max-width: 780px) {
+  .stage { --stage-pad: var(--s-9); }
+  .stage .home-hero__title { padding-block: 26px 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* No travelling pulses or swell: the threads hold still and only brighten. */
+  .loom__pulse { display: none; }
+  .stage[data-phase] .loom__side { animation: none; }
+}

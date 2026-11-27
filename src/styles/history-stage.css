@@ -1,0 +1,35 @@
+/* History's masthead. A running head, not a poster (ui-iter-31): the rail already names the
+   page, so the title sits small beside its lede, as on Settings and the Dictionary.
+   Since ui-iter-39 the search shares that line, like the Dictionary's Add a word, and the
+   time cards are gone: hours are marked in the list's own time margin (history.css). */
+.history-stage {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-6) var(--s-11);
+  justify-content: space-between;
+  padding: var(--s-9) var(--stage-pad) var(--s-4);
+}
+.history-stage__title { align-items: baseline; display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 4px var(--s-6); min-width: 0; }
+.history-stage h1 { color: var(--fg); font-size: var(--fs-section); font-weight: 700; letter-spacing: 0; margin: 0; }
+.history-stage__lede { color: var(--mut); flex: 0 1 auto; font-size: var(--fs-label); margin: 0; }
+.history-stage > .search { flex: 0 1 18rem; height: 34px; min-width: 12rem; }
+.history-stage .search input::placeholder { color: var(--mut); opacity: 1; }
+
+/* The status filter is the knot key: each outcome is a chip with its margin knot and count.
+   Loose chips, not a slab, so a narrow window wraps them like words. */
+.history-filter { flex: 1 1 0; min-width: 0; }
+.history-filter .seg { background: none; flex-wrap: wrap; gap: 2px var(--s-2); padding: 0; }
+.history-filter .seg__item { align-items: center; border-radius: var(--r-pill); display: inline-flex; gap: 6px; padding-inline: 10px; }
+.history-filter .seg__item:not(.on):hover { background: var(--navon); }
+.history-filter .ledger-knot { height: 9px; width: 9px; }
+.history-filter .ledger-knot[data-status]:not([data-status="inserted"]) { background: none; }
+.history-filter__count { color: var(--mut); font: 600 var(--fs-label)/1 var(--mono); font-variant-numeric: tabular-nums; }
+.history-filter .on .history-filter__count { color: var(--fg); }
+
+@media (max-width: 780px) {
+  .history-stage > .search { flex-basis: 100%; }
+  /* The clipping chip keeps its clip and count; its name stays in the label. */
+  .history-tools .clip-ticket { gap: var(--s-2); padding-left: var(--s-4); }
+  .history-tools .clip-ticket__title { clip-path: inset(50%); height: 1px; overflow: hidden; position: absolute; white-space: nowrap; width: 1px; }
+}

@@ -1,0 +1,123 @@
+/* The loom frame (ui-iter-08). The window is one instrument: the rail and each page's stage
+   join into a single dark frame in both themes (no toolbar since ui-iter-27). The stage
+   stops being a floating card: it is the frame's beam, and its glows run to the rail and the
+   window edge. Since ui-iter-31 no sheet of cloth lies on it either: each page opens
+   straight under its beam. The native Settings window (.settings-window-root) is framed
+   the same way. */
+.app,
+.settings-window-root {
+  --frame: 10px;
+  --gutter-min: var(--pad-x);
+  --gutter: var(--s-11);
+  background: linear-gradient(180deg, #17171f, #0a0a0e 100vh) #0a0a0e;
+}
+/* Content stays centred at --content-max on wide windows; the frame spans the column. */
+.app { --gutter: max(var(--gutter-min), calc((100vw - var(--side-w) - var(--frame) * 2 - var(--content-max)) / 2 + var(--pad-x))); }
+
+/* Frame surfaces outside a stage use the stage's dark tokens (see stage.css). */
+:is(.main, .settings-window-root) > .banner,
+:is(.main, .settings-window-root) > section[aria-busy] > .page-head {
+  color-scheme: dark;
+  --panel: #111118;
+  --field: #1a1a23;
+  --seg: #1c1c26;
+  --segon: #2c2c3a;
+  --line: #2a2a36;
+  --fg: #ececf1;
+  --mut: #a9a9b8;
+  --ctl-line: #6a6a80;
+  --sel-edge: #b6ff3c;
+  --navon: #2a2a38;
+  --accfg: var(--brand-a);
+  --info: #3cf0ff;
+  --err: #ff8585;
+  --focus: var(--brand-a);
+  --accent: var(--accfg);
+  --border: var(--line);
+  --danger: var(--err);
+  --muted: var(--mut);
+  --text: var(--fg);
+  color: var(--fg);
+}
+
+.main,
+.settings-window-root {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  max-width: none;
+  padding: 0 var(--frame) var(--frame);
+}
+.settings-window-root { min-height: 100vh; }
+:is(.main, .settings-window-root) > :is(.home, .history, .dictionary, .settings-window, section[aria-busy]) { display: flex; flex: 1 0 auto; flex-direction: column; }
+
+/* The beam: each page's stage is part of the frame, flush from the rail to the window edge. */
+:is(.main, .settings-window-root) .stage {
+  --stage-pad: var(--gutter);
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  flex: none;
+  margin: 0 calc(var(--frame) * -1);
+}
+/* The voice glows fade in and out vertically, so the beam has no visible edge. */
+:is(.main, .settings-window-root) .stage::before,
+:is(.main, .settings-window-root) .stage::after {
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 30%, #000 70%, transparent);
+}
+:is(.main, .settings-window-root) .settings-window { background: none; border: 0; border-radius: 0; box-shadow: none; max-width: none; overflow: visible; }
+:is(.main, .settings-window-root) .settings-window__bar.stage { background: transparent; padding-inline: var(--gutter); }
+
+/* The open page (ui-iter-31). Home has lain open under its beam since ui-iter-29; now every
+   page does. History's timeline, the Dictionary's two leaves, each Settings pane and the boot
+   line sit on the frame itself: no raised sheet, no reed and no lit fell between a page's
+   beam and its content, so the window is the rail and one page. The page keeps the old
+   sheet's surface pair, so rows, panels and fields keep the contrast they were tuned for.
+   Light gives it the linen tokens (daylight.css). */
+.main .page-body,
+:is(.main, .settings-window-root) .settings-window > .settings-panel,
+:is(.main, .settings-window-root) > section[aria-busy] > .boot-loading {
+  --bg: #121219;
+  --panel: #1a1a23;
+  color: var(--fg);
+  flex: 1 0 auto;
+  margin-top: var(--s-9);
+  padding: 0 calc(var(--gutter) - var(--frame)) var(--s-11);
+  position: relative;
+}
+/* Settings' dropped thread ties onto the pane's top rule, where the old fell was. */
+:is(.main, .settings-window-root) .settings-window > .settings-panel { border-top: 1px solid var(--line); padding-top: var(--s-10); }
+
+/* Notices sit on the frame above the beam. */
+:is(.main, .settings-window-root) > .banner { margin: var(--s-4) calc(var(--gutter) - var(--frame)) 0; }
+:is(.main, .settings-window-root) > .banner--info { background: color-mix(in srgb, var(--info) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 22%, transparent); }
+:is(.main, .settings-window-root) > .banner--error { background: color-mix(in srgb, var(--err) 11%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--err) 26%, transparent); }
+.main > .banner + .home { margin-top: 0; }
+/* With no toolbar above it, a notice starts level with the rail's brand. */
+.main > .banner { margin-top: var(--s-8); }
+
+/* The word list and its guide stay in the window. Each scrolls on its own,
+   including when the guide stacks under the list. */
+.main > .dictionary { flex: 1 1 auto; height: calc(100dvh - var(--frame)); min-height: 0; }
+.main .dictionary > .dictionary-book {
+  display: grid;
+  flex: 1 1 0;
+  border-top: 1px solid var(--line);
+  grid-template: minmax(0, 1fr) / minmax(0, 1.25fr) minmax(0, 1fr);
+  min-height: 0;
+  padding: 0;
+}
+@media (max-width: 959px) {
+  .main .dictionary > .dictionary-book { grid-template: minmax(200px, 1fr) minmax(0, max-content) / minmax(0, 1fr); }
+}
+
+/* Boot placeholder: the title on the frame, the loading line on the open page. */
+:is(.main, .settings-window-root) > section[aria-busy] > .page-head { margin: 0; padding: var(--s-10) calc(var(--gutter) - var(--frame)) var(--s-4); }
+:is(.main, .settings-window-root) > section[aria-busy] > .page-head h1 { color: #f6f6f9; }
+
+@media (max-width: 780px) {
+  .app { --gutter-min: var(--s-9); }
+  .main .page-body,
+  .main .settings-window > .settings-panel { padding-bottom: var(--s-10); }
+}

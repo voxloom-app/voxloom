@@ -144,14 +144,12 @@ for (const theme of ['light', 'dark'] as const) {
     expect(rest.padding).toBe('9px 18px');
     expect(rest.borderTopWidth).toBe('1px');
     expect(rest.backgroundImage).toMatch(/linear-gradient/);
-    // Distinctive Start/Stop outer shadow (not the regular 8px/16px scale).
-    if (theme === 'light') {
-      expect(rest.boxShadow).toContain('12px 24px -10px');
-      expect(rest.boxShadow).not.toContain('8px 16px -8px');
-    } else {
-      expect(rest.boxShadow).toContain('0px 1px 0px');
-      expect(rest.boxShadow).toContain('2px 4px -1px');
-      expect(rest.boxShadow).toContain('1px 6px -2px');
-    }
+    // Distinctive Start/Stop outer shadow (not the regular 8px/16px scale). Start always sits on
+    // the dark voice stage (ui-iter-01), so both themes use the tight, attached dark shadow.
+    expect(rest.boxShadow).toContain('0px 1px 0px');
+    expect(rest.boxShadow).toContain('2px 4px -1px');
+    expect(rest.boxShadow).toContain('6px 18px -6px');
+    expect(rest.boxShadow).not.toContain('12px 24px -10px');
+    expect(rest.boxShadow).not.toContain('8px 16px -8px');
   });
 }

@@ -72,9 +72,9 @@ models on your Mac.
 
 History is encrypted at rest on macOS and Windows. Linux history remains
 plaintext. Settings and dictionary files remain unencrypted. Clipboard managers
-may also see text during insertion. Use Settings → Privacy to control transcript
-retention, and read [Privacy and local data](PRIVACY.md) for deletion, backup
-and clipboard details.
+may also see text during insertion. Use Settings → Transcripts to control
+transcript retention, and read [Privacy and local data](PRIVACY.md) for
+deletion, backup and clipboard details.
 
 ## Development and documentation
 
@@ -91,4 +91,4 @@ The website lives in a separate repository, [voxloom-site](https://github.com/vo
 ## License
 
 [MIT](LICENSE). Bundled third-party notices are available in the app under
-Settings → Privacy → Licenses.
+Settings → Transcripts → Licenses.

@@ -18,7 +18,7 @@ const previewWords = [
 ];
 
 async function addWord(page: Page, word: string) {
-  await page.getByRole('button', { name: 'Add term', exact: true }).click();
+  await page.getByRole('button', { name: 'Add a word', exact: true }).click();
   await page.getByRole('textbox', { name: 'Word', exact: true }).fill(word);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
 }
@@ -48,7 +48,7 @@ async function expectUsableRange(page: Page, testInfo: TestInfo, state: string) 
       dictionary: box(element),
       footer: box(footer),
       list: { ...box(list), clientHeight: list.clientHeight, scrollHeight: list.scrollHeight, scrollTop: list.scrollTop },
-      controls: [...element.querySelectorAll('.page-head .btn, .search, .history-tools .fine')].map(box),
+      controls: [...element.querySelectorAll('.dictionary-stage button, .dictionary-guide, .search, .word-index .fine')].map(box),
       rows: [...list.children].map((row) => ({
         name: box(row.querySelector('strong')!),
         actions: box(row.querySelector('.term-row__actions')!),
@@ -110,7 +110,7 @@ for (const viewport of [
       const dense = await expectUsableRange(page, testInfo, 'dense-long-range');
       expect(dense.list.scrollHeight).toBeGreaterThan(dense.list.clientHeight);
       // Focus/activate actions at both scroll extremes, without scrolling the page.
-      const lastEdit = list.getByRole('listitem').last().getByRole('button').first();
+      const lastEdit = list.getByRole('listitem').last().getByRole('button', { name: /^Edit / });
       await lastEdit.focus();
       await expect(lastEdit).toBeInViewport();
       await page.keyboard.press('Enter');
@@ -124,7 +124,7 @@ for (const viewport of [
       await expect(list.getByRole('listitem')).toHaveCount(1);
       await expect(range).toHaveText(`${stressWords[0]} — ${stressWords[0]}`);
       await expectUsableRange(page, testInfo, 'filtered-single-long');
-      const firstEdit = list.getByRole('button').first();
+      const firstEdit = list.getByRole('button', { name: /^Edit / }).first();
       await firstEdit.click();
       const field = page.getByRole('textbox', { name: 'Word', exact: true });
       await expect(field).toBeFocused();
@@ -222,16 +222,18 @@ test.describe('coarse pointer', () => {
     await openDictionary(page);
     expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(true);
     const buttons = page.getByRole('listitem').first().getByRole('button');
+    await expect(buttons).toHaveCount(2);
     for (const button of await buttons.all()) {
       await expect(button).toBeVisible();
       const box = (await button.boundingBox())!;
       expect(box.width).toBeGreaterThanOrEqual(44);
       expect(box.height).toBeGreaterThanOrEqual(44);
     }
-    await buttons.first().tap();
+    const edit = page.getByRole('button', { name: 'Edit JSON', exact: true });
+    await edit.tap();
     await expect(page.getByRole('textbox', { name: 'Word', exact: true })).toBeFocused();
     await page.getByRole('button', { name: 'Cancel', exact: true }).tap();
-    await expect(buttons.first()).toBeFocused();
+    await expect(edit).toBeFocused();
   });
 });
 
@@ -245,6 +247,7 @@ test('row actions are persistent pointer targets and direct keyboard stops', asy
   await expect(edit.locator('..')).toHaveCSS('opacity', '1');
   await expect(remove).toBeVisible();
   await page.getByRole('searchbox').focus();
+  // A row's word is plain text; its first stop is Edit.
   await page.keyboard.press('Tab');
   await expect(edit).toBeFocused();
   await page.keyboard.press('Enter');
@@ -255,7 +258,7 @@ test('row actions are persistent pointer targets and direct keyboard stops', asy
   await expect(remove).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.getByText('3 words', { exact: true })).toBeVisible();
-  const add = page.getByRole('button', { name: 'Add term', exact: true });
+  const add = page.getByRole('button', { name: 'Add a word', exact: true });
   await add.click();
   const field = page.getByRole('textbox', { name: 'Word', exact: true });
   await expect(field).toBeFocused();
@@ -307,3 +310,89 @@ for (const width of [640, 1120, 1600]) {
     }
   });
 }
+
+for (const [width, colorScheme] of [[640, 'light'], [1120, 'dark']] as const) {
+  test(`lookup by a replaced form keeps the guide in reach at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ height: 620, width });
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await openDictionary(page);
+    const guide = page.locator('details.dictionary-guide');
+    const summary = guide.getByText('What adding a word does', { exact: true });
+    const index = (await page.locator('.word-index').boundingBox())!;
+    const aside = (await guide.boundingBox())!;
+    if (width === 640) {
+      // Under the list the guide starts closed so the words come first.
+      expect(index.y + index.height).toBeLessThanOrEqual(aside.y + 1);
+      await expect(guide).not.toHaveAttribute('open');
+      await expect(page.locator('.dictionary .term-row')).toHaveCount(4);
+      for (const row of await page.locator('.dictionary .term-row').all()) await expect(row).toBeInViewport({ ratio: 1 });
+    } else {
+      expect(index.x + index.width).toBeLessThanOrEqual(aside.x + 1);
+      await expect(guide).toHaveAttribute('open');
+    }
+    expect(aside.y + aside.height).toBeLessThanOrEqual(620);
+    const search = page.getByRole('searchbox');
+    await search.fill('tan-stack');
+    await expect(search).toBeFocused();
+    await expect(page.getByText('1 of 4 words')).toBeVisible();
+    const list = page.getByRole('list', { name: 'Dictionary words, alphabetical' });
+    await expect(list.getByRole('listitem')).toHaveText(['TTanStack Queryreplaces tan stack query, tanstack query, tan-stack query']);
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Edit TanStack Query', exact: true })).toBeFocused();
+    if (width === 640) {
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(guide).toHaveAttribute('open');
+    }
+    const steps = guide.getByRole('listitem');
+    await expect(steps.locator('strong')).toHaveText(['Writes it your way', 'Helps Whisper hear it', 'Guides cleanup']);
+    // The example is your newest word with something to replace, whatever the search shows.
+    await expect(guide.locator('.guide-fix')).toHaveText('For example, type script becomes TypeScript');
+    await expect(search).toHaveValue('tan-stack');
+    const open = (await guide.boundingBox())!;
+    expect(open.y + open.height).toBeLessThanOrEqual(620);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(620);
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(accessibility.violations.filter(({ impact }) => impact === 'critical' || impact === 'serious')).toEqual([]);
+  });
+}
+
+// The check in the Add sheet runs the real deterministic match on the word being saved.
+test('the Add sheet previews a fix and saves only the word', async ({ page }) => {
+  await page.setViewportSize({ height: 760, width: 1120 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openDictionary(page);
+  await page.getByRole('button', { name: 'Add a word', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Word', exact: true }).fill('Voxloom');
+  const check = page.getByRole('textbox', { name: /^What does Voxloom write instead\?/ });
+  const preview = page.locator('#dictionary-heard-preview');
+  await expect(check).toHaveAttribute('placeholder', 'For example: voxloom');
+  await expect(preview).toContainText('Type a mistake you’ve seen');
+  await expect(page.getByText('Only the word is saved. This preview isn’t.', { exact: true })).toBeVisible();
+  await check.focus();
+  await expect(check).toHaveCSS('outline-width', '3px');
+  await check.fill('ship it with vox loom');
+  await expect(preview.locator('mark')).toHaveText(['Voxloom']);
+  await expect(preview.locator('mark').first()).toHaveCSS('animation-name', 'none');
+  await expect(preview).toContainText('Fixed: Voxloom will write it like this.');
+  await check.fill('we keep json in postgres');
+  await expect(preview.locator('mark')).toHaveText(['JSON', 'Postgres']);
+  await expect(preview.locator('.word-check__was')).toHaveText(['json', 'postgres']);
+  await check.fill('ship it with box loom');
+  await expect(preview.locator('mark')).toHaveCount(0);
+  await expect(preview).toContainText('Not changed by spelling alone. Whisper or cleanup may still catch it.');
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations.filter(({ impact }) => impact === 'critical' || impact === 'serious')).toEqual([]);
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  // Only the word was saved; the preview text went nowhere.
+  const list = page.getByRole('list', { name: 'Dictionary words, alphabetical' });
+  await expect(list.getByRole('listitem')).toHaveCount(5);
+  await expect(page.getByText('5 words', { exact: true })).toBeVisible();
+  await expect(list.locator('.term-row[data-saved] strong')).toHaveText('Voxloom');
+  await expect(page.locator('.guide-fix__word')).toHaveText('Voxloom');
+  await expect(page.getByText(/box loom/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add a word', exact: true }).click();
+  await expect(check).toHaveValue('');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(list.getByRole('listitem')).toHaveCount(5);
+});

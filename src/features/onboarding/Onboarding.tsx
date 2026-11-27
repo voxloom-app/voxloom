@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useApp } from '../../app/AppContext';
 import { KeyCombo } from '../../components/KeyCombo';
-import { initialSettings } from '../../domain/fixtures';
-import { ShortcutRecorder } from '../settings/ShortcutRecorder';
 import { useDogfoodCapture } from '../../services/stt/useDogfoodCapture';
 import type { OwnFieldDeliveryGuard } from '../../services/stt/dogfoodPath';
 import { resolveTranscriptionModelId } from '../../services/stt/resolveModelId';
@@ -11,11 +9,16 @@ import { subscribe as subscribeSettings } from '../../services/settingsWindow';
 import { listenShortcutBound } from '../../services/shortcut/bindingEvents';
 import { listenModelsChanged } from '../../services/stt/modelsChanged';
 import { createOverlayBridge } from '../../services/shortcut';
-import { createGuidedSetup, permissionClear, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
+import { createGuidedSetup, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
 import { registerPracticeHandler, resetPracticeGestures } from './practiceBridge';
+import { LoomLine } from './LoomLine';
 import { createSetupBoundary } from './setupBoundary';
+import { SetupThread } from './SetupThread';
+import { ConnectionStep } from './ConnectionStep';
+import { PracticeStep, practiceLook } from './PracticeStep';
+import { ShortcutStep } from './ShortcutStep';
 import { SetupWindow } from './SetupWindow';
-import { SETUP_STEP_TITLES, WelcomeSteps } from './WelcomeSteps';
+import { SetupBrand, WelcomeCover } from './WelcomeCover';
 
 interface OnboardingProps {
   onClose: () => void;
@@ -34,10 +37,6 @@ const localProgress: SetupProgressStorage = {
 export function clearGuidedProgress(): void {
   try { localProgress.clear?.(); } catch { /* Unavailable storage has nothing to resume. */ }
 }
-const permissions = [
-  { kind: 'microphone', key: 'microphone', title: 'Hear your voice', name: 'Microphone', copy: 'Microphone access captures your speech when you dictate.' },
-  { kind: 'accessibility', key: 'accessibility', title: 'Type where you’re writing', name: 'Accessibility', copy: 'Accessibility lets Voxloom insert words into your text field. It also lets Esc cancel dictation and makes single-key shortcuts work.' },
-] as const;
 /** The other gesture than this try expects: say which one it wants instead of ignoring it. */
 const wrongGesture = {
   hold: 'That was a double-tap. For this try, hold your shortcut, speak, then release.',
@@ -199,74 +198,49 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
   useEffect(() => () => { sequence.current++; controller.cancelPractice(); }, [controller]);
 
   const allPermissions = permissionsClear(guided.permissions);
-  // Only Windows reports Accessibility as not required, so this selects its setup copy.
-  const onWindows = guided.permissions.accessibility === 'not-required';
   const connected = io.native && allPermissions && guided.modelReady && !guided.checking;
   const both = guided.holdDone && guided.tapDone;
   // Step 4 not ready shows a specific error in place of its attention line, so it is never shown twice.
   const shownError = error || guided.error;
+  // A success only belongs to this way once its try is tied off; after Try double-tap,
+  // the hold's result is history, so the note goes back to waiting.
+  const counted = guided.mode === 'tap' ? guided.tapDone : guided.holdDone;
+  const stale = practice.phase === 'success' && !counted;
+  const look = practiceLook(practice.phase, counted, hint !== null);
   const status = practice.phase === 'recording' ? (guided.mode === 'tap' ? 'Listening hands-free · press once to finish' : 'Listening · release to finish')
     : practice.phase === 'starting' ? 'Preparing microphone…'
-      : practice.phase === 'transcribing' || practice.phase === 'cleaning' ? 'Turning speech into text…'
-        : hint ?? practice.message ?? 'Ready when you are';
+      : practice.phase === 'transcribing' || practice.phase === 'cleaning' ? 'Transcribing…'
+        : hint ?? (look === 'done' ? `Inserted. ${guided.mode === 'tap' ? 'Hands-free' : 'Hold to talk'} works.` : stale ? null : practice.message) ?? 'Ready when you are';
+  // Say why the primary action is still waiting, beside it, instead of a dead button.
+  const waiting = guided.step === 2 ? (guided.ready ? '' : 'Waiting for your shortcut to be ready')
+    : guided.step === 3 && guided.mode === 'hold' ? (!guided.holdDone ? 'Opens after one hold-to-talk try' : busy ? 'Opens when this try ends' : '')
+      : guided.step === 3 ? (!guided.tapDone ? 'Opens after one hands-free try' : !guided.ready ? 'Waiting for access and the voice pack' : busy ? 'Opens when this try ends' : '')
+        : '';
   const next = () => action(async () => { cancel(); await controller.next(); });
   const finish = () => action(async () => {
     if (await controller.finish()) { controller.clearProgress(); setup.update({ complete: true }); close(); }
   });
 
   return <SetupWindow onEscape={() => { if (pending.current || ['starting', 'recording', 'transcribing', 'cleaning'].includes(live.current.phase)) cancel(); else close(); }} opener={opener}>
-    <div className="guided-setup">
-      <aside className="guided-rail" aria-label="Setup progress">
-        <div className="guided-brand"><span className="guided-mark" aria-hidden="true"><i /><i /><i /></span>Voxloom</div>
-        <ol>{SETUP_STEP_TITLES.map((label, index) => <li aria-current={guided.step === index + 1 ? 'step' : undefined} className={guided.step > index + 1 ? 'done' : ''} key={label}><b>{guided.step > index + 1 ? '✓' : index + 1}</b><span>{label}</span></li>)}</ol>
+    <div className="guided-setup" data-step={guided.step}>
+      {guided.step > 0 && <aside className="guided-rail" aria-label="Setup progress">
+        <SetupBrand />
+        <SetupThread guided={guided} shortcut={state.settings.shortcut} />
         <div className="guided-private">PRIVATE BY DESIGN<br /><span>On-device dictation.<br />No account. No cloud model.</span></div>
-      </aside>
-      <div className="guided-main">
+      </aside>}
+      {/* ui-iter-07: the content column is the loom's stage, in both themes. */}
+      <div className="guided-main stage">
         <section className="guided-content" aria-labelledby="guided-heading" tabIndex={0}>
-          <div className="guided-kicker">{['Your voice. Your Mac.', '01 / Get connected', '02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step]}</div>
-          <h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 0 ? <>Less typing.<br />More you.</> : guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
-          {guided.step === 0 && <>
-            <p className="guided-intro">Speak naturally. Voxloom turns your words into text, right where you’re writing.</p>
-            <WelcomeSteps shortcut={state.settings.shortcut} />
-
-          </>}
-          {guided.step === 1 && <>
-            <p className="guided-intro">{onWindows ? 'Windows has no typing permission to turn on. Microphone access is a Windows privacy setting, so Voxloom can only check it when you first dictate.' : 'Two permissions connect your microphone, typing and keyboard controls. We’ll check each before moving on.'}</p>
-            <div className="guided-permissions">{permissions.map((item) => {
-              const status = guided.permissions[item.key];
-              return <div className="guided-permission" key={item.kind}>
-                <div><strong>{item.title}</strong><p>{item.copy}</p><small>{status === 'authorized' ? '✓ Allowed' : status === 'not-granted' ? 'Access is off or has not been granted.' : status === 'not-determined' ? 'Not requested yet.' : status === 'unknown' ? 'Checking access…' : status === 'not-required' ? 'Not needed on Windows.' : status === 'unverified' ? 'Checked when you first dictate.' : status}</small></div>
-                {!permissionClear(status) && <div className="guided-permission-actions"><button className="btn" disabled={!io.native} onClick={() => void permission(item.kind)} type="button">{item.kind === 'accessibility' ? 'Open Accessibility Settings' : `Allow ${item.name}`}</button>{status !== 'not-determined' && item.kind !== 'accessibility' && <button className="btn ghost" disabled={!io.native} onClick={() => void permission(item.kind, true)} type="button">Open {item.name} Settings</button>}</div>}
-              </div>;
-            })}</div>
-            <p className="guided-mini">{onWindows ? 'If Voxloom can’t hear you when you dictate, open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone.' : 'Enable Voxloom in System Settings → Privacy & Security, then return and check again. If macOS asks you to quit and reopen Voxloom, do so, then resume setup. If Accessibility shows as off, Voxloom can’t tell whether access was denied or never requested.'}</p>
-            <button className="btn ghost" onClick={() => void action(controller.refresh)} type="button">Check again</button>
-            <div className="guided-pack"><strong>{guided.modelReady ? '✓ Voice pack verified · engine available' : guided.downloading ? `Downloading ${STT_MODEL_CATALOG.find((item) => item.id === guided.downloading)?.label ?? guided.downloading}…` : 'Voice pack needs attention'}</strong><span>{modelLabel} · {size}</span>
-              {guided.progress && <progress aria-label="Voice pack download" max={guided.progress.bytesTotal || undefined} value={guided.progress.bytesReceived} />}
-              {guided.downloading && !guided.progress && <progress aria-label="Voice pack download" />}
-              {!guided.modelReady && !guided.downloading && <button className="btn" disabled={!io.native || guided.checking || guided.modelState !== 'missing'} onClick={() => void action(controller.download)} type="button">Retry download</button>}
-              {guided.downloading && <button className="btn ghost" onClick={() => void action(() => io.cancelDownload(guided.downloading!))} type="button">Cancel download</button>}
-              <small>One verified download, then offline dictation. Interrupted downloads restart on Retry.</small>
-            </div>
-            <details><summary>What happens to my voice?</summary><p>The selected speech model runs locally. The download needs internet; speech is not sent to a cloud model. Text cleanup stays off during practice.</p></details>
-          </>}
-          {guided.step === 2 && <>
-            <p className="guided-intro">Hold these keys and talk, and Voxloom types your words where you’re writing. Keep them, or pick your own.</p>
-            <ShortcutRecorder defaultValue={initialSettings.shortcut} id="onboarding-shortcut" onChange={(value) => settings.update({ key: 'shortcut', value })} value={state.settings.shortcut} variant="card" />
-            <details className="guided-more"><summary>More ways to use it</summary><ul>
-              <li><b>Hands-free:</b> tap your shortcut twice quickly and Voxloom keeps listening without holding. Press it once more when you’re done. You’ll try both on the next step.</li>
-              <li><b>One key:</b> choose Change shortcut, then press just one key, like Right Option, Right Command or F13–F19. It uses the Accessibility access you allowed in step 1.</li>
-            </ul></details>
-            <p className="guided-mini guided-settings-note">You can change this later in Settings.</p>
-          </>}
-          {guided.step === 3 && <>
-            <div className="guided-modes" aria-label="Two ways to use the same shortcut"><span aria-current={guided.mode === 'hold' ? 'step' : undefined}>{guided.holdDone ? '✓' : '1'} Hold to talk</span><span aria-current={guided.mode === 'tap' ? 'step' : undefined}>{guided.tapDone ? '✓' : '2'} Double-tap</span></div>
-            <p className="guided-intro">{both ? 'You’ve tried both ways. Use whichever suits the moment.' : guided.mode === 'tap' ? 'Double-tap the same shortcut, then let go. Say a short sentence. Press the shortcut once more to finish.' : 'Click the note. Hold your shortcut, say a short sentence, then release to finish.'}</p>
-            <div className="guided-note"><div><span>PRACTICE NOTE</span><span role="status">{status}</span></div><textarea aria-label="Practice dictation field" defaultValue="" placeholder={guided.mode === 'tap' ? 'Try: Now I can speak hands-free.' : 'Try: My first words with Voxloom.'} ref={field} /></div>
-            <KeyCombo combo={state.settings.shortcut} />
-            <p className="guided-mini">{guided.mode === 'tap' ? 'Double-tap → speak → press once to finish.' : 'Hold → speak → release.'} Esc cancels without inserting.</p>
-            {!guided.ready && <p className="form-error">Check permissions, voice pack and registered shortcut before retrying.</p>}
-            <div className="guided-practice-actions"><button className="btn ghost" onClick={() => { cancel(); field.current?.focus(); }} type="button">{busy ? 'Cancel dictation' : 'Try again'}</button><button className="btn ghost" onClick={() => void action(controller.refresh)} type="button">Check again</button></div>
+          {guided.step === 0 ? <WelcomeCover heading={heading} shortcut={state.settings.shortcut} /> : guided.step === 2 ?
+            <ShortcutStep heading={heading} onChange={(value) => settings.update({ key: 'shortcut', value })} shortcut={state.settings.shortcut} /> : guided.step === 3 ?
+            <PracticeStep attempted={hint !== null || ['success', 'error', 'cancelled'].includes(practice.phase)} busy={busy} field={field} heading={heading}
+              holdDone={guided.holdDone} look={look} mode={guided.mode} onCheck={() => void action(controller.refresh)}
+              onRetry={() => { cancel(); field.current?.focus(); }} ready={guided.ready} shortcut={state.settings.shortcut} status={status} tapDone={guided.tapDone} /> : guided.step === 1 ?
+            <ConnectionStep guided={guided} heading={heading} modelLabel={modelLabel} size={size} connected={connected} native={io.native} error={shownError}
+              permission={permission} refresh={() => void action(controller.refresh)} download={() => void action(controller.download)}
+              cancelDownload={id => void action(() => io.cancelDownload(id))} /> : <>
+            <div className="guided-kicker">Ready for your next thought</div>
+            <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>You speak.<br />Voxloom types.</h2><LoomLine /></div>
           </>}
           {guided.step === 4 && <>
             <p className="guided-intro">You’ve tried both ways to dictate. Choose Open Voxloom to finish, then use your shortcut in any app.</p>
@@ -274,21 +248,24 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
               <p className="form-error" role="alert">{shownError || 'Access or the voice pack needs attention before you finish.'}</p>
               <button className="btn" onClick={() => { cancel(); controller.back(); controller.back(); controller.back(); }} type="button">Review access and voice pack</button>
             </>}
-            <div className="guided-shortcut"><KeyCombo combo={state.settings.shortcut} /><p>Hold for a quick thought. Double-tap to go hands-free. Press once more to finish.</p></div>
+            <div className="guided-shortcut"><KeyCombo combo={state.settings.shortcut} /><ul aria-label="Two ways to use it">
+              <li><b>Hold</b> for a quick thought.</li>
+              <li><b>Double-tap</b> to go hands-free. Press once more to finish.</li>
+            </ul></div>
             <p className="guided-mini">Your shortcut works in other apps once setup closes. If an app won’t take typed text, Voxloom may copy your words so you can paste them.</p>
           </>}
-          {shownError && !(guided.step === 4 && !guided.ready) && <p className="form-error" role="alert">{shownError}</p>}
+          {shownError && guided.step !== 1 && !(guided.step === 4 && !guided.ready) && <p className="form-error" role="alert">{shownError}</p>}
         </section>
         {guided.step === 0 && <p className="guided-mini guided-disclosure">{modelId === 'whisper-base.en' ? 'Starting setup downloads Whisper Base (English)' : `Starting setup prepares your selected ${modelLabel}`} ({size}) if needed. Your dictation is processed on this Mac. Larger voice packs are optional in Settings.</p>}
         <footer className="guided-footer">
           {guided.step > 0 && <button className="btn ghost" onClick={() => { cancel(); controller.back(); }} type="button">Back</button>}
           {guided.step < 4 && <button className="btn ghost" onClick={close} type="button">Set up later</button>}
-          <span />
+          <span className="guided-footer__wait" id="guided-wait">{waiting}</span>
           {guided.step === 0 ? <button className="btn primary" disabled={!io.native} onClick={() => void action(controller.start)} type="button">Start setup →</button>
             : guided.step === 1 ? <button className="btn primary" disabled={!connected} onClick={() => void next()} type="button">Continue →</button>
-              : guided.step === 2 ? <button className="btn primary" disabled={!guided.ready} onClick={() => void next()} type="button">Use this shortcut →</button>
-                : guided.step === 3 && guided.mode === 'hold' ? <button className="btn primary" disabled={!guided.holdDone || busy} onClick={() => { cancel(); controller.tryHandsFree(); field.current?.focus(); }} type="button">Try double-tap →</button>
-                  : guided.step === 3 ? <button className="btn primary" disabled={!both || !guided.ready || busy} onClick={() => void next()} type="button">Finish setup →</button>
+              : guided.step === 2 ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!guided.ready} onClick={() => void next()} type="button">Use this shortcut →</button>
+                : guided.step === 3 && guided.mode === 'hold' ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!guided.holdDone || busy} onClick={() => { cancel(); controller.tryHandsFree(); field.current?.focus(); }} type="button">Try double-tap →</button>
+                  : guided.step === 3 ? <button aria-describedby={waiting ? 'guided-wait' : undefined} className="btn primary" disabled={!both || !guided.ready || busy} onClick={() => void next()} type="button">Finish setup →</button>
                     : <button className="btn primary" disabled={!both || !guided.ready} onClick={() => void finish()} type="button">Open Voxloom</button>}
         </footer>
       </div>

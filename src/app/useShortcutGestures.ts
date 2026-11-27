@@ -26,7 +26,7 @@ import {
 import { useShortcutRegistration } from './useShortcutRegistration';
 import { bootRefusedText } from '../features/settings/shortcutCopy';
 import { answerShortcutQueries, emitShortcutBound } from '../services/shortcut/bindingEvents';
-import { isSettingsWindowOpen, subscribe } from '../services/settingsWindow';
+import { subscribe } from '../services/settingsWindow';
 import type {
   DogfoodPhase,
   UseDogfoodCaptureResult,
@@ -145,15 +145,16 @@ export function useShortcutGestures(options: GestureOptions) {
   const registeredRef = useRef<string | null>(null);
   /** BUS-69: combo lost by a failed re-bind after recording (until recovered). */
   const lostRef = useRef<string | null>(null);
+  // A refusal is already shown by the Settings recorder. Read the current page
+  // when the bind settles, not the page that happened to start the attempt.
+  const settingsOpen = () => optionsRef.current.state.screen === 'settings' && !optionsRef.current.onboardingOpen;
   /** Nothing holds the registered combo any more: tell every window. Returns it. */
   const reportLost = (message: string): string | null => {
     const lost = registeredRef.current;
     if (lost === null) return null;
     registeredRef.current = null;
     emitShortcutBound({ active: null, message, ok: false, previous: lost, shortcut: lost });
-    void isSettingsWindowOpen().then((open) => {
-      if (!open) optionsRef.current.onShortcutError?.(bootRefusedText(lost, null));
-    }, () => undefined);
+    if (!settingsOpen()) optionsRef.current.onShortcutError?.(bootRefusedText(lost, null));
     return lost;
   };
   optionsRef.current = options;
@@ -294,7 +295,7 @@ export function useShortcutGestures(options: GestureOptions) {
   }, [options.now, bootReady]);
 
   useShortcutRegistration(
-    options.state.settings.shortcut, nativeControllerRef, registeredRef, optionsRef, isSettingsWindowOpen, bootReady,
+    options.state.settings.shortcut, nativeControllerRef, registeredRef, optionsRef, settingsOpen, bootReady,
   );
 
   const overProductCapture = setupOverProductCapture(options);

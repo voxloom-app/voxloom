@@ -109,7 +109,7 @@ describe('ShortcutRecorder suspends dictation only while recording', () => {
       document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Escape', key: 'Escape' }));
     });
     expect(field()).toHaveAttribute('aria-pressed', 'false');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
     expect(screen.getByRole('status')).toHaveTextContent('Canceled. Shortcut unchanged.');
     expect(isDictationSuspended()).toBe(false);
   });
@@ -119,7 +119,7 @@ describe('ShortcutRecorder suspends dictation only while recording', () => {
     const user = userEvent.setup();
     await user.click(field());
     await user.keyboard('{Control>}{Escape}{/Control}');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
   });
 });
 

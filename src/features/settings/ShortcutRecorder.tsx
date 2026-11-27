@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { isTauri } from '@tauri-apps/api/core';
 import { comboLabel, isMacPlatform, Kbd, KeyCombo, spokenCombo } from '../../components/KeyCombo';
 import { captureShortcut } from '../../services/shortcut/shortcutCapture';
+import { ShortcutKeyMap } from './ShortcutKeyMap';
 import { isLoneKey, isLoneModifier, loneKeyCap, spokenLoneKey } from '../../services/shortcut/loneKey';
 import { IDLE, keyUp, modifierDown, otherDown, type LoneTracker } from '../../services/shortcut/loneKeyCapture';
 import { getActiveShortcut, useShortcutActive } from '../../services/shortcut/activeShortcut';
@@ -12,7 +13,7 @@ import {
 } from './recorderStore';
 import {
   addAKey, CANCELED, CARD_CANCEL, CARD_CHANGE, CARD_DEFAULT_PILL, CARD_LABEL, CARD_PROMPT, CARD_RECORDING_HELP,
-  CARD_RECORDING_LABEL, cardInUseText, cardLoneNoneActiveText, cardNoneActiveText, holdHint, invalidText, NOT_ACTIVE, pendingText, PROMPT,
+  CARD_RECORDING_LABEL, cardInUseText, cardLoneNoneActiveText, cardNoneActiveText, holdHint, invalidText, NOT_ACTIVE, pendingText,
   RECORDING, resetLinkText, resetText, savedText, successText,
 } from './shortcutCopy';
 
@@ -22,7 +23,7 @@ interface ShortcutRecorderProps {
   helpId?: string;
   /** Field id; Settings and onboarding each pass their own. */
   id?: string;
-  /** Id of the visible label; read before the field's own name. */
+  /** Id of a label to read before the field's own name. */
   labelId?: string;
   /** Marks the field invalid (e.g. a refused combo). */
   invalid?: boolean;
@@ -30,7 +31,7 @@ interface ShortcutRecorderProps {
   errorId?: string;
   onChange: (combo: string) => void;
   value: string;
-  /** "card": guided setup step 2 (BUS-219, Option A). Settings keeps the inline field. */
+  /** Guided setup keeps its step-2 card; Settings uses the keyboard map. */
   variant?: 'card' | 'inline';
 }
 
@@ -265,7 +266,7 @@ export function ShortcutRecorder({
         aria-describedby={invalid && errorId ? `${helpId} ${errorId}` : helpId}
         aria-invalid={invalid || status?.tone === 'error' || undefined}
         aria-labelledby={labelId ? `${labelId} ${id}` : undefined}
-        aria-label={recorderName(Boolean(labelId), recording, value, active)}
+        aria-label={`${recorderName(Boolean(labelId), recording, value, active)}${recording ? '' : '. Change keys'}`}
         aria-pressed={recording}
         className="shortcut-recorder__field"
         data-inactive={!active || undefined}
@@ -276,12 +277,7 @@ export function ShortcutRecorder({
         ref={fieldRef}
         type="button"
       >
-        {recording
-          ? <span className="shortcut-recorder__prompt">{preview ? `${comboLabel(preview)} …` : PROMPT}</span>
-          : <>
-            <KeyCombo combo={value} />
-            {!active && <span aria-hidden="true" className="shortcut-recorder__inactive">({NOT_ACTIVE})</span>}
-          </>}
+        <ShortcutKeyMap active={active} combo={recording ? preview : value} recording={recording} />
       </button>
       <button className="btn" disabled={value === defaultValue} onClick={reset} type="button">
         Reset to default

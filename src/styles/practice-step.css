@@ -1,0 +1,95 @@
+/* Step 3, First words: three beats on a thread beside one note. The beats and the note
+   follow the real capture: keys sink while you hold, then the HUD's lime, cyan and knot. */
+.practice__folio .guided-modes { border: 0; margin: 0; padding: 0; }
+.practice__lede { color: var(--mut); margin: 0 0 14px; max-width: 46ch; }
+
+.practice__beats { display: grid; list-style: none; margin: 0; padding: 0; }
+.practice__beats li { align-items: center; color: var(--mut); column-gap: 12px; display: grid; grid-template-columns: 26px minmax(0, 1fr); min-height: 46px; padding-block: 6px; position: relative; }
+.practice__beats li > b { background: #121219; border: 1.5px solid var(--ctl-line); border-radius: 50%; display: grid; font-size: var(--fs-micro); font-weight: 650; height: 26px; place-items: center; position: relative; width: 26px; z-index: 1; }
+.practice__beats li::before, .practice__beats li::after {
+  background: repeating-linear-gradient(180deg, var(--ctl-line) 0 3px, transparent 3px 6px);
+  content: ""; left: 12.25px; position: absolute; width: 1.5px;
+}
+.practice__beats li::before { bottom: 50%; top: 0; }
+.practice__beats li::after { bottom: 0; top: 50%; }
+.practice__beats li:first-child::before, .practice__beats li:last-child::after { display: none; }
+.practice__beats li[data-state="done"]::after, .practice__beats li[data-state="done"] + li::before { background: linear-gradient(180deg, var(--brand-a), var(--brand-b)); }
+.practice__beats li:is([data-state="done"], [data-state="current"]) { color: var(--fg); }
+.practice__beats li[data-state="done"] > b { background: linear-gradient(135deg, var(--brand-a), var(--brand-b)); border-color: transparent; color: var(--on-brand); }
+.practice__beats li[data-state="current"] > b {
+  --beat: var(--brand-a);
+  border: 2px solid var(--beat); color: var(--beat);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--beat) 12%, transparent), 0 0 14px color-mix(in srgb, var(--beat) 38%, transparent);
+}
+.practice[data-look="writing"] .practice__beats li[data-state="current"] > b { --beat: var(--brand-b); }
+
+/* Your real keys, as physical caps. They are instructions, not buttons. */
+.practice__beats .key-combo__caps { display: inline-flex; gap: 4px; margin-inline: 2px; vertical-align: middle; }
+.practice__beats .kbd {
+  background: linear-gradient(180deg, #32323f, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .13);
+  border-bottom-color: rgba(255, 255, 255, .04);
+  border-radius: 7px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .16), 0 2px 0 #050508, 0 6px 10px -5px rgba(0, 0, 0, .8);
+  color: #f6f6f9;
+  display: inline-grid;
+  font-size: var(--fs-secondary);
+  height: 28px;
+  margin-bottom: 2px;
+  min-width: 28px;
+  padding: 0 8px;
+  place-items: center;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease, border-color .12s ease;
+}
+.practice[data-mode="hold"][data-look="listening"] .practice__beats .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 0 0 #050508, 0 0 16px -3px color-mix(in srgb, var(--brand-a) 60%, transparent);
+  color: var(--brand-a);
+  transform: translateY(2px);
+}
+
+/* ---- The note: a sheet with the HUD's signal well in its header ---- */
+.practice__desk { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.practice-note {
+  background: linear-gradient(180deg, #1b1b24, #15151d);
+  border: 1px solid var(--ctl-line);
+  border-radius: 12px;
+  box-shadow: 0 18px 30px -22px rgba(0, 0, 0, .9);
+  overflow: hidden;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.practice[data-armed] .practice-note { border-color: color-mix(in srgb, var(--brand-a) 45%, var(--ctl-line)); }
+.practice[data-look="done"] .practice-note { border-color: color-mix(in srgb, var(--brand-b) 55%, var(--ctl-line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-b) 12%, transparent), 0 18px 30px -22px rgba(0, 0, 0, .9); }
+.practice-note__head { align-items: center; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: space-between; padding: 7px 8px 7px 16px; }
+.practice-note__head > span:first-child { color: var(--mut); font: 600 var(--fs-micro)/1.2 var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+.practice-note__signal {
+  --hud-tone: var(--ctl-line);
+  align-items: center; background: rgba(255, 255, 255, .04); border: 1px solid var(--line); border-radius: 16px;
+  display: inline-flex; font-size: var(--fs-label); font-weight: 550; gap: 8px; min-height: 28px; min-width: 0; padding: 3px 12px 3px 3px;
+}
+.practice[data-look="listening"] .practice-note__signal { --hud-tone: var(--brand-a); border-color: color-mix(in srgb, var(--brand-a) 40%, transparent); }
+.practice:is([data-look="writing"], [data-look="done"]) .practice-note__signal { --hud-tone: var(--brand-b); border-color: color-mix(in srgb, var(--brand-b) 40%, transparent); }
+.practice[data-look="idle"] .practice-note__signal .hud-signal { background: transparent; box-shadow: inset 0 0 0 1.5px var(--ctl-line); color: var(--mut); }
+.practice[data-look="trouble"] .practice-note__signal { --hud-tone: #ffc04d; border-color: color-mix(in srgb, #ffc04d 40%, transparent); }
+.practice-note textarea {
+  background: transparent; border: none; border-radius: 0; color: var(--fg); display: block;
+  font: 450 calc(var(--fs-bigkey) * 1.1)/1.45 var(--font-words);
+  min-height: 132px; padding: 16px 18px; resize: vertical; width: 100%;
+}
+.practice-note textarea::placeholder { color: var(--mut); font-style: italic; }
+.practice-note textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.practice__desk .form-error { margin: 0; }
+.guided-practice-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 8px 10px; }
+.guided-practice-actions .guided-mini { color: var(--mut); margin: 0 0 0 auto; }
+.practice .btn { background: var(--field); border: 1px solid var(--ctl-line); color: var(--fg); font-size: var(--fs-secondary); justify-content: center; min-height: 36px; }
+.practice .btn:hover { background: var(--segon); border-color: var(--mut); }
+
+@container (max-width: 720px) {
+  .practice__lede { margin-bottom: 8px; }
+  .practice__beats li { min-height: 40px; padding-block: 4px; }
+  .practice-note textarea { min-height: 96px; }
+}
+@media (max-height: 680px) {
+  .practice__beats li { min-height: 38px; padding-block: 3px; }
+  .practice-note textarea { min-height: 88px; padding-block: 12px; }
+}

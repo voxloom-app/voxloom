@@ -1,0 +1,67 @@
+/* The open page (ui-iter-29). Home is one surface from the shortcut to the colophon: the
+   earlier dictations hang straight under the stage's weft, with no sheet, reed or card
+   head between them and your last words, and how your words are made closes the page.
+   Since ui-iter-31 every page lies open like this (frame.css). Light gives the page the
+   frame's linen tokens (daylight.css). Rows and knots: home.css. */
+.home-page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  padding: 0 calc(var(--gutter) - var(--frame));
+}
+
+/* One reading measure, centred under the stage like the last pick. */
+.earlier,
+.home-colophon { margin-inline: auto; max-width: 46rem; width: 100%; }
+.earlier { --text-x: calc(var(--fs-mono) * 5.6 + 40px); margin-bottom: var(--s-11); }
+
+/* The label starts where the words do; View all sits at the copy column. */
+.earlier__head { align-items: baseline; display: flex; gap: var(--s-6); justify-content: space-between; padding: 0 0 var(--s-2) var(--text-x); }
+.earlier__head h2 { color: var(--mut); font-size: var(--fs-label); font-weight: 700; letter-spacing: .12em; margin: 0; text-transform: uppercase; }
+.earlier__head .link-button { margin-right: -4px; }
+.earlier .empty-state { justify-content: flex-start; padding-left: var(--text-x); }
+
+/* The key: each knot the list uses, named once, sitting in the knots' own column. */
+.earlier__key {
+  color: var(--mut);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--fs-secondary);
+  gap: var(--s-2) var(--s-10);
+  line-height: 1.5;
+  margin: var(--s-4) 0 0;
+  padding-left: calc(var(--fs-mono) * 5.6 + 14px);
+}
+.earlier__key i {
+  background: var(--ok);
+  border-radius: 50%;
+  display: inline-block;
+  height: 12px;
+  margin-right: 14px;
+  vertical-align: -1px;
+  width: 12px;
+}
+.earlier__key [data-status="copied"] i { background: none; box-shadow: inset 0 0 0 2px var(--info); }
+.earlier__key [data-status="unverified"] i { background: none; border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); }
+
+/* The colophon: model, output and writing style at the page's foot, set once and left. */
+.home-colophon {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-5) var(--s-11);
+  justify-content: center;
+  margin-top: auto;
+  padding: var(--s-8) 0 var(--s-9);
+}
+.home-colophon .home-colophon__setup { color: var(--mut); display: inline-flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 2px 8px; justify-content: center; margin: 0; }
+.home-colophon__setup > span + span::before { content: "·"; content: "·" / ""; margin-right: 8px; }
+.home-style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: center; }
+.home-colophon .seg__item { font-size: var(--fs-secondary); padding: 3px 10px; }
+.home-colophon .hs-note { justify-content: center; }
+
+/* Narrow: the colophon tightens; words keep their line beside the time (QA #59, home.css). */
+@media (max-width: 780px) {
+  .home-colophon { gap: var(--s-4) var(--s-8); }
+}

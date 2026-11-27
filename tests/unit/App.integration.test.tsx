@@ -89,6 +89,7 @@ describe('App integration', () => {
         'Keep the TypeScript boundary small and explicit.',
       )).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Settings' }));
+      await user.click(screen.getByRole('tab', { name: /^Cleanup/ }));
       await user.click(within(
         screen.getByRole('radiogroup', { name: 'Current style' }),
       ).getByRole('radio', { name: 'Casual' }));
@@ -101,11 +102,12 @@ describe('App integration', () => {
         screen.getByRole('button', { name: 'Dictionary' }),
       );
       await user.click(
-        screen.getByRole('button', { name: 'Add term' }),
+        screen.getByRole('button', { name: 'Add a word' }),
       );
       await user.type(screen.getByLabelText('Word'), 'Vite');
       await user.click(screen.getByRole('button', { name: 'Save' }));
-      expect(screen.getByText('Vite')).toBeInTheDocument();
+      // The list, not the guide's example, which also shows one of your words.
+      expect(within(screen.getByRole('list', { name: 'Dictionary words, alphabetical' })).getByText('Vite')).toBeInTheDocument();
     });
 
   it('opens help with question mark and closes with Escape', async () => {
@@ -130,7 +132,7 @@ describe('App integration', () => {
         screen.getByRole('button', { name: 'Dictionary' }),
       );
       await user.click(
-        screen.getByRole('button', { name: 'Add term' }),
+        screen.getByRole('button', { name: 'Add a word' }),
       );
       fireEvent.keyDown(document, shortcutKey);
       fireEvent.keyUp(document, shortcutKey);
@@ -185,7 +187,8 @@ describe('App integration', () => {
       await user.click(screen.getByRole('button', { name: 'Set up later' }));
       expect(
         screen.getAllByRole('button', { name: 'Copy dictation' }),
-      ).toHaveLength(5);
+      ).toHaveLength(4);
+      expect(screen.getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
 
       await user.click(
         screen.getByRole('button', { name: 'Settings' }),

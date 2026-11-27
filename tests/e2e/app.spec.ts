@@ -80,17 +80,19 @@ test('screens, settings, themes, and baselines stay synchronized', async (
   await page.goto('/');
   await skipOnboarding(page);
   await page.getByRole('button', { name: 'Dictionary' }).click();
-  await page.getByRole('button', { name: 'Add term' }).click();
+  await page.getByRole('button', { name: 'Add a word' }).click();
   await expectAccessible(page);
   await page.getByRole('textbox', { name: 'Word' }).fill(' Vite ');
   await page.getByRole('button', { name: 'Save' }).click();
   await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: /^Microphone/ }).click();
   await expect(page.getByText(
     'Native microphone capture is unavailable here',
   )).toBeVisible();
   await expect(page.getByLabel('Microphone', { exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Unavailable' }))
     .toBeDisabled();
+  await page.getByRole('tab', { name: /^Cleanup/ }).click();
   await page.getByRole('radiogroup', { name: 'Current style' })
     .getByRole('radio', { exact: true, name: 'Casual' }).click();
 
@@ -101,7 +103,7 @@ test('screens, settings, themes, and baselines stay synchronized', async (
   for (const [theme, slug] of themes) {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('tab', { name: 'Appearance' }).click();
-    await page.getByLabel(theme).check();
+    await page.getByRole('radio', { exact: true, name: theme }).check();
     for (const screen of screens) {
       await page.getByRole('button', { name: screen }).click();
       await page.screenshot({
@@ -113,7 +115,7 @@ test('screens, settings, themes, and baselines stay synchronized', async (
   }
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('tab', { name: 'Appearance' }).click();
-  await page.getByLabel('Follow system').check();
+  await page.getByRole('radio', { exact: true, name: 'Follow system' }).check();
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('body')).toHaveAttribute(
     'data-appearance-resolved',
@@ -137,16 +139,16 @@ test('screens, settings, themes, and baselines stay synchronized', async (
     .toHaveAttribute('aria-checked', 'true');
 });
 
-test('every Settings tab passes axe in light and dark', async ({ page }) => {
+test('every Settings pane on the voice path passes axe in light and dark', async ({ page }) => {
   await page.goto('/');
   await skipOnboarding(page);
   for (const theme of ['Light', 'Dark']) {
     await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('tab', { name: 'Appearance' }).click();
     await page.getByLabel(theme, { exact: true }).check();
-    for (const tab of ['Capture', 'Models', 'Appearance', 'Privacy']) {
-      await page.getByRole('tab', { name: tab }).click();
-      await expect(page.getByRole('tabpanel', { name: tab })).toBeVisible();
+    for (const stop of ['Shortcut', 'Microphone', 'Speech', 'Cleanup', 'Output', 'Transcripts', 'Appearance']) {
+      await page.getByRole('tab', { name: new RegExp(`^${stop}:`) }).click();
+      await expect(page.getByRole('tabpanel', { name: new RegExp(`^${stop}:`) })).toBeVisible();
       await expectAccessible(page);
     }
   }
@@ -155,7 +157,7 @@ test('every Settings tab passes axe in light and dark', async ({ page }) => {
 test('settings.html (the native Settings window entry) renders and passes axe', async ({ page }) => {
   await page.goto('/settings.html');
   await expect(page.getByRole('tablist', { name: 'Settings sections' })).toBeVisible();
-  await page.getByRole('tab', { name: 'Privacy' }).click();
+  await page.getByRole('tab', { name: /^Transcripts/ }).click();
   await expectAccessible(page);
 });
 
@@ -164,7 +166,9 @@ test('the 760×660 Settings window keeps two-column rows and a two-column recove
   await page.goto('/settings.html');
   const cols = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(await cols('.settings-rows .frow')).toBe(2);
-  await page.getByRole('tab', { name: 'Privacy' }).click();
+  // The sentence stays short enough that the pane's last row is in reach without scrolling.
+  await expect(page.getByRole('switch', { name: /Start at login/ })).toBeInViewport({ ratio: 1 });
+  await page.getByRole('tab', { name: /^Transcripts/ }).click();
   expect(await cols('.settings-rows .frow')).toBe(2);
   expect(await cols('.recovery-grid')).toBe(2);
   await page.getByRole('tab', { name: 'Appearance' }).click();
@@ -178,18 +182,21 @@ test('records the shortcut by pressing it (BUS-47)', async ({ page }) => {
   const field = page.getByRole('button', { name: /^(Shortcut|App-local shortcut|Global shortcut) / });
   const before = await field.boundingBox();
   await field.click();
-  await expect(field).toHaveText('Press keys…');
+  await expect(field.locator('.key-map__chord')).toHaveText('Press keys…');
+  await expect(field.locator('[data-plotted]')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space');
+  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space. Change keys');
   await field.click();
   await page.keyboard.press('Control+F5');
   await expect(page.getByText(/can't be used/)).toBeVisible();
   await page.keyboard.press('Control+Alt+KeyK');
-  await expect(field).toHaveAccessibleName(/^Shortcut Control (Option|Alt) K$/);
+  await expect(field).toHaveAccessibleName(/^Shortcut Control (Option|Alt) K\. Change keys$/);
+  await expect(field.locator('[data-key="K"][data-plotted]')).toBeVisible();
+  await expect(field.locator('[data-plotted]')).toHaveCount(3);
   expect((await field.boundingBox())?.y).toBe(before?.y);
   if (process.env.BUS47_SHOT) await page.screenshot({ path: process.env.BUS47_SHOT });
   await page.getByRole('button', { name: 'Reset to default' }).click();
-  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space');
+  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space. Change keys');
 });
 
 test('dialogs, reduced motion, narrow and coarse layouts work', async (
@@ -207,9 +214,11 @@ test('dialogs, reduced motion, narrow and coarse layouts work', async (
   const overlayPage = await page.context().newPage();
   await overlayPage.emulateMedia({ reducedMotion: 'reduce' });
   await overlayPage.goto('/overlay.html');
-  const transitionDuration = await overlayPage.locator('.wave i').first()
-    .evaluate((element) => getComputedStyle(element).transitionDuration);
-  expect(Number.parseFloat(transitionDuration)).toBeLessThanOrEqual(0.00001);
+  for (const selector of ['.wave i', '.hud-signal']) {
+    const transitionDuration = await overlayPage.locator(selector).first()
+      .evaluate((element) => getComputedStyle(element).transitionDuration);
+    expect(Number.parseFloat(transitionDuration), selector).toBeLessThanOrEqual(0.00001);
+  }
   await overlayPage.close();
   await page.screenshot({
     fullPage: true,

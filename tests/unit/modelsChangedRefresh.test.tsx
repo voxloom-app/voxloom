@@ -1,4 +1,4 @@
-/// BUS-35: the startup check's stt:models-changed event re-lists Settings → Models.
+/// BUS-35: the startup check's stt:models-changed event re-lists Settings → Speech.
 /// BUS-85.2: also refresh once after the listener registers so an early event isn't missed.
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';

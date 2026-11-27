@@ -1,23 +1,32 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useApp } from '../../app/AppContext';
-import { EmptyState } from '../../components/EmptyState';
 import { Icon } from '../../components/Icon';
-import { IconButton } from '../../components/IconButton';
-import { SearchField } from '../../components/SearchField';
+import { newestFirst, sortedWords } from '../../services/dictionary/format';
+import { DictionaryGuide } from './DictionaryGuide';
 import { WordDialog } from './WordDialog';
-import { sortedWords } from '../../services/dictionary/format';
+import { WordIndex } from './WordIndex';
+import { formsByWord } from './spellingForms';
 
-const count = (n: number) => `${n} ${n === 1 ? 'word' : 'words'}`;
-
+/**
+ * The page is your word list (ui-iter-35). Its facing page says, in plain
+ * words, what saving a word does; checking a mistake lives in the Add sheet.
+ */
 export function Dictionary() {
   const { dictionary, state } = useApp();
   const [editing, setEditing] = useState<string>();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [saved, setSaved] = useState<string>();
   const opener = useRef<HTMLElement | null>(null);
-  const words = sortedWords(state.words).filter((word) =>
-    word.toLowerCase().includes(query.toLowerCase())
-  );
+  const alphabetical = useMemo(() => sortedWords(state.words), [state.words]);
+  const forms = useMemo(() => formsByWord(state.words), [state.words]);
+  const example = useMemo(() => {
+    const word = newestFirst(state.words).find((candidate) => forms.get(candidate)?.length);
+    return word ? { heard: forms.get(word)![0], word } : undefined;
+  }, [state.words, forms]);
+  const needle = query.trim().toLowerCase();
+  const words = alphabetical.filter((word) => word.toLowerCase().includes(needle)
+    || forms.get(word)?.some((form) => form.includes(needle)));
 
   function edit(word: string | undefined, element: HTMLElement) {
     opener.current = element;
@@ -27,57 +36,33 @@ export function Dictionary() {
 
   return (
     <section aria-labelledby="dictionary-title" className="dictionary">
-      <header className="page-head page-head--action">
-        <div>
-          <h1 id="dictionary-title">Dictionary</h1>
-          <p>Your canonical spellings for names and terms.</p>
-        </div>
-        <button className="btn primary" onClick={(event) => edit(undefined, event.currentTarget)} type="button">
-          <Icon name="plus" /> Add term
-        </button>
-      </header>
-      <div className="history-tools">
-        <SearchField label="Search dictionary" onChange={setQuery} placeholder="Search words" value={query} />
-        <span aria-live="polite" className="fine">
-          {query ? `${words.length} of ${count(state.words.length)}` : count(state.words.length)}
-        </span>
-      </div>
-      <div className="dictionary-list-head">
-        <span>Canonical spelling</span>
-        <span className="dictionary-list-sort">A–Z <span aria-hidden="true">↓</span></span>
-      </div>
-      <div aria-label={words.length ? 'Dictionary words, alphabetical' : undefined} className="term-grid" role={words.length ? 'list' : undefined}>
-        {words.map((word) => (
-          <div className="term-row" key={word} role="listitem">
-            <strong>{word}</strong>
-            <div className="action-group term-row__actions">
-              <IconButton icon="edit" label={`Edit ${word}`} onClick={(event) => edit(word, event.currentTarget)} />
-              <IconButton icon="trash" label={`Delete ${word}`} onClick={() => dictionary.delete(word)} tone="danger" />
-            </div>
+      <header className="stage dictionary-stage">
+        <div className="dictionary-stage__top">
+          <div className="dictionary-stage__title">
+            <h1 id="dictionary-title">Dictionary</h1>
+            <p className="dictionary-stage__lede">Words and names you want Voxloom to spell your way.</p>
           </div>
-        ))}
-        {!words.length && (
-          <EmptyState icon="book" title={query ? 'No words found.' : 'No words yet'}>
-            {query ? 'Try another search.' : 'Add names and terms you use often.'}
-          </EmptyState>
-        )}
-      </div>
-      {words.length > 0 && (
-        <div className="dictionary-list-foot">
-          <span>{words[0]} — {words[words.length - 1]}</span>
-          <span>Alphabetical order</span>
+          <button className="btn primary" onClick={(event) => edit(undefined, event.currentTarget)} type="button">
+            <Icon name="plus" /> Add a word
+          </button>
         </div>
-      )}
+      </header>
+      <div className="page-body dictionary-book">
+        <WordIndex
+          forms={forms} onDelete={(word) => dictionary.delete(word)} onEdit={edit}
+          onQuery={setQuery} query={query} saved={saved} total={alphabetical.length} words={words}
+        />
+        <DictionaryGuide empty={!state.words.length} example={example} />
+      </div>
       {open && (
         <WordDialog
-          editing={editing}
-          onClose={() => setOpen(false)}
+          editing={editing} onClose={() => setOpen(false)}
           onSave={(word, previous) => {
             dictionary.save(word, previous);
+            setSaved(word);
             setOpen(false);
           }}
-          opener={opener.current}
-          words={state.words}
+          opener={opener.current} words={state.words}
         />
       )}
     </section>

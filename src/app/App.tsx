@@ -4,19 +4,23 @@ import { isCleanupActive } from '../domain/cleanup';
 import type { Screen } from '../domain/types';
 import { Dictionary } from '../features/dictionary/Dictionary';
 import { History } from '../features/history/History';
+import { focusHistoryRecord } from '../features/history/focusHistoryRecord';
 import { Home } from '../features/home/Home';
+import { stagePhase } from '../features/home/stagePhase';
 import { clearGuidedProgress, Onboarding } from '../features/onboarding/Onboarding';
 import { Settings } from '../features/settings/Settings';
 import { isTauriEnv } from '../services/capture/captureService';
-import { listenOnboardingOpen, openSettingsWindow, subscribe } from '../services/settingsWindow';
+import { listenOnboardingOpen, listenSettingsOpen, subscribe } from '../services/settingsWindow';
 import { disarmCleanupPrewarm, prewarmCleanup } from '../services/cleanup/prewarm';
 import { useCleanupPrewarm } from '../services/stt/useCleanupPrewarm';
 import { useDogfoodCapture } from '../services/stt/useDogfoodCapture';
 import { ResetSessionDialog, ShortcutsDialog } from './AppDialogs';
 import { useApp } from './AppContext';
 import { BootHydratePlaceholder } from './shell/BootHydratePlaceholder';
+import { RailTools } from './shell/RailTools';
+import { Recall } from './shell/Recall';
 import { Sidebar } from './shell/Sidebar';
-import { TitleBar } from './shell/TitleBar';
+import { hasOpenModal } from './modalState';
 import { useAppKeys } from './useAppKeys';
 import { useDevSession } from './useDevSession';
 import { toGestureDogfoodBridge, useShortcutGestures } from './useShortcutGestures';
@@ -85,18 +89,34 @@ export function App() {
     state,
   });
 
-  // Native: Settings is its own window (title bar, ⌥4, ⌘,); browser dev keeps it in-page.
   const native = isTauriEnv();
-  const navigate = useCallback((screen: Screen) => {
-    if (screen === 'settings' && native) void openSettingsWindow()
-      .catch((error: unknown) => announceError(`Couldn't open Settings: ${String(error)}`));
-    else dispatch({ screen, type: 'set-screen' });
-  }, [announceError, dispatch, native]);
+  const recallInput = useRef<HTMLInputElement | null>(null);
+  const navigate = useCallback((screen: Screen) => dispatch({ screen, type: 'set-screen' }), [dispatch]);
+  useEffect(() => subscribe(() => listenSettingsOpen(() => {
+    // Match the keyboard route: never navigate away from an open editor or setup.
+    if (hasOpenModal()) return;
+    recallInput.current?.blur();
+    navigate('settings');
+  })), [navigate]);
   const openHelp = useCallback((opener: HTMLElement) => {
     modalOpener.current = opener;
     setShortcutOpen(true);
   }, []);
-  useAppKeys({ blocked: onboardingOpen || shortcutOpen, onHelp: openHelp, onNavigate: navigate });
+
+  // Recall (ui-iter-11): ⌘K or / from any screen picks up any thread you've said.
+  const openRecall = useCallback(() => {
+    recallInput.current?.focus();
+    recallInput.current?.select();
+  }, []);
+  const copyText = useCallback((text: string) => {
+    clipboard.copy(text).then(() => announce('Copied to clipboard'), () => announce('Copy failed'));
+  }, [announce, clipboard]);
+  // History renders in the same commit as the screen change, so its row exists once this task runs.
+  const showRecalled = useCallback((id: string) => {
+    navigate('history');
+    window.setTimeout(() => focusHistoryRecord(id), 0);
+  }, [navigate]);
+  useAppKeys({ blocked: onboardingOpen || shortcutOpen, onHelp: openHelp, onNavigate: navigate, onRecall: openRecall });
 
   // A dev session reset is a first run: the guided tutorial starts over too.
   const dev = useDevSession(
@@ -118,9 +138,13 @@ export function App() {
 
   // Completion is unknown until durable settings hydrate: a finished user must
   // not see "Setup incomplete" flash first.
+  // The warp rail follows the same phase as the Home stage, on every screen.
+  const phase = stagePhase(dogfood.phase, dogfood.captureState.kind === 'active', state.dictation);
   const status = dogfood.phase === 'recording' ? 'Listening'
     : dogfood.phase === 'transcribing' ? 'Transcribing'
     : dogfood.phase === 'cleaning' ? 'Cleaning up'
+    : phase === 'listening' || phase === 'speaking' ? 'Listening'
+    : phase === 'processing' ? 'Transcribing'
     : !bootReady ? 'Loading…' : state.onboarding.complete ? 'Ready' : 'Setup incomplete';
   const gated = (title: string, screen: ReactNode) =>
     bootReady ? screen : <BootHydratePlaceholder title={title} />;
@@ -129,24 +153,39 @@ export function App() {
   // Home keeps its state and the opener gets focus back, but is not shown.
   return <>
     <div className="app" hidden={onboardingOpen} id="app-shell">
-      <TitleBar
-        onHelp={openHelp}
-        onSettings={() => navigate('settings')}
-        settingsOpen={!native && state.screen === 'settings'}
-      />
+      {/* No toolbar (ui-iter-27): the rail carries Recall and Settings, pages start at the top. */}
       <Sidebar
+        capture={{ dogfood, isNative: native, onCopy: copyText }}
         onNavigate={navigate}
         onReset={dev.requestReset}
+        phase={phase}
         screen={state.screen}
+        search={(
+          <Recall
+            inputRef={recallInput}
+            now={now}
+            onCopy={copyText}
+            onNavigate={navigate}
+            onShow={showRecalled}
+            records={state.records}
+          />
+        )}
         shortcut={state.settings.shortcut}
         status={status}
+        tools={(
+          <RailTools
+            onHelp={openHelp}
+            onSettings={() => navigate('settings')}
+            settingsOpen={state.screen === 'settings'}
+          />
+        )}
       />
       <main className="main">
         {bootReady && state.screen === 'home' && !onboardingOpen && !state.onboarding.complete && <div className="banner banner--info"><span className="banner__text">Setup is incomplete. Connect access and try both ways to dictate.</span><button className="btn ghost" onClick={(event) => { modalOpener.current = event.currentTarget; setOnboardingOpen(true); }} type="button">Resume setup</button></div>}
-        {(state.screen === 'home' || (native && state.screen === 'settings')) && <Home dogfood={dogfood} onToast={announce} />}
+        {state.screen === 'home' && <Home dogfood={dogfood} onToast={announce} />}
         {state.screen === 'history' && gated('History', <History onToast={announce} />)}
         {state.screen === 'dictionary' && gated('Dictionary', <Dictionary />)}
-        {!native && state.screen === 'settings' && gated('Settings', <Settings onSetup={openSetup} />)}
+        {state.screen === 'settings' && gated('Settings', <Settings focusOnOpen initialTab={state.settingsTab} onSetup={openSetup} />)}
       </main>
     </div>
     {onboardingOpen && <Onboarding key={setupRun} onClose={() => setOnboardingOpen(false)}

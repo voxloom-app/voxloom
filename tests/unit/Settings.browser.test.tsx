@@ -25,7 +25,7 @@ import { renderWithApp } from './testUtils';
 
 describe('Settings without a native host', () => {
   it('shows unavailable copy and disables microphone controls', () => {
-    renderWithApp(<Settings onSetup={vi.fn()} />);
+    renderWithApp(<Settings initialTab="microphone" onSetup={vi.fn()} />);
     expect(screen.getByText(/native microphone capture is unavailable/i))
       .toBeInTheDocument();
     expect(screen.getByLabelText('Microphone')).toBeDisabled();

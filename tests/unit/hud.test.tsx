@@ -1,5 +1,4 @@
 /// UI PR 8: HUD behavior rules (SPEC § HUD) — view, result timing, mapping, motion.
-import { readFileSync } from 'node:fs';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OverlayWaveformView, resultText, spokenResultText } from '../../src/overlay/OverlayWaveformView';
@@ -26,13 +25,14 @@ describe('HUD view', () => {
   const visible = (c: HTMLElement) => [...c.children].filter((n) => !n.classList.contains('sr-only'))
     .map((n) => n.textContent).join('');
 
-  it('shows no text while listening or transcribing', () => {
+  it('reserves words for the wait and result phases', () => {
     const { container, rerender } = render(<OverlayWaveformView levels={levels} waveform="speaking" />);
     expect(visible(container)).toBe('');
     expect(screen.getByRole('status')).toHaveTextContent('');
     rerender(<OverlayWaveformView levels={levels} waveform="processing" />);
-    expect(visible(container)).toBe('');
-    expect(container.querySelector('.hud-transcribing')).not.toBeNull();
+    expect(visible(container)).toBe('Transcribing0:00');
+    expect(container.querySelector('.hud-caption')).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelector('.hud-clock')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('keeps one permanent live region that announces Transcribing and results', () => {
@@ -124,32 +124,5 @@ describe('overlayBridge.showResult', () => {
     expect(window.showBottomCenter).toHaveBeenLastCalledWith(OVERLAY_LISTEN_PLACEMENT);
     await vi.advanceTimersByTimeAsync(3000);
     expect(window.hide).not.toHaveBeenCalled();
-  });
-});
-
-describe('HUD motion (Option A)', () => {
-  const css = readFileSync('src/styles/hud.css', 'utf8');
-  it('pulses on 1.6 s and shimmers with a transform, not background-position', () => {
-    expect(css).toMatch(/\.hud-transcribing \{[^}]*animation: hud-pulse 1\.6s ease-in-out infinite/);
-    expect(css).toMatch(/\.hud-transcribing i \{[^}]*animation: hud-shimmer 1\.6s linear infinite/);
-    expect(css).toMatch(/@keyframes hud-shimmer \{ to \{ transform: translateX\(-50%\); \} \}/);
-    expect(css).not.toMatch(/background-position/);
-  });
-  it('uses whole rounded bars (no half cap at either end)', () => {
-    expect(css).toMatch(/rect width='3' height='6' rx='1\.5'/);
-    expect(css).toMatch(/\/ 5px 6px repeat-x/);
-    expect((118 + 2) % 5).toBe(0); // 24 bars × 3px + 23 gaps × 2px
-  });
-  it('falls back to a slow 3 s opacity breathe under Reduce Motion', () => {
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.hud-transcribing \{ animation: hud-breathe 3s ease-in-out infinite; \}\s*\.hud-transcribing i \{ animation: none;/);
-    expect(css).toMatch(/@keyframes hud-breathe \{ 0%, 100% \{ opacity: \.6; \} 50% \{ opacity: \.9; \} \}/);
-  });
-});
-
-describe('HUD sizing (no jump between listening and transcribing)', () => {
-  const css = readFileSync('src/styles/hud.css', 'utf8');
-  it('uses one 118px row for the waveform and the transcribing row', () => {
-    expect(css).toMatch(/\.recording--overlay \.wave \{[^}]*width: 118px/);
-    expect(css).toMatch(/\.hud-transcribing \{[^}]*width: 118px/);
   });
 });

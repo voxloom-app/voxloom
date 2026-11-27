@@ -56,7 +56,7 @@ describe('saving the same lone key again after a refused launch', () => {
     const nativeRef = { current: controller } as MutableRefObject<NativeShortcutController | null>;
     const registeredRef = { current: null } as MutableRefObject<string | null>;
     const callbacksRef = { current: {} };
-    renderHook(() => useShortcutRegistration('F13', nativeRef, registeredRef, callbacksRef, async () => true, true));
+    renderHook(() => useShortcutRegistration('F13', nativeRef, registeredRef, callbacksRef, () => true, true));
     await waitFor(() => expect(retry.handler).not.toBeNull());
 
     calls.length = 0;
@@ -72,7 +72,7 @@ describe('saving the same lone key again after a refused launch', () => {
     await controller.setShortcut('F13');
     const nativeRef = { current: controller } as MutableRefObject<NativeShortcutController | null>;
     const registeredRef = { current: null } as MutableRefObject<string | null>;
-    renderHook(() => useShortcutRegistration('F13', nativeRef, registeredRef, { current: {} }, async () => true, true));
+    renderHook(() => useShortcutRegistration('F13', nativeRef, registeredRef, { current: {} }, () => true, true));
     await waitFor(() => expect(retry.handler).not.toBeNull());
     calls.length = 0;
     await act(async () => retry.handler!('F13'));

@@ -1,8 +1,8 @@
-import { Icon } from '../components/Icon';
+import { HudSignal } from '../components/HudSignal';
 import { isMacPlatform } from '../components/KeyCombo';
-import { Waveform, WAVEFORM_BARS } from '../components/Waveform';
+import { Waveform } from '../components/Waveform';
 import type { OverlayResult, OverlayWaveform } from '../services/shortcut/overlayVisibility';
-import { AuroraListeningEffect } from './AuroraListeningEffect';
+import { WaitClock } from './WaitClock';
 
 interface Props {
   levels: readonly number[];
@@ -11,10 +11,7 @@ interface Props {
   mac?: boolean;
 }
 
-/**
- * The HUD's words for a result. Short enough for the 248px result window;
- * `spokenResultText` gives screen readers the full sentence.
- */
+/** Visible result; the live region has room to spell out the paste shortcut. */
 export function resultText(result: OverlayResult | null, mac = isMacPlatform()): string {
   const paste = mac ? '⌘V' : 'Ctrl+V';
   switch (result) {
@@ -25,46 +22,31 @@ export function resultText(result: OverlayResult | null, mac = isMacPlatform()):
   }
 }
 
-/** Full sentence for the live region (no width limit). */
 export function spokenResultText(result: OverlayResult | null, mac = isMacPlatform()): string {
-  // Spelled out so screen readers say it; the visible pill keeps ⌘V / Ctrl+V.
   const paste = mac ? 'Command V' : 'Control V';
   if (result === 'copied') return `Copied. Press ${paste} to paste`;
   if (result === 'maybe-copied') return `May have been inserted; also copied. If it's missing, press ${paste} to paste.`;
   return resultText(result, mac);
 }
 
-const isResult = (w: OverlayWaveform) => w.startsWith('result-');
-
-/**
- * Non-focusable desktop HUD (SPEC § HUD behavior rules). Listening: waveform
- * inside the decorative Aurora rim and halo, which stay mounted through
- * transcribing. Transcribing: Option A (pulsing, shimmering lime→cyan bar row;
- * slow breathe under Reduce Motion). Results: a brief Copied / maybe-copied /
- * error. One permanent role=status node announces "Transcribing" and results.
- */
+/** Preserve the face, signal well and single live region across all three phases. */
 export function OverlayWaveformView({ levels, waveform, result = null, mac = isMacPlatform() }: Props) {
-  // Levels arrive as 0–1 display levels (OverlayApp applies toDisplayLevel).
-  const energy = levels.reduce((sum, level) => sum + level, 0) / WAVEFORM_BARS;
-  const text = isResult(waveform) ? resultText(result, mac) : '';
-  const spoken = waveform === 'processing' ? 'Transcribing' : isResult(waveform) ? spokenResultText(result, mac) : '';
+  const outcome = waveform.startsWith('result-');
+  const processing = waveform === 'processing';
+  const listening = !outcome && !processing;
   const kind = waveform === 'result-copied' ? 'copied' : waveform === 'result-unverified' ? 'unverified' : 'failed';
-  return (
-    <>
-      <div aria-atomic="true" className="sr-only" role="status">{spoken}</div>
-      {isResult(waveform) ? (
-        <div aria-hidden="true" className={`hud-result hud-result--${kind}`} data-waveform={waveform}>
-          <Icon name={kind === 'failed' ? 'warn' : 'copy'} size={14} />
-          <span>{text}</span>
-        </div>
-      ) : (
-        <div className="recording recording--overlay" data-waveform={waveform}>
-          <AuroraListeningEffect energy={energy} />
-          {waveform === 'processing'
-            ? <div aria-hidden="true" className="hud-transcribing"><i /></div>
-            : <Waveform levels={levels} waveform={waveform} />}
-        </div>
-      )}
-    </>
-  );
+  const tone = kind === 'copied' ? 'ok' : kind === 'unverified' ? 'warn' : 'err';
+  const spoken = outcome ? spokenResultText(result, mac) : processing ? 'Transcribing' : '';
+  return <>
+    <div aria-atomic="true" className="sr-only" role="status">{spoken}</div>
+    <div className={`hud-capsule${outcome ? ` hud-result hud-result--${kind}` : ''}`} data-waveform={waveform}>
+      <HudSignal signal={listening ? 'listening' : processing ? 'processing' : tone} />
+      <Waveform form={listening ? 'meter' : processing ? 'ink' : 'knot'} levels={levels} />
+      {processing && <>
+        <span aria-hidden="true" className="hud-caption">Transcribing</span>
+        <WaitClock />
+      </>}
+      {outcome && <span aria-hidden="true" className="hud-label" key={waveform}>{resultText(result, mac)}</span>}
+    </div>
+  </>;
 }
