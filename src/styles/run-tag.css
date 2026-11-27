@@ -1,0 +1,41 @@
+/* What a run did, on one tag tied off with the HUD's knots (ui-iter-17): solid for done,
+   half for a caveat, frayed for failed or cancelled. Since ui-iter-21 it hangs under the
+   Start capsule on Home's stage (loom-bar.css) and from the rail's foot on other pages,
+   where it also carries the missing-shortcut warning. Tokens carry both themes. */
+.run-tag {
+  --tone: var(--ok);
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--tone) 5%, var(--field));
+  border: 1px solid color-mix(in srgb, var(--tone) 28%, var(--line));
+  border-radius: 999px 12px 12px 999px;
+  color: var(--fg);
+  display: flex;
+  font-size: var(--fs-label);
+  gap: 7px;
+  justify-self: center;
+  line-height: 1.4;
+  margin: var(--s-2) 0 0;
+  max-width: 100%;
+  padding: 4px 11px 4px 6px;
+  position: relative;
+  text-align: left;
+}
+.run-tag[data-tone="warn"] { --tone: var(--warn); }
+.run-tag[data-tone="err"] { --tone: var(--err); }
+/* The short string it hangs from. */
+.run-tag::before {
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--tone) 70%, transparent));
+  content: "";
+  height: var(--s-6);
+  left: 13px;
+  position: absolute;
+  top: calc(var(--s-6) * -1 - 1px);
+  width: 1px;
+}
+.run-tag__knot { flex: none; margin-top: 1px; overflow: visible; }
+.run-tag__knot circle,
+.run-tag__knot path { fill: none; stroke: var(--tone); stroke-width: 1.5px; }
+.run-tag__knot .knot__core { fill: var(--tone); stroke: none; }
+.run-tag__knot .knot__fray { stroke-dasharray: 2.6 2.6; }
+.run-tag__words { min-width: 0; overflow-wrap: anywhere; }
+.run-copy { justify-self: center; }

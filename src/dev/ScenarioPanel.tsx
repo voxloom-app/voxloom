@@ -1,4 +1,18 @@
 import { useApp } from '../app/AppContext';
+import type { DictationRecord } from '../domain/types';
+
+const PHRASES = [
+  'Move the sync to Thursday morning.', 'Add a test for the empty state.', 'Thanks, that works for me.',
+  'Ship the synthetic sample today.', 'Check the release notes before lunch.', 'Rename the draft to version two.',
+];
+
+/** Synthetic: a busy day where no delivery could be confirmed, so every pick shares one status. */
+export function unverifiedDay(now: number, count = 38): DictationRecord[] {
+  return Array.from({ length: count }, (_, index) => ({
+    createdAt: now - (count - index) * 4 * 60_000, durationSeconds: 3 + (index % 9), id: `synthetic-unverified-${now}-${index}`,
+    model: null, recoveryExpiresAt: null, status: 'unverified', style: 'formal', text: PHRASES[index % PHRASES.length],
+  }));
+}
 
 interface ScenarioPanelProps {
   onReset: () => void;
@@ -17,6 +31,9 @@ export function ScenarioPanel({ onReset }: ScenarioPanelProps) {
       <button onClick={onReset}>First-run setup</button>
       <button onClick={() => dispatch({ type: 'scenario-empty' })}>
         Empty lists
+      </button>
+      <button onClick={() => unverifiedDay(now()).forEach((record) => dispatch({ record, type: 'append-record' }))}>
+        38 unconfirmed runs
       </button>
       <button onClick={dictation.start}>
         Listening · silent

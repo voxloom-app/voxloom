@@ -14,6 +14,7 @@
 @import "./home-actions.css";
 @import "./stage.css";
 @import "./home-pick.css";
+@import "./loom-bar.css";
 @import "./history.css";
 @import "./history-stage.css";
 @import "./history-clips.css";
@@ -33,8 +34,7 @@
 @import "./gesture-guide.css";
 @import "./features.css";
 @import "./hud-shuttle.css";
-@import "./rail-cloth.css";
-@import "./rail-tag.css";
+@import "./run-tag.css";
 @import "./models.css";
 @import "./scale-layout.css";
 @import "./frame.css";

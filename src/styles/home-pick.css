@@ -9,9 +9,11 @@
 .stage .home-hero[data-words] h1 .key-combo__caps { gap: 6px; }
 .stage .home-hero[data-words] h1 .kbd { border-radius: 9px; font-size: calc(var(--fs-bigkey) * .8); height: calc(var(--bigkey) * .76); min-width: calc(var(--bigkey) * .76); padding: 0 11px; }
 
-.pick { --pick-tone: var(--ok); margin-bottom: var(--s-10); }
-.pick[data-status="copied"] { --pick-tone: var(--info); }
-.pick[data-status="unverified"] { --pick-tone: var(--warn); }
+.pick { margin-bottom: var(--s-7); }
+/* The knot on the weft beneath (loom-bar.css) takes the same outcome colour as the badge. */
+:is(.pick, .loom-bar) { --pick-tone: var(--ok); }
+:is(.pick, .loom-bar)[data-status="copied"] { --pick-tone: var(--info); }
+:is(.pick, .loom-bar)[data-status="unverified"] { --pick-tone: var(--warn); }
 
 .pick__label { color: var(--mut); font-size: var(--fs-label); font-weight: 600; letter-spacing: .04em; margin: 0 0 var(--s-5); }
 
@@ -44,10 +46,12 @@
   overflow: hidden;
 }
 
-/* The weft: one lime-to-cyan pick across the stage, knotted where the words sit. */
-.pick__weft { display: block; height: 14px; margin: var(--s-8) calc(var(--stage-pad) * -1) var(--s-6); position: relative; }
+/* The weft: one lime-to-cyan pick across the stage, knotted between the Start capsule (voice
+   in) and Copy (text out), on the stage's LoomBar (ui-iter-21). The thread runs behind both. */
+.pick__weft { display: block; grid-area: 1 / 2; height: 12px; width: 12px; }
+.pick__weft:empty { width: 0; }
 .pick__weft::before,
-.pick__weft::after { content: ""; height: 2px; left: 0; position: absolute; top: 6px; }
+.pick__weft::after { content: ""; height: 2px; left: 0; position: absolute; top: calc(var(--bar-h) / 2 - 1px); z-index: -1; }
 .pick__weft::before {
   background: linear-gradient(90deg, transparent 4%, var(--brand-a) 30%, var(--brand-b) 70%, transparent 96%);
   opacity: .6;
@@ -59,24 +63,22 @@
   background: var(--pick-tone);
   border-radius: 50%;
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--pick-tone) 22%, transparent), 0 0 18px color-mix(in srgb, var(--pick-tone) 45%, transparent);
+  display: block;
   height: 12px;
-  left: calc(50% - 6px);
-  position: absolute;
-  top: 1px;
   width: 12px;
 }
 
-.pick__meta { align-items: center; color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 6px 12px; justify-content: center; }
+.pick__meta { align-items: center; color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 6px 12px; justify-content: center; margin-top: var(--s-7); }
 .pick__meta time { color: var(--fg); font-family: var(--mono); font-size: var(--fs-mono); }
 .stage .pick__copy {
-  background: rgba(255, 255, 255, .04);
+  background: #1b1b23;
   border: 1px solid rgba(255, 255, 255, .2);
   border-radius: var(--r-pill);
   color: var(--fg);
   font-size: var(--fs-secondary);
   font-weight: 600;
-  min-height: 32px;
-  padding: 4px 14px;
+  min-height: 34px;
+  padding: 4px 16px;
 }
 .stage .pick__copy:hover { border-color: color-mix(in srgb, var(--brand-a) 60%, transparent); color: var(--brand-a); }
 

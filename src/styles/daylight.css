@@ -83,8 +83,17 @@
   background: linear-gradient(90deg, color-mix(in srgb, #b6ff3c 34%, transparent), color-mix(in srgb, #b6ff3c 10%, transparent) 78%, transparent);
 }
 [data-appearance-resolved="light"] .rail-today:hover { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .6)); }
-[data-appearance-resolved="light"] .rail-warp__thread { opacity: .42; }
-[data-appearance-resolved="light"] .sidebar[data-phase] .rail-warp__thread { opacity: .7; }
+[data-appearance-resolved="light"] .rail-today__day i { background: var(--fg); opacity: .32; }
+[data-appearance-resolved="light"] .rail-today__day i[data-newest] { box-shadow: none; opacity: .8; }
+[data-appearance-resolved="light"] .rail-key .kbd {
+  background: linear-gradient(180deg, #ffffff, #f3f0ea);
+  border-color: rgba(70, 56, 30, .18);
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 0 #cbc3b3;
+  color: var(--fg);
+}
+[data-appearance-resolved="light"] .sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 12px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
+}
 
 /* ---- Key caps by daylight: white caps on a warm shadow, like the keyboard under your hands ---- */
 [data-appearance-resolved="light"] :is(.stage .home-hero h1, .voice-path__value, .loom-line, .guided-shortcut, .guided-content > .key-combo, .shortcut-card__keys) .kbd {

@@ -1,7 +1,7 @@
-/* Warp rail, part two (ui-iter-03): today's beam and the warp threads. The threads hang
-   from the Today beam (ui-iter-17) and carry today's cloth down to the docked shuttle. At
-   rest they hold still; while you speak, lime pulses run down; while Voxloom writes, cyan
-   pulses run back up. */
+/* Warp rail, part two (ui-iter-03): today's beam and the rail's foot. Since ui-iter-21 the
+   rail is quiet: no warp threads, no woven cloth, no docked shuttle (Start lives on Home's
+   stage, loom-bar.css). Today keeps its lit rod, and the day's picks are ticks on it, placed
+   by time of day in one dye whatever their outcome, so the rail never turns into a slab. */
 
 /* Today in words, set on the warp beam: a lit rod with a peg at each end. */
 .rail-today {
@@ -16,6 +16,8 @@
   text-align: left;
   width: 100%;
 }
+/* Whatever follows Today (the foot, the Developer panel) sits at the bottom of the rail. */
+.sidebar > .rail-today { margin-bottom: auto; }
 .rail-today:hover { background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .05)); }
 .rail-today::after {
   background:
@@ -41,36 +43,76 @@
 }
 .rail-today__head b { color: #f6f6f9; font-size: var(--fs-emph); letter-spacing: -.02em; }
 .rail-today__sum { color: var(--mut); font-size: var(--fs-label); }
-.rail-today__loose { align-items: center; color: var(--warn); display: inline-flex; font-size: var(--fs-label); font-weight: 600; gap: 5px; }
+.rail-today__loose { align-items: center; color: var(--mut); display: inline-flex; font-size: var(--fs-label); gap: 6px; }
+.rail-today__knot { flex: none; height: 11px; width: 11px; }
+.rail-today__knot circle,
+.rail-today__knot path { fill: none; stroke: var(--warn); stroke-width: 1.5px; }
+.rail-today__knot .knot__core { fill: var(--warn); stroke: none; }
 
-/* The warp: grows into the free space and collapses first in short windows. */
-/* The threads hang from the beam's rod, so the warp starts flush under it, unfaded. */
-.rail-warp {
-  flex: 1 1 0;
-  margin: calc(var(--s-7) * -1) calc(var(--s-5) * -1) calc(var(--s-7) * -1);
-  min-height: 36px;
-  pointer-events: none;
-  position: relative;
+/* The day on the rod: one tick per dictation, midnight at the left peg, midnight at the right.
+   One dye for every outcome; the newest is lit. Above the rod's own paint. */
+.rail-today__day { bottom: -4px; height: 8px; inset-inline: 0; position: absolute; z-index: 1; }
+.rail-today__day i {
+  background: #f6f6f9;
+  border-radius: 1px;
+  height: 100%;
+  left: calc(8px + (100% - 16px) * var(--at));
+  opacity: .42;
+  position: absolute;
+  top: 0;
+  width: 1px;
 }
-.rail-warp svg { display: block; height: 100%; inset: 0; position: absolute; width: 100%; }
-.rail-warp path { fill: none; stroke-linecap: round; transition: opacity .4s ease; vector-effect: non-scaling-stroke; }
-.rail-warp__thread { opacity: .32; stroke-width: 1; }
-/* Pulses only run while the voice is moving; the static offset staggers them otherwise. */
-.rail-warp__pulse { opacity: 0; stroke-dasharray: 14 86; stroke-dashoffset: calc(var(--i) * 13); stroke-width: 2; }
-@keyframes warp-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-.sidebar[data-phase="listening"] .rail-warp__thread,
-.sidebar[data-phase="speaking"] .rail-warp__thread,
-.sidebar[data-phase="processing"] .rail-warp__thread { opacity: .5; }
-.sidebar[data-phase="listening"] .rail-warp__pulse,
-.sidebar[data-phase="speaking"] .rail-warp__pulse { animation: warp-flow 1.6s linear infinite; animation-delay: calc(var(--i) * -.23s); opacity: 1; stroke: var(--brand-a); }
-.sidebar[data-phase="speaking"] .rail-warp__pulse { animation-duration: 1s; }
-.sidebar[data-phase="processing"] .rail-warp__pulse { animation: warp-flow 1.3s linear infinite reverse; animation-delay: calc(var(--i) * -.19s); opacity: 1; stroke: var(--brand-b); }
+.rail-today__day i[data-newest] { box-shadow: 0 0 5px 1px color-mix(in srgb, #f6f6f9 55%, transparent); opacity: 1; }
+
+/* The foot: the keys to hold away from Home, or the run you can finish from here. */
+.rail-foot { display: grid; gap: var(--s-4); }
+.rail-foot:empty { display: none; }
+.rail-foot .run-tag::before { display: none; } /* the foot is not under a capsule: no string to hang from */
+.rail-run { align-items: center; display: flex; gap: var(--s-3); justify-content: center; }
+.rail-run__stop { gap: 7px; min-height: 32px; padding: 4px 14px; }
+.rail-run__stop .rec-dot { height: 8px; width: 8px; }
+.rail-run__cancel { min-height: 32px; padding: 4px 10px; }
+.rail-run__busy { color: var(--mut); font-size: var(--fs-label); margin: 0; text-align: center; }
+
+/* With nothing to say: the keys to hold, as small caps on one line. */
+.rail-key {
+  align-items: center;
+  color: var(--mut);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--fs-label);
+  gap: 3px 5px;
+  justify-content: center;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
+.rail-key .key-combo__caps { gap: 3px; }
+.rail-key .kbd {
+  background: linear-gradient(180deg, #2c2c38, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-kbd);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 0 #050508;
+  color: #f6f6f9;
+  font-size: var(--fs-micro);
+  min-height: 20px;
+  min-width: 20px;
+  padding: 0 5px;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
+}
+/* Held while you speak: the caps sink and take the voice's lime. */
+.sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--brand-a) 60%, transparent);
+  color: var(--accfg);
+  transform: translateY(2px);
+}
 
 .dev-panel summary { color: var(--mut); cursor: pointer; font-size: var(--fs-label); padding: 0 var(--s-4); }
 .dev-panel .state-lab { border-top: 0; margin-top: var(--s-3); padding-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
-  /* No travelling pulses or pulsing dot: the threads and keys only brighten. */
-  .rail-warp__pulse { display: none; }
+  /* No pulsing dot or sinking caps: they only brighten. */
   .sidebar[data-phase] .brand__dot { animation: none; }
+  .sidebar[data-phase] .rail-key .kbd { transform: none; }
 }

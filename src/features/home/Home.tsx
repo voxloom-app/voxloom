@@ -42,7 +42,7 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
   return (
     <div className="home">
       {/* The voice stage: one dark instrument in both themes, alive while you dictate.
-          Dictating from the window lives on the rail's docked shuttle (ui-iter-15). */}
+          Dictating from the window starts on its weft, beside Copy (ui-iter-21). */}
       <div className="stage" data-phase={phase}>
         <div className="stage__readout">
           <span className="stage__mic"><i aria-hidden="true" />{stageLabel(phase, dogfood.phase)}</span>
@@ -52,6 +52,7 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
           </span>
         </div>
         <HomeHero
+          capture={{ dogfood, isNative, onCopy: (t) => { void copy(t); } }}
           cleanupModelStore={cleanupModelStore}
           isNative={isNative}
           pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }}

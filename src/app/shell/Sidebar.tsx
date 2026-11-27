@@ -4,11 +4,11 @@ import { isMacPlatform, KeyCombo } from '../../components/KeyCombo';
 import { Knot } from '../../components/Knot';
 import { ScenarioPanel } from '../../dev/ScenarioPanel';
 import type { Screen } from '../../domain/types';
+import { type CaptureProps, runHasNews } from '../../features/home/captureRun';
 import type { StagePhase } from '../../features/home/stagePhase';
 import { navScreens } from './screens';
+import { RailRun } from './RailRun';
 import { RailToday } from './RailToday';
-import { RailWarp } from './RailWarp';
-import { ShuttleDock, type ShuttleDockProps } from './ShuttleDock';
 import { useShortcutActive } from '../../services/shortcut/activeShortcut';
 import { NO_SHORTCUT } from '../../features/settings/shortcutCopy';
 
@@ -16,28 +16,26 @@ type Props = {
   screen: Screen;
   shortcut: string;
   status: string;
-  /** What your voice is doing right now; the warp and the key caps follow it. */
+  /** What your voice is doing right now; the status dot and the page's reed follow it. */
   phase?: StagePhase;
   onNavigate: (screen: Screen) => void;
   onReset: () => void;
-  /** Opens one of today's dictations in History, from its pick in the cloth. */
-  onShowRecord?: (id: string) => void;
-  /** Dictating from the window: the shuttle docked at the fell (ui-iter-15). */
-  capture?: ShuttleDockProps;
+  /** The shared run, so a dictation can be finished from pages without the Start capsule. */
+  capture?: CaptureProps;
 };
 
 /**
- * The warp rail (ui-iter-03): the window's frame, in the Home stage's dark
- * material in both themes. It stays put while pages scroll. Since ui-iter-15 it
- * is a working loom: today's dictations are woven across its warp, and the
- * shuttle docked at the fell starts a dictation from any page. Since ui-iter-17
- * it hangs as one loom: Today is the beam the warp hangs from, the cloth can be
- * read pick by pick, and one line under the shuttle says what just happened or,
- * away from Home (whose stage already shows it), which keys to hold. The threads
- * move only while you speak or Voxloom writes.
+ * The warp rail (ui-iter-03): the window's frame, in the Home stage's dark material in
+ * both themes. It stays put while pages scroll. Since ui-iter-21 it is quiet: the brand
+ * and its live status, the pages, and Today on its beam, with a tick on the rod for each
+ * dictation by time of day. Start dictating lives on Home's stage beside Copy. Away from
+ * Home the rail's foot says which keys to hold or, during a run, offers Stop and Cancel
+ * and then what the run did.
  */
-export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset, onShowRecord }: Props) {
+export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset }: Props) {
   const active = useShortcutActive();
+  const away = screen !== 'home';
+  const news = away && capture !== undefined && runHasNews(capture.dogfood);
   return (
     <aside className="sidebar" data-phase={phase}>
       <div className="brand">
@@ -65,17 +63,15 @@ export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onN
         ))}
       </nav>
       <RailToday onOpen={() => onNavigate('history')} />
-      <RailWarp onShow={onShowRecord} />
-      <div className="rail-dock">
-        {capture && <ShuttleDock {...capture} />}
-        {!active ? (
-          <p className="rail-tag" data-tone="warn">
-            <Knot className="rail-tag__knot" tone="warn" />
-            <span className="rail-tag__words">{NO_SHORTCUT}</span>
+      <div className="rail-foot">
+        {!active && (
+          <p className="run-tag" data-tone="warn">
+            <Knot className="run-tag__knot" tone="warn" />
+            <span className="run-tag__words">{NO_SHORTCUT}</span>
           </p>
-        ) : screen !== 'home' && !capture?.dogfood.message && (
-          <p className="rail-key">Hold <KeyCombo combo={shortcut} /> in any app to dictate</p>
         )}
+        {news && <RailRun dogfood={capture.dogfood} onCopy={capture.onCopy} />}
+        {active && away && !news && <p className="rail-key">Hold <KeyCombo combo={shortcut} /> in any app to dictate</p>}
       </div>
       {import.meta.env.DEV && (
         <details className="dev-panel">

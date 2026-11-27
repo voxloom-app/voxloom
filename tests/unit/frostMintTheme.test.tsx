@@ -43,9 +43,10 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*color: var\(--seg-on-fg, var\(--fg\)\);/);
   });
 
-  it('docks dictating from the window on the rail instead of a Home deck (ui-iter-15)', () => {
+  it('dictates from the stage\'s weft, not a Home deck or the rail (ui-iter-21)', () => {
     expect(readFileSync(join(root, 'features/home/Home.tsx'), 'utf8')).not.toContain('home-card--dictate');
-    expect(readFileSync(join(root, 'app/shell/ShuttleDock.tsx'), 'utf8')).toContain('className="rail-shuttle"');
+    expect(readFileSync(join(root, 'features/home/LoomBar.tsx'), 'utf8')).toContain('className="dictate__button"');
+    expect(readFileSync(join(root, 'app/shell/Sidebar.tsx'), 'utf8')).not.toMatch(/dictate__button|DictateCapsule|LoomBar/);
     expect(css('stage.css')).not.toContain('.home-card--dictate');
   });
 

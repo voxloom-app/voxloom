@@ -43,15 +43,21 @@ describe('The last pick (ui-iter-09): your words take the stage', () => {
     expect(within(pick()).getByRole('blockquote')).toHaveTextContent(NEWEST);
     expect(pick().querySelector('.badge')).toHaveAttribute('data-status', 'inserted');
     expect(pick()).toHaveAttribute('data-status', 'inserted');
-    expect(pick().querySelector('.pick__meta')).toHaveTextContent(/· 9 words · 7s Copy$/);
+    expect(pick().querySelector('.pick__meta')).toHaveTextContent(/· 9 words · 7s$/);
     expect(pick().querySelector('time')).toHaveAttribute('dateTime', new Date(NOW - 3 * 60_000).toISOString());
     // The heading still opens the page; the pick follows it, and the lede steps aside.
     const headings = screen.getAllByRole('heading').map((h) => h.textContent);
     expect(headings.slice(0, 2)).toEqual([expect.stringMatching(/^Hold .* to dictate$/), 'Last dictation']);
     expect(document.querySelector('.home-hero__lede')).toBeNull();
     expect(document.querySelector('.home-hero')).toHaveAttribute('data-words');
-    // The weft and knot are decoration only.
-    expect(pick().querySelector('.pick__weft')).toHaveAttribute('aria-hidden', 'true');
+    // ui-iter-21: the weft runs under the words, from Start (in) through the knot to Copy (out);
+    // the knot is decoration only and takes the pick's status.
+    const weft = document.querySelector('.home-hero .loom-bar')!;
+    expect(weft).toHaveAttribute('data-status', 'inserted');
+    expect(weft.querySelector('.pick__weft')).toHaveAttribute('aria-hidden', 'true');
+    expect(pick().compareDocumentPosition(weft)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(within(weft as HTMLElement).getByRole('button', { name: 'Start dictating' })).toBeInTheDocument();
+    expect(within(weft as HTMLElement).getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
   });
 
   it('does not repeat the last pick on the cloth', () => {

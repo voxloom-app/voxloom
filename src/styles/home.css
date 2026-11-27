@@ -1,5 +1,5 @@
 /* Home (UI PR 3): hero and recent dictations. The hero lives inside the voice stage
-   (stage.css), which sets its surface; dictating from the window is on the rail. */
+   (stage.css), which sets its surface; Start dictating sits on its weft (loom-bar.css). */
 .home-hero { text-align: center; }
 
 .home-hero h1 {

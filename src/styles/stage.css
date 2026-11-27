@@ -152,7 +152,7 @@
 /* The stage ends on the writing style: no deck beneath it since ui-iter-15. */
 .home > .stage { padding-bottom: var(--s-11); }
 /* Manual recovery: the run's own transcript, only when History didn't keep it. Dictating
-   from the window moved to the rail's docked shuttle (ui-iter-15, rail-cloth.css). */
+   from the window starts on the stage's weft (ui-iter-21, loom-bar.css). */
 .stage .stage__recovery {
   align-items: center;
   background: rgba(255, 255, 255, .035);
