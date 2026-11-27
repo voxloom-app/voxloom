@@ -37,8 +37,22 @@ describe('History says it once (ui-iter-23)', () => {
     for (const row of rows) {
       expect(within(row).getByText(NOT_VERIFIED)).toHaveClass('sr-only');
       expect(row.querySelector('.recovery-state')).toBeNull();
-      expect(within(row).getByText('Unverified')).toHaveClass('badge--unverified');
+      expect(within(row).getByRole('button', { name: /Recording details.*Unverified/ })).toHaveAttribute('aria-expanded', 'false');
+      expect(row.querySelector('.ledger-knot')).toHaveAttribute('data-status', 'unverified');
+      expect(row.querySelector('.badge')).toBeNull();
     }
+  });
+
+  it('keys only the outcomes present in the filtered day and uses the same shapes in its time margin', () => {
+    renderWithApp(<History onToast={vi.fn()} />, NOON);
+    const key = document.querySelector('.ledger-key')!;
+    for (const [status, count] of [['inserted', 3], ['copied', 2], ['failed', 1]] as const) {
+      expect(key).toHaveTextContent(`${count} ${status}`);
+      expect(key.querySelector(`.ledger-knot[data-status="${status}"]`)).not.toBeNull();
+      expect(document.querySelectorAll(`.ledger-stamp .ledger-knot[data-status="${status}"]`)).toHaveLength(count);
+    }
+    act(() => screen.getByRole('radio', { name: 'Copied' }).click());
+    expect(key).toHaveTextContent(/^2 copied$/);
   });
 
   it('uses the singular for a lone unverified dictation', () => {
@@ -81,7 +95,7 @@ describe('History says it once (ui-iter-23)', () => {
     expect(badge).toContain('color: var(--mut);');
     expect(badge).not.toMatch(/background: color-mix\(in srgb, var\(--warn\)/);
     const quiet = 'color-mix(in srgb, var(--warn) 45%, var(--mut))';
-    expect(css('history.css')).toContain(`.history-row.recent-row[data-status="unverified"]::before { --tone: ${quiet}; border: 2px dotted var(--tone);`);
+    expect(css('history.css')).toContain(`.ledger-knot[data-status="unverified"] { background: var(--bg); border: 2px dotted ${quiet};`);
     // The time index measures activity, never delivery outcomes.
     expect(css('history-stage.css')).not.toContain('[data-status');
     expect(css('home.css')).toContain(`.home .recent-row[data-status="unverified"]::before { border: 2px dotted ${quiet};`);

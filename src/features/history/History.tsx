@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useApp } from '../../app/AppContext';
 import { canStartDictation } from '../../app/state';
 import { EmptyState } from '../../components/EmptyState';
-import { Icon } from '../../components/Icon';
 import { SearchField } from '../../components/SearchField';
 import { SegmentedControl } from '../../components/SegmentedControl';
 import { canRetry } from '../../domain/records';
@@ -11,7 +10,8 @@ import { isTauriEnv } from '../../services/capture/captureService';
 import { canClip, ClippingSheet } from './ClippingSheet';
 import { TimeIndex } from './TimeIndex';
 import { HistoryRow } from './HistoryRow';
-import { formatSpoken, groupByDay, tally } from './historyLoom';
+import { groupByDay } from './historyLoom';
+import { HistoryDayHead } from './HistoryDayHead';
 
 interface HistoryProps {
   onToast: (message: string) => void;
@@ -32,8 +32,6 @@ const retentionCopy: Record<Settings['transcriptRetention'], string> = {
   forever: 'Kept until you delete them (Settings › Transcripts).',
   off: 'Transcript retention is off (Settings › Transcripts).',
 };
-
-const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
 /** The time index leads into day-grouped transcripts. Each day states its
  * unverified caution once instead of boxing every row. */
@@ -113,45 +111,27 @@ export function History({ onToast }: HistoryProps) {
           {clippable && <ClippingSheet onCopy={(text) => clipboard.copy(text)} passages={passages} />}
         </div>
         <div className="history-timeline">
-          {groups.map((group) => {
-            const sum = tally(group.records);
-            const unsure = group.records.filter((record) => record.status === 'unverified').length;
-            return (
-              <div className="history-day" key={group.key}>
-                <div className="history-day__head">
-                  <h2>{group.label}</h2>
-                  <span>{plural(sum.dictations, 'dictation')} · {formatSpoken(sum.seconds)} spoken</span>
-                  {unsure > 0 && (
-                    // Said once for the day; each row keeps its own note for screen readers.
-                    <p className="history-day__unsure">
-                      <Icon name="warn" size={13} />
-                      <span>
-                        <strong>{unsure} unverified</strong>
-                        {' · '}Couldn’t confirm {unsure === 1 ? 'it was' : 'they were'} typed.
-                        Check the field before copying or retrying.
-                      </span>
-                    </p>
-                  )}
-                </div>
-                <div className="history-list">
-                  {group.records.map((record) => (
-                    <HistoryRow
-                      canStart={canStartDictation(state.dictation)}
-                      clipNumber={numbers.get(record.id)}
-                      currentTime={currentTime}
-                      isNative={isNative}
-                      key={record.id}
-                      onClip={canClip(record) ? toggleClip : undefined}
-                      onCopy={(text) => { void copy(text); }}
-                      onDelete={(id) => history.delete(id)}
-                      onRetry={retry}
-                      record={record}
-                    />
-                  ))}
-                </div>
+          {groups.map((group) => (
+            <div className="history-day" key={group.key}>
+              <HistoryDayHead group={group} />
+              <div className="history-list">
+                {group.records.map((record) => (
+                  <HistoryRow
+                    canStart={canStartDictation(state.dictation)}
+                    clipNumber={numbers.get(record.id)}
+                    currentTime={currentTime}
+                    isNative={isNative}
+                    key={record.id}
+                    onClip={canClip(record) ? toggleClip : undefined}
+                    onCopy={(text) => { void copy(text); }}
+                    onDelete={(id) => history.delete(id)}
+                    onRetry={retry}
+                    record={record}
+                  />
+                ))}
               </div>
-            );
-          })}
+            </div>
+          ))}
           {!state.records.length && (
             <EmptyState icon="clock" title="No dictations yet">
               Hold the shortcut in any app to dictate. Transcripts appear here.

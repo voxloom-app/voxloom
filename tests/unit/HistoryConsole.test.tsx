@@ -36,7 +36,8 @@ describe('History segmented filter (UI PR 4)', () => {
       fireEvent.click(screen.getByRole('radio', { name: status[0].toUpperCase() + status.slice(1) }));
       const expected = initialRecords.filter((r) => r.status === status).length;
       expect(rows(), status).toHaveLength(expected);
-      rows().forEach((row) => expect(row.querySelector('.badge')?.getAttribute('data-status')).toBe(status));
+      rows().forEach((row) => expect(within(row).getByRole('button', { name: /^Recording details/ }))
+        .toHaveAccessibleName(new RegExp(`${status}$`, 'i')));
     }
     fireEvent.click(screen.getByRole('radio', { name: 'All' }));
     expect(rows()).toHaveLength(initialRecords.length);
@@ -58,12 +59,13 @@ describe('History segmented filter (UI PR 4)', () => {
     expect(rows()).toHaveLength(initialRecords.filter((r) => r.status === 'inserted').length);
   });
 
-  it('renders badge, meta and notes per row; Retry only in the browser', () => {
+  it('keeps the failure note on the page and its badge in the recording slip; Retry only in the browser', () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     renderWithApp(<History onToast={vi.fn()} />);
     expect(screen.getByText(/Audio isn’t saved/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('radio', { name: 'Failed' }));
     const row = rows()[0];
+    fireEvent.click(within(row).getByRole('button', { name: /Recording details.*Failed/ }));
     expect(within(row).getByText('Failed')).toHaveClass('badge');
     expect(within(row).getByText(/No audio retry available/)).toBeInTheDocument();
     expect(within(row).queryByRole('button', { name: 'Retry transcription' })).toBeNull();
@@ -93,6 +95,8 @@ describe('History row actions (designer: reachable by keyboard and VoiceOver)', 
     // No aria-labelledby on the row: VoiceOver would read the transcript twice.
     expect(row).not.toHaveAttribute('aria-labelledby');
     row.focus();
+    await user.tab();
+    expect(within(row).getByRole('button', { name: /^Recording details/ })).toHaveFocus();
     await user.tab();
     const first = within(row).getByRole('button', { name: 'Copy transcript' });
     expect(first).toHaveFocus();
@@ -135,7 +139,7 @@ describe('may-have-inserted History rows (Review #44)', () => {
       recoveryExpiresAt: null, status: 'unverified' as const, style: 'formal' as const, text: 'hi',
     };
     render(<HistoryRow canStart currentTime={2_000} isNative onCopy={() => {}} onDelete={() => {}} onRetry={() => {}} record={record} />);
-    expect(screen.getByText('Unverified')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Recording details.*Unverified/ })).toBeVisible();
     expect(screen.queryByText(/^(Failed|Copied)$/)).toBeNull();
     expect(screen.getByText(note, { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/copy the text to recover it/)).toBeNull();

@@ -1,152 +1,81 @@
 /* Page header shared by Dictionary and the boot placeholder. */
 .page-head { margin-bottom: var(--s-8); }
-
-.page-head h1 {
-  font-size: var(--fs-page);
-  font-weight: 850;
-  letter-spacing: -.03em;
-  margin-bottom: 4px;
-}
-
+.page-head h1 { font-size: var(--fs-page); font-weight: 850; letter-spacing: -.03em; margin-bottom: 4px; }
 .page-head p { color: var(--mut); margin: 0; max-width: 640px; }
 
-.history-tools {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-6);
-  margin-bottom: var(--s-6);
-}
-
+.history-tools { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-6); margin-bottom: var(--s-6); }
 .history-tools .search { min-width: 220px; }
 
-/* History timeline (ui-iter-02): each day is a heading and one thread; every row
-   ties a knot on it. The masthead and time index live in history-stage.css. */
-.history-timeline { display: grid; gap: var(--s-10); }
+/* The reading ledger. Technical notes live behind their time stamp, rather
+   than between passages. The tinted time margin runs unbroken down the day. */
+.history-timeline { display: grid; gap: var(--s-11); margin-inline: auto; max-width: 64rem; }
 .history-day {
-  --spool-time: calc(var(--fs-mono) * 5.6);
-  --row-x: 14px;
-  --row-y: 13px;
-  --col-gap: 14px;
-  --line-h: calc(var(--fs-emph) * 1.45);
-  --knot-y: calc(var(--row-y) + var(--line-h) / 2);
-  --thread-x: calc(var(--row-x) + var(--spool-time) + var(--col-gap) + 5px);
-  --thread: color-mix(in srgb, var(--accfg) 40%, var(--line));
-  /* Middle of the day heading's first line (padding and serif size: history-clips.css). */
-  --head-mid: calc(var(--s-4) + var(--fs-sheet) * .74 - 4px);
+  --stamp-w: calc(var(--fs-mono) * 6 + 22px);
+  --row-gap-x: var(--s-8);
+  --row-y: 12px;
+  --line-h: calc(var(--fs-emph) * 1.55);
+  min-width: 0;
 }
-
-.history-day__head {
-  align-items: baseline;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px var(--s-6);
-  padding: 0 var(--row-x) 8px calc(var(--row-x) + var(--spool-time) + var(--col-gap) * 2 + 12px);
-  position: relative;
+.ledger-dateline {
+  align-items: baseline; border-bottom: 1px solid var(--ctl-line); display: flex; flex-wrap: wrap;
+  gap: 2px var(--s-8); justify-content: space-between; padding: var(--s-5) 0;
 }
-/* The day's mark on the thread, which runs on down to the first knot. */
-.history-day__head::before,
-.history-day__head::after { content: ""; position: absolute; }
-.history-day__head::before { background: var(--accfg); border-radius: 2px; height: 10px; left: calc(var(--thread-x) - 4px); top: calc(var(--head-mid) - 5px); transform: rotate(45deg); width: 10px; z-index: 1; }
-.history-day__head::after { background: var(--thread); bottom: 0; left: var(--thread-x); top: var(--head-mid); width: 2px; }
-.history-day__head h2 { font-size: var(--fs-section); font-weight: 750; letter-spacing: -.01em; margin: 0; }
-.history-day__head > span { color: var(--mut); font-size: var(--fs-label); }
-/* An unverified caution, said once for the day instead of on every row (ui-iter-23). */
-.history-day__unsure { align-items: flex-start; color: var(--mut); display: flex; flex-basis: 100%; font-size: var(--fs-secondary); gap: 6px; margin: 2px 0 0; }
-.history-day__unsure > .icon { color: var(--warn); flex: none; margin-top: 2px; }
-.history-day__unsure strong { color: var(--fg); font-weight: 650; }
+.ledger-dateline h2 { font: normal calc(var(--fs-sheet) * 1.65)/1.2 var(--font-words); letter-spacing: -.035em; margin: 0; }
+.ledger-dateline > span { color: var(--mut); font-size: var(--fs-label); }
+.ledger-headings { align-items: center; display: grid; gap: var(--row-gap-x); grid-template-columns: var(--stamp-w) 1fr; padding-block: var(--s-5); }
+.ledger-headings__time { color: var(--mut); font: 650 var(--fs-micro)/1.4 var(--mono); letter-spacing: .04em; padding-left: 8px; text-transform: uppercase; }
+.ledger-key { color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-label); gap: var(--s-2) var(--s-8); }
+.ledger-key > span { align-items: baseline; display: inline-flex; gap: 6px; }
+.ledger-key .ledger-knot { align-self: flex-start; margin-top: .38em; }
 
-.history-day .history-list { gap: 0; }
+/* A shared alphabet in the margin and its key: solid, open, frayed, uncertain.
+   No newest-row fill: an unknown delivery must never look like a verified one. */
+.ledger-knot { background: var(--ok); border-radius: 50%; display: inline-block; flex: none; height: 10px; width: 10px; }
+.ledger-knot[data-status="copied"] { background: var(--bg); border: 2px solid var(--info); }
+.ledger-knot[data-status="failed"] { background: var(--bg); border: 2px dashed var(--err); border-radius: 2px; }
+.ledger-knot[data-status="unverified"] { background: var(--bg); border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); }
 
+.history-day .history-list { border-top: 1px solid var(--line); gap: 0; }
 .history-row.recent-row {
-  align-items: start;
-  border-radius: var(--r-card);
-  border-top: 0;
-  column-gap: var(--col-gap);
-  grid-template-areas: "time knot body actions";
-  grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto;
-  padding: var(--row-y) var(--row-x);
-  position: relative;
-  row-gap: 4px;
-  transition: background-color .15s ease, box-shadow .15s ease;
+  align-items: start; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  column-gap: var(--row-gap-x); grid-template-areas: "time body actions";
+  grid-template-columns: var(--stamp-w) minmax(0, 1fr) auto;
+  padding: var(--row-y) var(--s-4) var(--row-y) 0; position: relative; row-gap: 0;
 }
 .history-row.recent-row:first-child { padding-top: var(--row-y); }
-.history-row.recent-row > .timestamp { grid-area: time; line-height: var(--line-h); text-align: right; width: auto; }
-.history-row.recent-row > .history-row__body { grid-area: body; min-width: 0; }
-.history-row.recent-row > .action-group { gap: 2px; grid-area: actions; margin: calc((var(--line-h) - 44px) / 2) -8px 0 0; }
-.history-row .history-row__text { font-family: var(--font-words); font-size: calc(var(--fs-emph) * 1.06); font-weight: 400; letter-spacing: .003em; line-height: var(--line-h); margin: 0; }
-
-/* Knot: hollow in its status colour; the newest of the list is tied tight and glows. */
 .history-row.recent-row::before {
-  --tone: var(--ok);
-  background: var(--bg);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 2px var(--tone);
-  content: "";
-  grid-area: knot;
-  height: 12px;
-  margin-top: calc((var(--line-h) - 12px) / 2);
-  position: relative;
-  width: 12px;
-  z-index: 1;
+  background: color-mix(in srgb, var(--mut) 5%, transparent); border-right: 1px dashed var(--ctl-line);
+  bottom: 0; content: ''; left: 0; pointer-events: none; position: absolute; top: 0; width: var(--stamp-w);
 }
-.history-row.recent-row[data-status="copied"]::before { --tone: var(--info); }
-/* Unverified is unknown, not broken (ui-iter-23): a quiet dotted ring, no panel; its day says why. */
-.history-row.recent-row[data-status="unverified"]::before { --tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); border: 2px dotted var(--tone); box-shadow: none; }
-.history-row.recent-row[data-status="failed"]::before { --tone: var(--err); border: 2px dashed var(--tone); box-shadow: none; }
-.history-day:first-child .history-row.recent-row:first-child::before { background: var(--tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 22%, transparent); }
-
-/* The row's stretch of thread. It frays around a failed dictation. */
-.history-row.recent-row::after { background: var(--thread); bottom: 0; content: ""; left: var(--thread-x); position: absolute; top: 0; width: 2px; }
-.history-row.recent-row:last-child::after { bottom: auto; height: var(--knot-y); }
-.history-row.recent-row[data-status="failed"]::after { background: repeating-linear-gradient(180deg, var(--err) 0 4px, transparent 4px 9px); opacity: .75; }
-
-/* Rows lift onto a panel under the pointer or focus; only failed rows, which need a
-   retry or a copy, always sit on one. */
-.history-row.recent-row:hover,
-.history-row.recent-row:focus-within,
-.history-row.recent-row[data-status="failed"] { background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 10px 24px -18px rgba(15, 23, 42, .45); }
-.history-row.recent-row[data-status="failed"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--err) 35%, var(--line)), 0 10px 24px -18px rgba(15, 23, 42, .45); }
-.history-row.recent-row:is(:hover, :focus-within, [data-status="failed"])::before { background: var(--panel); }
-.history-day:first-child .history-row.recent-row:first-child:is(:hover, :focus-within, [data-status="failed"])::before { background: var(--tone); }
-
-.history-row__meta {
-  align-items: center;
-  color: var(--mut);
-  display: flex;
-  flex-wrap: wrap;
-  font-size: var(--fs-secondary);
-  gap: 6px;
-  margin: 3px 0 0;
+.history-row.recent-row > .ledger-stamp {
+  align-items: center; border: 0; border-radius: 0; color: var(--mut); display: flex;
+  gap: 4px; grid-area: time; justify-content: space-between; min-height: max(28px, var(--line-h));
+  padding: 0 0 0 8px; position: relative; text-align: start;
 }
+.ledger-stamp .timestamp { color: inherit; font-variant-numeric: tabular-nums; text-decoration: underline dotted var(--ctl-line); text-underline-offset: 4px; }
+.ledger-stamp .ledger-knot { margin-right: -5px; }
+.ledger-stamp:is(:hover, :focus-visible, [aria-expanded="true"]) { background: var(--navon); color: var(--fg); }
+.ledger-stamp:focus-visible { outline-color: var(--accfg); }
+.ledger-stamp[aria-expanded="true"] .timestamp { text-decoration: underline solid var(--accfg); }
+.history-row.recent-row > .history-row__body { grid-area: body; min-width: 0; }
+.history-row .history-row__text { font-family: var(--font-words); font-size: calc(var(--fs-emph) * 1.12); font-weight: 400; letter-spacing: .002em; line-height: var(--line-h); margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.history-row.recent-row > .action-group { gap: 2px; grid-area: actions; }
+.history-row.recent-row:is(:hover, :focus-within) { background: color-mix(in srgb, var(--mut) 5%, transparent); }
+.history-row.recent-row[data-status="failed"] { background: var(--panel); box-shadow: inset -2px 0 var(--err); }
+.history-row .recovery-state, .history-row .history-row__exception { color: var(--mut); font-size: var(--fs-secondary); margin: 2px 0 0; }
+.history-row .recovery-state { align-items: baseline; color: var(--warn); display: flex; gap: 6px; }
 
-.history-row .recovery-state {
-  align-items: flex-start;
-  color: var(--warn);
-  display: flex;
-  font-size: var(--fs-secondary);
-  gap: 6px;
-  margin-top: 6px;
-}
+/* The slip opens on the same baseline grid, outside the word measure. */
+.history-row.recent-row > .recording-slip { border-block: 1px dashed var(--ctl-line); grid-column: 2 / -1; margin: var(--s-6) 0 var(--s-2); padding: var(--s-6) 0; }
+.recording-slip__fields { display: grid; gap: var(--s-5) var(--s-8); grid-template-columns: 1fr .7fr 1.6fr 1fr; margin: 0; max-width: 40rem; }
+.recording-slip__fields > div { min-width: 0; }
+.recording-slip__fields dt { color: var(--mut); font: 600 var(--fs-micro)/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.recording-slip__fields dd { color: var(--fg); font-size: var(--fs-secondary); font-weight: 600; margin: 3px 0 0; overflow-wrap: anywhere; }
+.recording-slip > p, .history-row__original { color: var(--mut); font-size: var(--fs-secondary); margin: var(--s-5) 0 0; }
+.history-row__original summary { cursor: pointer; width: fit-content; }
+.history-row__original p { font-family: var(--mono); font-size: var(--fs-mono); margin: 4px 0 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 
-.history-row .recovery-state .icon { margin-top: 2px; }
-
-/* Narrow: time and words keep sharing a line (QA #59); actions drop under the words. */
 @media (max-width: 780px) {
-  .history-row.recent-row {
-    grid-template-areas: "time knot body" ". knot actions";
-    grid-template-columns: var(--spool-time) 12px minmax(0, 1fr);
-  }
-  .history-row.recent-row > .action-group { grid-column: 3; justify-self: start; margin: 0 0 0 -12px; }
+  .history-day { --row-gap-x: 12px; }
+  .recording-slip__fields { gap: var(--s-4) var(--s-8); grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-
-/* BUS-16: cleanup provenance. */
-.history-row__original {
-  color: var(--mut);
-  font-size: var(--fs-secondary);
-  margin-top: 4px;
-}
-
-.history-row__original summary { cursor: default; width: fit-content; }
-/* The original is what the engine heard: mono, like the Dictionary's Heard tape. */
-.history-row__original p { font-family: var(--mono); font-size: var(--fs-mono); margin: 4px 0 0; white-space: pre-wrap; }

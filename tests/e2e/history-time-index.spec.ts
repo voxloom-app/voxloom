@@ -38,6 +38,19 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await expect(target).toBeInViewport({ ratio: 1 });
     await expect(rows).toHaveCount(38); // jumping isn't filtering
     await page.keyboard.press('Tab');
+    const stamp = target.getByRole('button', { name: 'Recording details, 11:56 AM, Unverified' });
+    await expect(stamp).toBeFocused();
+    await page.keyboard.press('Enter');
+    const slip = target.getByRole('region', { name: 'Recording details at 11:56 AM' });
+    await expect(slip.getByText('Unverified')).toBeVisible();
+    await expect(slip.getByText('Speech model')).toBeVisible();
+    await expect(rows.locator('.recording-slip:visible')).toHaveCount(1);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+    await page.screenshot({ path: info.outputPath(`recording-slip-${colorScheme}.png`) });
+    await page.keyboard.press('Space');
+    await expect(slip).toBeHidden();
+    await page.keyboard.press('Tab');
     await expect(target.getByRole('button', { name: 'Copy transcript' })).toBeFocused();
   });
 }
