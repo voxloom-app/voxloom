@@ -20,22 +20,15 @@
 [data-appearance-resolved="light"] .stage .pick__copy { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: 0 1px 2px rgba(70, 56, 30, .1); }
 [data-appearance-resolved="light"] .stage .pick__copy:hover { border-color: var(--sel-edge); color: var(--accfg); }
 
-/* ---- History: the woven day ---- */
+/* ---- Page titles on the linen ---- */
 [data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1) { color: var(--fg); }
-[data-appearance-resolved="light"] .day-loom__warp { stroke: rgba(70, 56, 30, .2); }
-[data-appearance-resolved="light"] .day-loom__weft { opacity: 1; }
-[data-appearance-resolved="light"] .day-loom g + g .day-loom__weft { opacity: .62; }
-[data-appearance-resolved="light"] .day-loom__loose { stroke: rgba(70, 56, 30, .38); }
-[data-appearance-resolved="light"] .day-loom__ticks li::before { background: rgba(70, 56, 30, .09); }
-[data-appearance-resolved="light"] .day-loom__waiting { background: #ffffff; border-color: rgba(70, 56, 30, .14); }
-[data-appearance-resolved="light"] :is(.day-loom__knot, .voice-path__thread i) { background-color: var(--linen); }
-[data-appearance-resolved="light"] .day-loom__knot:is([data-newest], [data-active][data-newest]) { background-color: var(--tone); }
 
 /* ---- Dictionary: the spelling proof. Restored words wear a highlighter's lime. ---- */
 [data-appearance-resolved="light"] .proof__knot { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
 [data-appearance-resolved="light"] .proof__label--typed::before { background-color: var(--brand-b); }
 
 /* ---- Settings: the voice path ---- */
+[data-appearance-resolved="light"] .voice-path__thread i { background-color: var(--linen); }
 [data-appearance-resolved="light"] .voice-path__stop:hover { background: rgba(255, 255, 255, .5); }
 [data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__thread i { background-color: var(--knot); }
 [data-appearance-resolved="light"] .voice-path__thread::before { opacity: .8; }

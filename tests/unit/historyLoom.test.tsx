@@ -1,9 +1,9 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { History } from '../../src/features/history/History';
 import {
-  dayLabel, formatSpoken, groupByDay, loomLayout, looseThreads, tally, weftPath, wordCount,
+  dayLabel, formatSpoken, groupByDay, looseThreads, tally, wordCount,
 } from '../../src/features/history/historyLoom';
 import type { DictationRecord } from '../../src/domain/types';
 import { renderWithApp } from './testUtils';
@@ -15,7 +15,6 @@ const record = (id: string, createdAt: number, extra: Partial<DictationRecord> =
   createdAt, durationSeconds: 10, id, model: null, recoveryExpiresAt: null,
   status: 'inserted', style: 'formal', text: 'one two three', ...extra,
 });
-const knots = () => [...document.querySelectorAll<HTMLElement>('.day-loom__knot')];
 
 describe('history loom helpers (ui-iter-02)', () => {
   it('labels days relative to now and groups newest-first records by local day', () => {
@@ -42,122 +41,46 @@ describe('history loom helpers (ui-iter-02)', () => {
       record('c', 0, { status: 'unverified' }), record('d', 0, { status: 'copied' }),
     ])).toEqual({ failed: 1, unverified: 2 });
   });
-
-  it('spans whole hours, at least three, and runs today on to now', () => {
-    const layout = loomLayout([record('old', at(26, 12, 8)), record('new', at(26, 13, 57), { durationSeconds: 60 })], NOW, true);
-    expect(layout.ticks.map((t) => t.label)).toEqual(['12 PM', '1 PM', '2 PM', '3 PM']);
-    expect(layout.ticks.map((t) => Math.round(t.x))).toEqual([0, 33, 67, 100]);
-    expect(layout.now).toBeCloseTo(66.67, 1);
-    expect(layout.knots.map((k) => [k.id, k.newest, k.size])).toEqual([['old', false, 12], ['new', true, 18]]);
-    expect(layout.knots[0].x).toBeCloseTo((8 / 180) * 100, 5);
-
-    const earlier = loomLayout([record('a', at(25, 7, 30)), record('b', at(25, 18, 10))], NOW, false);
-    expect(earlier.now).toBeNull();
-    expect(earlier.ticks[0].label).toBe('7 AM');
-    expect(earlier.ticks.at(-1)!.x).toBeLessThanOrEqual(100);
-    expect(earlier.ticks.length).toBeLessThanOrEqual(7);
-    expect(loomLayout([], NOW, true)).toEqual({ knots: [], now: null, ticks: [] });
-  });
-
-  it('weaves both threads through every knot and on to the end', () => {
-    for (const side of [1, -1] as const) {
-      const d = weftPath([100, 400, 410], side, 700);
-      expect(d.startsWith('M0 ')).toBe(true);
-      for (const x of ['100', '400.0', '410.0', '700.0']) expect(d).toContain(` ${x} 24`);
-    }
-    // The threads swap sides between knots, so they cross at each one.
-    const lift = (d: string) => Number(d.split(' C ')[2].split(' ')[1]);
-    expect(lift(weftPath([100, 400], 1, 400))).toBeGreaterThan(24);
-    expect(lift(weftPath([100, 400], -1, 400))).toBeLessThan(24);
-    expect(weftPath([], 1, 0)).toBe('');
-  });
 });
 
-describe('History woven day (ui-iter-02, said once since ui-iter-23)', () => {
-  it('names the loom\'s day without repeating the rail\'s tally, and groups the timeline under it', () => {
+describe('History masthead', () => {
+  it('groups the timeline by day without repeating its tally in the masthead', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
-    const stage = document.querySelector('.history-stage')!;
+    const stage = screen.getByRole('heading', { level: 1, name: 'History' }).closest('header')!;
     expect(stage).toHaveClass('stage');
-    expect(within(stage as HTMLElement).getByRole('heading', { level: 1 })).toHaveTextContent('History');
-    expect(stage.querySelector('.history-stage__day')).toHaveTextContent('Today');
-    // The rail's Today beam and the day heading already count the day.
     expect(stage.querySelector('dl')).toBeNull();
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Today');
     expect(screen.getByText('6 dictations · 1m 42s spoken')).toBeInTheDocument();
-    expect(knots()).toHaveLength(6);
-    expect(document.querySelector('.day-loom')).toHaveAttribute('aria-hidden', 'true');
-  });
-
-  it('leaves loose threads to the status filter, which fades the knots it hides', () => {
-    renderWithApp(<History onToast={vi.fn()} />, () => NOW);
     expect(screen.queryByRole('button', { name: /^Show (failed|unverified)$/ })).toBeNull();
-    const failed = screen.getByRole('radio', { name: 'Failed' });
-    fireEvent.click(failed);
-    expect(failed).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getAllByRole('article')).toHaveLength(1);
-    // Knots stay on the loom; the ones the filter hides fade.
-    expect(knots().filter((k) => k.dataset.match === 'false')).toHaveLength(5);
-    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
-    expect(screen.getAllByRole('article')).toHaveLength(6);
   });
 
-  it('lights the knot of the row under the pointer or focus', () => {
-    renderWithApp(<History onToast={vi.fn()} />, () => NOW);
-    const [newest, second] = screen.getAllByRole('article');
-    const activeKnots = () => knots().filter((k) => k.dataset.active).map((k) => k.dataset.record);
-    fireEvent.mouseOver(within(second).getByRole('heading', { level: 3 }));
-    expect(activeKnots()).toEqual(['record-2']);
-    fireEvent.mouseLeave(document.querySelector('.history-timeline')!);
-    expect(activeKnots()).toEqual([]);
-    fireEvent.focus(within(newest).getByRole('button', { name: 'Copy transcript' }));
-    expect(activeKnots()).toEqual(['record-1']);
-    fireEvent.blur(within(newest).getByRole('button', { name: 'Copy transcript' }));
-    expect(activeKnots()).toEqual([]);
-  });
-
-  it('keeps an empty loom, with no day caption or clipping sheet, when there is no history', () => {
+  it('leaves the empty state to the timeline, without a time index or clipping sheet', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
     for (const button of screen.getAllByRole('button', { name: 'Delete transcript' })) fireEvent.click(button);
-    expect(document.querySelector('.day-loom')).toHaveAttribute('data-empty', 'true');
-    expect(document.querySelector('.history-stage__day')).toBeNull();
+    expect(screen.queryByRole('navigation', { name: 'Time index' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Open clipping sheet/ })).toBeNull();
     expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
     expect(screen.getByText('No dictations yet')).toBeInTheDocument();
   });
 
-  it('keeps masthead text at AA on the surfaces it adds to the stage', () => {
+  it('keeps index text and ink legible on the graphite and linen materials', () => {
+    const css = readFileSync('src/styles/history-stage.css', 'utf8');
+    expect(css).toMatch(/\.time-index__period \{[^}]*background: var\(--field\)/);
+    expect(css).toMatch(/\.time-index__imprint i\[data-ink\] \{ background: var\(--info\)/);
+    expect(css).not.toContain('animation:'); // static data, even with motion enabled
     const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-    const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-    const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
-    const ratio = (a: string, b: string) => {
-      const [x, y] = [lum(hex(a)), lum(hex(b))].sort((m, n) => n - m);
-      return (x + 0.05) / (y + 0.05);
-    };
-    const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
-    const stage = readFileSync('src/styles/stage.css', 'utf8');
-    const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(stage)![1];
-    const css = readFileSync('src/styles/history-stage.css', 'utf8');
-    // Pin the surfaces this test measures, so a restyle has to revisit it.
-    expect(css).toContain('.day-loom__waiting { background: #15151c;');
-    expect(css).not.toContain('rgba(255, 255, 255, .025)'); // the loose-threads deck is gone
-    const top = '#17171f';
-    const surfaces = [
-      '#15151c', // waiting chip
-      mix('#b6ff3c', top, 0.18), // brightest lime glow
-      mix('#3cf0ff', top, 0.16), // brightest cyan glow
-    ];
-    for (const surface of surfaces) {
-      expect(ratio(token('mut'), surface), `mut on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(token('fg'), surface), `fg on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio('#b6ff3c', surface), `day caption / NOW on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio('#f6f6f9', surface), `title on ${surface}`).toBeGreaterThanOrEqual(4.5);
+    const lum = (hex: string) => [1, 3, 5].reduce((sum, i, n) => sum + [0.2126, 0.7152, 0.0722][n] * lin(parseInt(hex.slice(i, i + 2), 16)), 0);
+    for (const sheet of ['stage.css', 'daylight.css']) {
+      const source = readFileSync(`src/styles/${sheet}`, 'utf8');
+      const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(source)![1];
+      // Peak stage glows from the previous masthead test, plus resting and hover surfaces.
+      const peak = sheet === 'stage.css' ? ['#344124', '#1d3a43'] : ['#e9e4da', '#daecab', '#bce7e4'];
+      for (const surface of [token('panel'), token('field'), ...peak]) {
+        for (const name of ['fg', 'mut', 'info']) {
+          const [dark, light] = [lum(surface), lum(token(name))].sort((a, b) => a - b);
+          expect((light + .05) / (dark + .05), `${sheet}: ${name} on ${surface}`).toBeGreaterThanOrEqual(name === 'info' ? 3 : 4.5);
+        }
+      }
     }
-  });
-
-  it('stills the loom under reduced motion', () => {
-    const css = readFileSync('src/styles/history-stage.css', 'utf8');
-    const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toContain('.day-loom__pulse { display: none; }');
-    expect(reduced).toContain('.day-loom__now::after { animation: none; }');
   });
 });

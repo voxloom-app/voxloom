@@ -4,6 +4,7 @@ import { isCleanupActive } from '../domain/cleanup';
 import type { Screen } from '../domain/types';
 import { Dictionary } from '../features/dictionary/Dictionary';
 import { History } from '../features/history/History';
+import { focusHistoryRecord } from '../features/history/focusHistoryRecord';
 import { Home } from '../features/home/Home';
 import { stagePhase } from '../features/home/stagePhase';
 import { clearGuidedProgress, Onboarding } from '../features/onboarding/Onboarding';
@@ -111,14 +112,7 @@ export function App() {
   // History renders in the same commit as the screen change, so its row exists once this task runs.
   const showRecalled = useCallback((id: string) => {
     navigate('history');
-    window.setTimeout(() => {
-      const row = [...document.querySelectorAll<HTMLElement>('.history .history-row[data-record]')].find((el) => el.dataset.record === id);
-      if (!row) return;
-      row.focus({ preventScroll: true });
-      row.scrollIntoView?.({ block: 'center' });
-      row.dataset.recalled = '';
-      window.setTimeout(() => { delete row.dataset.recalled; }, 2_400);
-    }, 0);
+    window.setTimeout(() => focusHistoryRecord(id), 0);
   }, [navigate]);
   useAppKeys({ blocked: onboardingOpen || shortcutOpen, onHelp: openHelp, onNavigate: navigate, onRecall: openRecall });
 

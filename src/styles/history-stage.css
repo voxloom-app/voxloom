@@ -1,83 +1,81 @@
-/* History (ui-iter-02): a woven day. The masthead is the Home voice stage's dark
-   material (.stage in stage.css supplies its tokens) and ties each of the latest
-   day's dictations as a knot on the day loom. Since ui-iter-23 it says nothing
-   the rail or the filter already says: no tally, no loose-threads deck.
-   The timeline below runs one status-knotted thread through each day. */
-.history-stage { margin-bottom: var(--s-10); padding: var(--s-10) var(--stage-pad) var(--s-9); }
-.history-stage__title { min-width: 0; }
-.history-stage h1 { color: #f6f6f9; font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; margin: 0 0 6px; }
-.history-stage__lede { color: var(--mut); font-size: var(--fs-secondary); margin: 0; max-width: 58ch; }
+/* History's time index: a strip of stamped periods with an impression of
+   when you spoke. The strip uses the stage's own graphite / linen tokens. */
+.history-stage { padding: var(--s-10) var(--stage-pad) var(--s-6); }
+.history-stage__title { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-10); justify-content: space-between; }
+.history-stage h1 { color: var(--fg); font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; margin: 0; }
+.history-stage__lede { color: var(--mut); flex: 0 1 48ch; font-size: var(--fs-secondary); margin: 0; }
 
-/* The loom's day, on the line the "Now" label shares. */
-.history-stage__day { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .12em; line-height: 1; margin: var(--s-11) 0 0; text-transform: uppercase; }
-.history-stage__day + .day-loom { margin-top: calc(var(--fs-micro) * -1); }
-
-/* The day loom: two weft threads twist through the day and knot at each dictation. */
-.day-loom { isolation: isolate; margin-top: var(--s-11); position: relative; }
-.day-loom__track { height: 48px; position: relative; }
-.day-loom__weave { display: block; height: 48px; overflow: visible; width: 100%; }
-.day-loom path { fill: none; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.day-loom__warp { stroke: rgba(255, 255, 255, .16); stroke-width: 1; }
-.day-loom__weft { opacity: .85; stroke-width: 2; }
-.day-loom g + g .day-loom__weft { opacity: .5; }
-/* The static offset staggers the pulses when animation is off or paused. */
-.day-loom__pulse { animation: day-loom-flow 7s linear infinite; animation-delay: calc(var(--i) * -3.5s); opacity: .75; stroke-dasharray: 4 96; stroke-dashoffset: calc(var(--i) * 50); stroke-width: 3.5; }
-.day-loom__loose { stroke: rgba(255, 255, 255, .26); stroke-dasharray: 2 7; stroke-width: 1.5; }
-@keyframes day-loom-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
-
-.day-loom__knot {
-  --tone: var(--ok);
-  background: var(--panel);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 2px var(--tone), 0 0 0 3px var(--panel);
-  height: var(--knot);
-  position: absolute;
-  top: 24px;
-  transform: translate(-50%, -50%);
-  transition: opacity .25s ease, transform .2s ease, box-shadow .2s ease;
-  width: var(--knot);
+.time-index {
+  align-items: stretch;
+  border-block: 1px solid var(--ctl-line);
+  display: flex;
+  margin-top: var(--s-9);
 }
-.day-loom__knot[data-status="copied"] { --tone: var(--info); }
-/* Unverified is unknown, not broken: a quiet dotted ring (ui-iter-23). */
-.day-loom__knot[data-status="unverified"] { --tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); border: 2px dotted var(--tone); box-shadow: 0 0 0 3px var(--panel); }
-/* A failed dictation frays: a broken ring instead of a tied knot. */
-.day-loom__knot[data-status="failed"] { --tone: var(--err); border: 2px dashed var(--tone); box-shadow: 0 0 0 3px var(--panel); }
-.day-loom__knot[data-newest] { background: var(--tone); box-shadow: 0 0 0 3px var(--panel), 0 0 16px 2px color-mix(in srgb, var(--tone) 55%, transparent); }
-.day-loom__knot[data-match="false"] { opacity: .22; }
-/* The row you're on, found in your day. */
-.day-loom__knot[data-active] { box-shadow: inset 0 0 0 2px var(--tone), 0 0 0 3px var(--panel), 0 0 18px 4px color-mix(in srgb, var(--tone) 65%, transparent); opacity: 1; transform: translate(-50%, -50%) scale(1.5); z-index: 1; }
-.day-loom__knot[data-status="failed"][data-active] { box-shadow: 0 0 0 3px var(--panel), 0 0 18px 4px color-mix(in srgb, var(--tone) 65%, transparent); }
+.time-index__head { align-self: center; display: flex; flex: 0 0 auto; flex-direction: column; gap: 2px; padding: var(--s-4) var(--s-9) var(--s-4) 0; }
+.time-index__head > strong { color: var(--fg); font-size: var(--fs-secondary); font-weight: 650; }
+.time-index__head > span, .time-index__pages { color: var(--mut); font-size: var(--fs-label); }
+.time-index__pages { align-items: center; display: flex; gap: var(--s-4); font-variant-numeric: tabular-nums; }
+.time-index__pages button { background: none; border: 0; border-radius: var(--r-ctl); color: var(--accfg); font: inherit; min-height: 30px; min-width: 30px; }
+.time-index__pages button[aria-disabled="true"] { color: var(--mut); cursor: default; }
+.time-index__pages button:not([aria-disabled="true"]):hover { background: var(--field); }
 
-.day-loom__now { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .1em; line-height: 1; position: absolute; text-transform: uppercase; top: -4px; transform: translateX(-50%); }
-.day-loom__now::after {
-  animation: day-loom-now 2.4s ease-in-out infinite;
-  background: var(--accfg);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-a) 25%, transparent);
-  content: "";
-  height: 6px;
-  left: 50%;
-  position: absolute;
-  top: 28px;
-  transform: translate(-50%, -50%);
-  width: 6px;
+.time-index__strip { display: grid; flex: 1; grid-auto-columns: minmax(0, 1fr); grid-auto-flow: column; min-width: 0; }
+.time-index__period {
+  align-content: center;
+  align-items: center;
+  background: var(--field);
+  border: 0;
+  border-inline-start: 1px dashed var(--ctl-line);
+  border-radius: 0;
+  color: var(--fg);
+  container: time-card / inline-size;
+  display: grid;
+  gap: 2px var(--s-4);
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 78px;
+  padding: var(--s-5) var(--s-6);
+  position: relative;
+  text-align: start;
 }
-@keyframes day-loom-now { 50% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand-a) 0%, transparent); } }
+.time-index__label { font-family: var(--font-words); font-size: calc(var(--fs-sheet) * 1.42); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; }
+.time-index__count { color: var(--mut); font-size: var(--fs-label); grid-area: 2 / 1; }
+.time-index__jump { color: var(--mut); font-family: var(--mono); grid-area: 2 / 2; justify-self: end; }
+/* The punch matrix has a fixed pitch, not one decorative mark per record.
+   Quiet pilot holes register the empty intervals; filled slots mark activity. */
+.time-index__imprint {
+  align-items: center;
+  border-inline-start: 1px solid var(--line);
+  display: grid;
+  gap: 3px 4px;
+  grid-area: 1 / 2;
+  grid-auto-rows: 7px;
+  grid-template-columns: repeat(6, 4px);
+  justify-items: center;
+  padding-inline-start: var(--s-5);
+}
+.time-index__imprint i { background: var(--ctl-line); border-radius: 2px; height: 3px; width: 3px; }
+.time-index__imprint i[data-ink] { background: var(--info); border-radius: 1px; height: 7px; width: 4px; }
+.time-index__period:is(:hover, :focus-visible) { background: var(--panel); box-shadow: inset 0 -2px var(--accfg); }
+.time-index__period:is(:hover, :focus-visible) .time-index__jump { color: var(--accfg); }
+.time-index__period:focus-visible { outline-offset: -2px; }
 
-.day-loom__waiting { background: #15151c; border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-pill); color: var(--mut); font-size: var(--fs-secondary); left: 50%; padding: 3px 12px; position: absolute; top: 24px; transform: translate(-50%, -50%); white-space: nowrap; }
-
-.day-loom__ticks { height: 16px; list-style: none; margin: 4px 0 0; padding: 0; position: relative; }
-.day-loom__ticks li { color: var(--mut); font-family: var(--mono); font-size: var(--fs-micro); line-height: 16px; position: absolute; top: 0; transform: translateX(-50%); white-space: nowrap; }
-/* Faint heddles behind the threads, one per labelled hour. */
-.day-loom__ticks li::before { background: rgba(255, 255, 255, .07); bottom: calc(100% + 4px); content: ""; height: 48px; left: 50%; position: absolute; width: 1px; z-index: -1; }
-/* The end labels sit inside the stage, flush with their hour. */
-.day-loom__ticks li:first-child { transform: none; }
-.day-loom__ticks li:first-child::before { left: 0; }
-.day-loom__ticks li:last-child:not(:first-child) { transform: translateX(-100%); }
-.day-loom__ticks li:last-child:not(:first-child)::before { left: auto; right: 0; }
-
-@media (prefers-reduced-motion: reduce) {
-  /* The loom holds still; knots, threads and "now" stay put. */
-  .day-loom__pulse { display: none; }
-  .day-loom__now::after { animation: none; }
+@media (max-width: 980px) {
+  .time-index { flex-direction: column; }
+  .time-index__head { align-items: baseline; align-self: stretch; flex-direction: row; flex-wrap: wrap; gap: 2px var(--s-5); padding: var(--s-4) 0; }
+  .time-index__pages { margin-inline-start: auto; }
+  .time-index__strip { border-top: 1px solid var(--line); }
+}
+/* Keep the whole strip on one line in a narrow desktop window. Set the
+   punches beneath the number when there isn't room beside it. */
+@container time-card (max-width: 155px) {
+  .time-index__label { grid-column: 1 / -1; }
+  .time-index__imprint { grid-area: 3 / 1 / auto / -1; border: 0; padding: var(--s-2) 0 0; }
+  .time-index__count { grid-column: 1 / -1; }
+  .time-index__jump { grid-row: 3; place-self: end; }
+}
+@media (max-width: 600px) {
+  .time-index__strip { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .time-index__period { border-top: 1px solid var(--line); }
+  .time-index__period:only-child { grid-column: 1 / -1; }
 }

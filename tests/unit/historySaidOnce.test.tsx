@@ -82,7 +82,8 @@ describe('History says it once (ui-iter-23)', () => {
     expect(badge).not.toMatch(/background: color-mix\(in srgb, var\(--warn\)/);
     const quiet = 'color-mix(in srgb, var(--warn) 45%, var(--mut))';
     expect(css('history.css')).toContain(`.history-row.recent-row[data-status="unverified"]::before { --tone: ${quiet}; border: 2px dotted var(--tone);`);
-    expect(css('history-stage.css')).toContain(`.day-loom__knot[data-status="unverified"] { --tone: ${quiet}; border: 2px dotted var(--tone);`);
+    // The time index measures activity, never delivery outcomes.
+    expect(css('history-stage.css')).not.toContain('[data-status');
     expect(css('home.css')).toContain(`.home .recent-row[data-status="unverified"]::before { border: 2px dotted ${quiet};`);
     expect(css('home-pick.css')).toContain(`[data-status="unverified"] { --pick-tone: ${quiet}; }`);
     expect(css('recall.css')).toContain(`.recall__opt[data-status="unverified"] .recall__knot { --tone: ${quiet}; background: none; border: 1.5px dotted var(--tone); }`);

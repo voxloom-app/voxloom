@@ -54,7 +54,7 @@ export function HistoryRow({ record, isNative, currentTime, canStart, clipNumber
   const original = record.cleanup?.status === 'cleaned' && record.rawText
     && record.rawText !== record.text ? record.rawText : null;
   return (
-    <article className="recent-row history-row" data-clipped={clipNumber ? true : undefined} data-record={record.id} data-status={record.status} tabIndex={0}>
+    <article id={`history-record-${record.id}`} className="recent-row history-row" data-clipped={clipNumber ? true : undefined} data-record={record.id} data-status={record.status} tabIndex={0}>
       <span className="timestamp">{formatTime(record.createdAt)}</span>
       <div className="history-row__body">
         <h3 className="history-row__text" id={textId}>{record.text}</h3>

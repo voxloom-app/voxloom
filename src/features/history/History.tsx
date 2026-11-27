@@ -9,11 +9,9 @@ import { canRetry } from '../../domain/records';
 import type { DictationRecord, HistoryStatus, Settings } from '../../domain/types';
 import { isTauriEnv } from '../../services/capture/captureService';
 import { canClip, ClippingSheet } from './ClippingSheet';
-import { DayLoom } from './DayLoom';
+import { TimeIndex } from './TimeIndex';
 import { HistoryRow } from './HistoryRow';
-import {
-  dayKey, dayLabel, formatSpoken, groupByDay, loomLayout, tally,
-} from './historyLoom';
+import { formatSpoken, groupByDay, tally } from './historyLoom';
 
 interface HistoryProps {
   onToast: (message: string) => void;
@@ -37,22 +35,14 @@ const retentionCopy: Record<Settings['transcriptRetention'], string> = {
 
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`;
 
-/**
- * History as a woven day that says each thing once (ui-iter-23). The masthead
- * (the Home stage's material) ties the latest day's dictations as knots on its
- * loom; the rail already tallies today, and the status filter already shows
- * loose threads, so neither is repeated here. The timeline groups transcripts
- * by day on one status-knotted thread, and each day states its unverified
- * caution once instead of boxing every row.
- */
+/** The time index leads into day-grouped transcripts. Each day states its
+ * unverified caution once instead of boxing every row. */
 export function History({ onToast }: HistoryProps) {
   const { clipboard, dictation, history, now, state } = useApp();
   const isNative = isTauriEnv();
   const [currentTime, setCurrentTime] = useState(now);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<Filter>('all');
-  // The row under the pointer or keyboard focus; its knot lights up on the day loom.
-  const [active, setActive] = useState<string | null>(null);
   const sorted = [...state.records].sort((a, b) => b.createdAt - a.createdAt);
   // Keep only IDs here. Filtering does not discard a clip; deleting a record does.
   const [clipIds, setClipIds] = useState<Set<string>>(() => new Set());
@@ -72,12 +62,6 @@ export function History({ onToast }: HistoryProps) {
     .filter((record) => record.text.toLowerCase().includes(query.toLowerCase()));
   const groups = groupByDay(records, currentTime);
 
-  // The masthead follows the latest day with dictations, whatever the filters show.
-  const latest = sorted[0];
-  const loomDay = latest ? dayKey(latest.createdAt) : null;
-  const dayRecords = sorted.filter((record) => dayKey(record.createdAt) === loomDay);
-  const layout = loomLayout(dayRecords, currentTime, loomDay === dayKey(currentTime));
-  const matches = new Set(records.map((record) => record.id));
   // The clipping sheet only earns a place once something can be clipped.
   const clippable = passages.length > 0 || state.records.some(canClip);
 
@@ -108,11 +92,6 @@ export function History({ onToast }: HistoryProps) {
     dictation.retry(record.id);
   }
 
-  const track = (target: EventTarget | null) => {
-    const row = target instanceof Element ? target.closest<HTMLElement>('[data-record]') : null;
-    setActive(row?.dataset.record ?? null);
-  };
-
   return (
     <section aria-labelledby="history-title" className="history">
       <header className="stage history-stage">
@@ -125,8 +104,7 @@ export function History({ onToast }: HistoryProps) {
               : 'Failed dictations can be retried while their temporary recovery buffer lasts.'}
           </p>
         </div>
-        {latest && <p className="history-stage__day">{dayLabel(latest.createdAt, currentTime)}</p>}
-        <DayLoom active={active} layout={layout} matches={matches} />
+        <TimeIndex groups={groups} key={`${status}:${query}`} />
       </header>
       <div className="cloth">
         <div className="history-tools" data-clipping={passages.length > 0 || undefined}>
@@ -134,15 +112,7 @@ export function History({ onToast }: HistoryProps) {
           <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />
           {clippable && <ClippingSheet onCopy={(text) => clipboard.copy(text)} passages={passages} />}
         </div>
-        <div
-          className="history-timeline"
-          onBlur={(event) => {
-            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setActive(null);
-          }}
-          onFocus={(event) => track(event.target)}
-          onMouseLeave={() => setActive(null)}
-          onMouseOver={(event) => track(event.target)}
-        >
+        <div className="history-timeline">
           {groups.map((group) => {
             const sum = tally(group.records);
             const unsure = group.records.filter((record) => record.status === 'unverified').length;

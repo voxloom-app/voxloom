@@ -21,7 +21,7 @@
 .history-tools .search { min-width: 220px; }
 
 /* History timeline (ui-iter-02): each day is a heading and one thread; every row
-   ties a knot on it. The masthead and day loom live in history-stage.css. */
+   ties a knot on it. The masthead and time index live in history-stage.css. */
 .history-timeline { display: grid; gap: var(--s-10); }
 .history-day {
   --spool-time: calc(var(--fs-mono) * 5.6);
