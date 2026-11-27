@@ -138,7 +138,7 @@ describe('Recall at the top of the rail (ui-iter-11, moved by ui-iter-27)', () =
     const user = await openApp();
     await user.click(screen.getByRole('button', { name: 'Open keyboard shortcuts' }));
     const sheet = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
-    expect(within(sheet).getByText('Recall anything you said')).toBeInTheDocument();
+    expect(within(sheet).getByText('Recall a dictation')).toBeInTheDocument();
     fireEvent.keyDown(document.activeElement ?? document, { key: 'k', metaKey: true });
     fireEvent.keyDown(document.activeElement ?? document, { key: '/' });
     expect(field()).not.toHaveFocus();

@@ -1,0 +1,97 @@
+/* The help sheet opens flat: a playable shortcut on the left, window commands on the right. */
+.overlay:has(.shortcut-guide) { --sheet-max: 820px; }
+.overlay__panel:has(.shortcut-guide) { container-type: inline-size; padding-inline: clamp(14px, 2.8vw, 32px); }
+.overlay__panel:has(.shortcut-guide) .modal-close { height: 30px; width: 30px; }
+.overlay__panel:has(.shortcut-guide) > h2 { font-size: calc(var(--fs-sheet) * 1.65); }
+.shortcut-guide {
+  --stock: var(--sheet);
+  border-top: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .92fr);
+  margin-top: var(--s-7);
+}
+.shortcut-guide section { min-width: 0; padding-top: var(--s-8); }
+.shortcut-guide h3 { color: var(--fg); font-size: var(--fs-body); margin: 0; }
+.shortcut-guide__scope { font-size: var(--fs-secondary); margin: 3px 0 var(--s-5); }
+.shortcut-demo { padding-right: var(--s-10); }
+.shortcut-demo__illustration {
+  --stock: var(--field);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--brand-a) 4%, transparent), transparent 70%), var(--stock);
+  border-block: 1px solid var(--line); margin-top: var(--s-6); padding: 0 var(--s-6) var(--s-4);
+}
+.shortcut-demo__keys {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 76px;
+  padding-block: var(--s-6) var(--s-8);
+}
+.shortcut-demo__caps { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.shortcut-demo__keys .kbd {
+  background: linear-gradient(var(--panel), var(--field));
+  border: 1px solid var(--ctl-line);
+  box-shadow: 0 3px 0 var(--ctl-line), 0 6px 10px -4px rgb(0 0 0 / 35%);
+  color: var(--fg);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  font-size: var(--fs-bigkey);
+  min-height: 46px;
+  min-width: 40px;
+  padding: 4px 12px;
+  text-align: start;
+}
+.shortcut-demo__keys .kbd small { color: var(--mut); font-size: var(--fs-micro); font-weight: 500; }
+@media (prefers-reduced-motion: no-preference) {
+  .shortcut-demo__keys[data-down] .kbd {
+    background: color-mix(in srgb, var(--brand-a) 14%, var(--field));
+    border-color: var(--accfg);
+    box-shadow: 0 1px 0 var(--accfg);
+    transform: translateY(2px);
+  }
+  .shortcut-demo__keys[data-down] small { color: var(--fg); }
+}
+.shortcut-demo .seg { max-width: 100%; }
+.shortcut-demo .seg__item { min-height: 30px; }
+.shortcut-demo .gesture-score { margin-top: 0; }
+.shortcut-demo .gesture-score__keys, .shortcut-demo .gesture-score__voice { height: 28px; }
+.shortcut-demo p.shortcut-demo__instruction { color: var(--fg); font: calc(var(--fs-body) * 1.12)/1.4 var(--font-words); margin: var(--s-5) 0 var(--s-8); }
+.shortcut-demo__playback { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); }
+.shortcut-demo__playback .btn { min-height: 32px; }
+.shortcut-demo__playback .btn span { color: var(--accfg); }
+.shortcut-demo__playback small { color: var(--mut); font-size: var(--fs-label); }
+.shortcut-guide :is(button, .seg__item):focus-visible { outline: 2px solid var(--accfg); outline-offset: 2px; }
+
+/* Four number keys share one modifier, as they do on the actual keyboard. */
+.window-keys { border-left: 1px dashed var(--ctl-line); padding-left: var(--s-10); }
+.window-keys__numbers {
+  background: var(--field); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  display: grid; gap: 4px; grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none; margin: var(--s-8) 0; padding: var(--s-6) 4px;
+}
+.window-keys__numbers li { align-items: center; display: flex; flex-direction: column; gap: 7px; }
+.window-keys__numbers .kbd { background: var(--sheet); border-color: var(--ctl-line); font: 600 var(--fs-emph)/1 var(--mono); min-width: 32px; padding: 6px; }
+.window-keys__numbers li span { color: var(--fg); font-size: var(--fs-label); }
+.window-keys__list { margin: 0; }
+.window-keys__list > div { align-items: center; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 8px; justify-content: space-between; padding-block: var(--s-5); }
+.window-keys__list dt { font-size: var(--fs-secondary); }
+.window-keys__list dd { align-items: center; color: var(--mut); display: flex; font-size: var(--fs-label); gap: 4px; margin: 0; }
+@container (max-width: 640px) {
+  .shortcut-demo { padding-right: var(--s-6); }
+  .window-keys { padding-left: var(--s-6); }
+  .window-keys__numbers { grid-template-columns: repeat(4, auto); justify-content: space-around; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Both complete gestures remain readable without running the illustration. */
+  .shortcut-demo__playback { display: none; }
+}
+@container (max-width: 36em) {
+  .window-keys__numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: var(--s-5); }
+}
+@container (max-width: 32em) {
+  .shortcut-guide { grid-template-columns: minmax(0, 1fr); }
+  .shortcut-demo { padding-right: 0; }
+  .window-keys { border-left: 0; border-top: 1px dashed var(--ctl-line); margin-top: var(--s-7); padding-left: 0; }
+  .window-keys__numbers { grid-template-columns: repeat(auto-fit, minmax(5em, 1fr)); }
+}

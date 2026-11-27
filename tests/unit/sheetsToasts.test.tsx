@@ -1,5 +1,5 @@
 /// UI PR 9: step dots, shortcuts sheet, toast severity icons.
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ShortcutsDialog } from '../../src/app/AppDialogs';
@@ -34,14 +34,56 @@ describe('toastTone (toasts board strings)', () => {
 });
 
 describe('ShortcutsDialog', () => {
-  it('lists gesture, navigation, Recall, Settings and this sheet, and Done closes it', async () => {
+  it('lists both ways to dictate and the window shortcuts, and closes from its header', async () => {
     const onClose = vi.fn();
     render(<ShortcutsDialog onClose={onClose} opener={null} shortcut="Control+Shift+Space" />);
-    for (const label of ['Dictate (hold / double-tap to latch)', 'Go to Home · History · Dictionary', 'Recall anything you said', 'Settings', 'Show this sheet']) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+    const help = screen.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    const pages = within(help).getByRole('list', { name: 'Page shortcuts' });
+    for (const [i, name] of ['Home', 'History', 'Dictionary', 'Settings'].entries()) {
+      expect(within(pages).getAllByRole('listitem')[i]).toHaveTextContent(`${i + 1}${name}`);
     }
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Done' }));
+    for (const label of ['Recall a dictation', 'Open Settings', 'Show this sheet']) {
+      expect(within(help).getByText(label)).toBeInTheDocument();
+    }
+    expect(within(help).getByText('Hold your shortcut while you speak. Release to finish.')).toBeVisible();
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Close Keyboard shortcuts' }));
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('shortcut examples', () => {
+  it('prints the side and the name on a Mac modifier key, not just its symbol', () => {
+    const platform = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    try {
+      render(<ShortcutsDialog onClose={() => {}} opener={null} shortcut="AltRight" />);
+      const key = screen.getByRole('region', { name: 'Dictation keys' }).querySelector('kbd');
+      expect(key).toHaveTextContent('⌥Right Option');
+    } finally { platform.mockRestore(); }
+  });
+
+  it('uses the saved key, releases it between the hands-free taps, and cancels on a mode change', () => {
+    vi.useFakeTimers();
+    try {
+      render(<ShortcutsDialog onClose={() => {}} opener={null} shortcut="F17" />);
+      const demo = screen.getByRole('region', { name: 'Dictation keys' });
+      const keys = demo.querySelector('.shortcut-demo__keys')!;
+      expect(keys).toHaveTextContent('F17');
+      fireEvent.click(screen.getByRole('radio', { name: 'Hands-free' }));
+      expect(within(demo).getByText(/press once to finish/)).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: 'Play example' }));
+      const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+      advance(260); expect(keys).toHaveAttribute('data-down');
+      advance(150); expect(keys).not.toHaveAttribute('data-down');
+      advance(90); expect(keys).toHaveAttribute('data-down');
+      advance(300); expect(keys).not.toHaveAttribute('data-down');
+      fireEvent.click(screen.getByRole('radio', { name: 'Hold to talk' }));
+      advance(2000); expect(keys).not.toHaveAttribute('data-down');
+      expect(screen.getByRole('button', { name: 'Play example' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Play example' }));
+      advance(1500); expect(keys).toHaveAttribute('data-down');
+      advance(1500); expect(keys).not.toHaveAttribute('data-down');
+      expect(screen.getByRole('button', { name: 'Play example' })).toBeEnabled();
+    } finally { vi.useRealTimers(); }
   });
 });
 
