@@ -51,7 +51,7 @@ describe('ShortcutRecorder waits for native registration', () => {
     expect(status()).toHaveTextContent(/^Setting/);
     await report({ message: 'raw Control+Alt+K', ok: false, shortcut: 'Ctrl + Alt + K' });
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT);
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
     expect(status()).toHaveTextContent('⌃⌥K is in use by another app. Kept ⌃⇧Space.');
     expect(status()).not.toHaveTextContent('Control+Alt+K'); // no raw hotkey string
   });
@@ -159,7 +159,7 @@ describe('ShortcutRecorder waits for native registration', () => {
     expect(status()).toHaveTextContent(/Still waiting for/);
     await report({ active: DEFAULT, ok: false, shortcut: 'Ctrl + Alt + K' });
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT);
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
     expect(status()).toHaveTextContent('⌃⌥K is in use by another app. Kept ⌃⇧Space.');
   });
 

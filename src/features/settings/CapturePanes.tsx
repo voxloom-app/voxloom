@@ -33,24 +33,18 @@ export function ShortcutPane({ onSetup }: { onSetup: (opener: HTMLElement) => vo
   const update = settings.update;
   return (
     <div className="settings-rows">
-      <div className="frow frow--recorder" data-path-stop="shortcut">
-        <span className="frow__label">
-          <span id="settings-shortcut-label">Shortcut</span>
-          <small className="frow__help" id="settings-shortcut-help">
-            {SHORTCUT_HELP}
-          </small>
-        </span>
-        <span className="frow__control">
-          <ShortcutRecorder
-            defaultValue={initialSettings.shortcut}
-            labelId="settings-shortcut-label"
-            onChange={(value) => update({ key: 'shortcut', value })}
-            value={state.settings.shortcut}
-          />
-          <button aria-label="Set up shortcuts" className="btn" onClick={(event) => onSetup(event.currentTarget)} type="button">
-            Set up shortcuts…
-          </button>
-        </span>
+      <div className="shortcut-station" data-path-stop="shortcut">
+        <span className="sr-only" id="settings-shortcut-label">Shortcut</span>
+        <ShortcutRecorder
+          defaultValue={initialSettings.shortcut}
+          labelId="settings-shortcut-label"
+          onChange={(value) => update({ key: 'shortcut', value })}
+          value={state.settings.shortcut}
+        />
+        <button aria-label="Set up shortcuts" className="btn" onClick={(event) => onSetup(event.currentTarget)} type="button">
+          Set up shortcuts…
+        </button>
+        <small className="shortcut-station__help" id="settings-shortcut-help">{SHORTCUT_HELP}</small>
       </div>
       <div className="frow">
         <span className="frow__label">

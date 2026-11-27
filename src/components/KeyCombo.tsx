@@ -59,7 +59,8 @@ export function spokenCombo(combo: string, mac = isMacPlatform()): string {
   if (lone) return lone;
   const names = mac ? spokenMac : spokenOther;
   return combo.split('+').map((part) => part.trim()).filter(Boolean)
-    .map((part) => names[part.toLowerCase()] ?? (part.length === 1 ? part.toUpperCase() : part)).join(' ');
+    .map((part) => cmdOrCtrl.has(part.toLowerCase()) ? (mac ? 'Command' : 'Control')
+      : names[part.toLowerCase()] ?? (part.length === 1 ? part.toUpperCase() : part)).join(' ');
 }
 
 export function Kbd({ children }: { children: string }) {

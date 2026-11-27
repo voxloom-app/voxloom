@@ -247,7 +247,7 @@ describe('Shortcut recorder (BUS-47)', () => {
     await user.click(field);
     expect(field).toHaveTextContent('Press keys…');
     await user.keyboard('{Control>}{Alt>}k{/Alt}{/Control}');
-    expect(field).toHaveAccessibleName('Shortcut Control Option K');
+    expect(field).toHaveAccessibleName('Shortcut Control Option K. Change keys');
     expect(screen.getByText(/^Shortcut set to/)).toBeInTheDocument();
   });
 });

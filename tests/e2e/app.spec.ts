@@ -166,6 +166,7 @@ test('the 760×660 Settings window keeps two-column rows and a two-column recove
   await page.goto('/settings.html');
   const cols = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(await cols('.settings-rows .frow')).toBe(2);
+  await expect(page.getByRole('button', { name: /Next stop: Microphone/ })).toBeInViewport({ ratio: 1 });
   await page.getByRole('tab', { name: /^Transcripts/ }).click();
   expect(await cols('.settings-rows .frow')).toBe(2);
   expect(await cols('.recovery-grid')).toBe(2);
@@ -180,18 +181,21 @@ test('records the shortcut by pressing it (BUS-47)', async ({ page }) => {
   const field = page.getByRole('button', { name: /^(Shortcut|App-local shortcut|Global shortcut) / });
   const before = await field.boundingBox();
   await field.click();
-  await expect(field).toHaveText('Press keys…');
+  await expect(field.locator('.key-map__chord')).toHaveText('Press keys…');
+  await expect(field.locator('[data-plotted]')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space');
+  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space. Change keys');
   await field.click();
   await page.keyboard.press('Control+F5');
   await expect(page.getByText(/can't be used/)).toBeVisible();
   await page.keyboard.press('Control+Alt+KeyK');
-  await expect(field).toHaveAccessibleName(/^Shortcut Control (Option|Alt) K$/);
+  await expect(field).toHaveAccessibleName(/^Shortcut Control (Option|Alt) K\. Change keys$/);
+  await expect(field.locator('[data-key="K"][data-plotted]')).toBeVisible();
+  await expect(field.locator('[data-plotted]')).toHaveCount(3);
   expect((await field.boundingBox())?.y).toBe(before?.y);
   if (process.env.BUS47_SHOT) await page.screenshot({ path: process.env.BUS47_SHOT });
   await page.getByRole('button', { name: 'Reset to default' }).click();
-  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space');
+  await expect(field).toHaveAccessibleName('Shortcut Control Shift Space. Change keys');
 });
 
 test('dialogs, reduced motion, narrow and coarse layouts work', async (

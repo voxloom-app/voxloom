@@ -57,7 +57,7 @@ describe('recorder state outlives the recorder', () => {
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT); // reverted while unmounted
     await user.click(toggle); // come back
     expect(status()).toHaveTextContent('⌃⌥K is in use by another app. Kept ⌃⇧Space.');
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space. Change keys');
   });
 
   it('a refusal right after the remount still lands', async () => {
@@ -87,7 +87,7 @@ describe('recorder state outlives the recorder', () => {
     await user.keyboard('{Control>}{Alt>}t{/Alt}{/Control}');
     await report({ active: null, ok: false, previous: DEFAULT, shortcut: 'Ctrl + Alt + T' });
     expect(onChange).toHaveBeenLastCalledWith(DEFAULT); // kept so next launch retries
-    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space, not active');
+    expect(field()).toHaveAccessibleName('Dictation shortcut, Control Shift Space, not active. Change keys');
     expect(field()).toHaveAttribute('data-inactive', 'true');
     expect(field()).toHaveTextContent('(not active)');
     await report({ active: 'Ctrl + Alt + J', ok: true, shortcut: 'Ctrl + Alt + J' });

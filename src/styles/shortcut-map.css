@@ -1,0 +1,131 @@
+/* The Shortcut pane is a keyboard plate and its printed legend. Both halves are
+   one recorder, not a keyboard of pretend buttons. The US diagram is a reference;
+   key names outside it remain readable without identifying a glyph or a colour. */
+.shortcut-station {
+  align-items: center;
+  container-type: inline-size;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: var(--s-5);
+}
+.shortcut-recorder { display: contents; }
+.shortcut-recorder__field {
+  --map-bed: #171c20;
+  --map-case: #101315;
+  --map-face: #2c3235;
+  --map-bevel: #495053;
+  --map-legend: #dae0de;
+  --map-selected: var(--brand-a);
+  --map-print: var(--on-brand);
+  --map-edge: var(--accfg);
+  background: var(--panel);
+  border: 1px solid var(--ctl-line);
+  border-radius: 9px;
+  box-shadow: 0 3px 0 var(--line);
+  color: var(--fg);
+  cursor: pointer;
+  display: block;
+  flex-basis: 100%;
+  font: inherit;
+  margin: 0 0 5px;
+  min-width: 0;
+  padding: 0;
+  text-align: start;
+  width: 100%;
+}
+[data-appearance-resolved="light"] .shortcut-recorder__field {
+  --map-bed: #eceae1;
+  --map-case: #ccc9bc;
+  --map-face: #fbfaf4;
+  --map-bevel: #a5a497;
+  --map-legend: #434941;
+  --map-selected: #3e611e;
+  --map-print: #ffffff;
+}
+.shortcut-recorder__field:hover { border-color: var(--map-edge); }
+.shortcut-recorder__field:focus-visible { outline: 3px solid var(--map-edge); outline-offset: 3px; }
+.shortcut-recorder__field[data-recording] { --map-edge: var(--info); border-color: var(--map-edge); border-style: dashed; }
+.key-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(10em, 28%); }
+.key-map__plot {
+  background-color: var(--map-bed);
+  background-image: radial-gradient(color-mix(in srgb, var(--map-legend) 24%, transparent) .7px, transparent .9px);
+  background-size: 8px 8px;
+  border-radius: 8px 0 0 8px;
+  display: grid;
+  gap: var(--s-4);
+  padding: var(--s-5) var(--s-8);
+}
+.key-map__caption, .key-map__eyebrow, .key-map__scale {
+  color: var(--map-legend);
+  font: 600 var(--fs-micro)/1.3 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.key-map__caption { align-items: center; display: flex; gap: var(--s-6); }
+.key-map__caption i { border-top: 1px solid var(--map-bevel); flex: 1; }
+.key-map__diagram {
+  align-self: center;
+  background: var(--map-case);
+  border: 1px solid var(--map-bevel);
+  border-radius: 7px;
+  box-shadow: 0 3px 0 var(--map-bevel), 0 6px 10px #0002;
+  display: block;
+  justify-self: center;
+  max-width: 490px;
+  width: 100%;
+}
+.key-map__skirt { fill: var(--map-bevel); }
+.key-map__face { fill: var(--map-face); stroke: var(--map-bevel); stroke-width: .8px; }
+.key-map__diagram text { fill: var(--map-legend); font: 500 var(--fs-label) var(--mono); }
+.key-map__diagram [data-plotted] .key-map__face { fill: var(--map-selected); stroke: var(--map-selected); }
+.key-map__diagram [data-plotted] text { fill: var(--map-print); font-weight: 700; }
+.key-map__witness { stroke: var(--map-print); stroke-linecap: round; stroke-width: 1.8px; }
+.key-map__scale { align-items: center; display: flex; gap: var(--s-5); justify-content: end; letter-spacing: .015em; text-transform: none; }
+.key-map__scale::before { background: repeating-linear-gradient(90deg, var(--map-bevel) 0 1px, transparent 1px 8px); content: ''; flex: 1; height: 5px; }
+.key-map__legend {
+  align-content: center;
+  align-items: start;
+  border-left: 1px dashed var(--ctl-line);
+  display: grid;
+  gap: var(--s-7);
+  padding: var(--s-8) var(--s-9);
+}
+.key-map__eyebrow { color: var(--mut); }
+.key-map__chord { display: flex; flex-wrap: wrap; font: 580 calc(var(--fs-sheet) * 1.45)/1.15 var(--font); gap: .13em .23em; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.key-map__chord > span { max-width: 100%; }
+.key-map__chord i { color: var(--mut); font-style: normal; font-weight: 400; padding-right: .2em; }
+.key-map__action { align-items: center; color: var(--accfg); display: flex; font-size: var(--fs-secondary); font-weight: 650; gap: 6px; }
+.shortcut-recorder__field:hover .key-map__action { text-decoration: underline; text-underline-offset: 3px; }
+.shortcut-recorder__field[data-recording] .key-map__action { color: var(--info); }
+.shortcut-station__help { color: var(--mut); flex: 1 1 24ch; font-size: var(--fs-label); margin-left: auto; text-align: end; }
+.shortcut-recorder__status { flex-basis: 100%; font-size: var(--fs-label); line-height: 1.35; order: 1; }
+.shortcut-recorder__status:empty { flex-basis: 0; position: absolute; }
+.shortcut-recorder__status[data-tone="error"] { color: var(--danger); }
+
+/* Leave the next stop in reach on short desktop windows. */
+@media (max-height: 780px) {
+  .settings-panel[data-pane="shortcut"] .settings-pane__walk { margin-top: var(--s-5); padding-top: var(--s-5); }
+  .settings-panel[data-pane="shortcut"] .settings-pane__head { margin-bottom: var(--s-6); }
+}
+
+/* The standalone Settings window is only 660px tall. Put the reference and
+   fingering labels on one line and let the intro sit beside the pane title. */
+@media (min-width: 650px) and (max-height: 700px) {
+  .settings-window-root [data-pane="shortcut"] .settings-pane__head { align-items: baseline; display: flex; flex-wrap: wrap; gap: 0 var(--s-6); }
+  .settings-window-root [data-pane="shortcut"] .settings-pane__where { flex-basis: 100%; }
+  .settings-window-root .key-map__plot { grid-template-columns: 1fr auto; }
+  .settings-window-root .key-map__scale { grid-column: 2; grid-row: 1; }
+  .settings-window-root .key-map__diagram { grid-column: 1 / -1; grid-row: 2; max-width: 425px; }
+  .settings-window-root [data-pane="shortcut"] .settings-pane__step { padding-block: var(--s-3); }
+}
+
+@container (max-width: 560px) {
+  .key-map { grid-template-columns: minmax(0, 1fr); }
+  .key-map__plot { border-radius: 8px 8px 0 0; padding: var(--s-6); }
+  .key-map__legend { align-items: center; border: 0; border-top: 1px dashed var(--ctl-line); gap: 4px 12px; grid-template-columns: 1fr auto; padding: var(--s-6); }
+  .key-map__eyebrow { grid-column: 1 / -1; }
+  .key-map__chord { font-size: var(--fs-sheet); }
+  .shortcut-station__help { flex-basis: 100%; text-align: start; }
+}
