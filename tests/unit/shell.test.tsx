@@ -142,12 +142,17 @@ describe('App shell (UI PR 3)', () => {
 });
 
 describe('Home (UI PR 3)', () => {
-  it('shows a status badge on each earlier row and on the last pick', () => {
+  it('shows a status badge on the last pick; earlier rows name theirs once, in the knot key', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const rows = document.querySelectorAll('.home .recent-row');
     expect(rows).toHaveLength(4);
     expect(document.querySelector('.home .pick .badge')).toHaveAttribute('data-status', 'inserted');
-    rows.forEach((row) => expect(row.querySelector('.badge')).not.toBeNull());
+    // ui-iter-29: no pill per row; each row keeps its status for screen readers.
+    rows.forEach((row) => {
+      expect(row.querySelector('.badge')).toBeNull();
+      expect(row.querySelector('.sr-only')?.textContent).toMatch(/^(Inserted|Copied|Unverified)$/);
+    });
+    expect(document.querySelector('.earlier__key')).toHaveTextContent('2 copied2 inserted');
   });
 
   it('keeps the writing style caption ahead of its control', () => {

@@ -16,19 +16,8 @@
 
 .home-hero h1 .kbd { font-size: var(--fs-emph); min-width: 30px; padding: 7px 8px; }
 .home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 auto var(--s-8); }
-.home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: center; }
-/* How your words are made, on one quiet line at the stage's foot (ui-iter-25): the model and
-   the output, which had a readout of their own above the shortcut, then the writing style. */
-.home-hero__foot { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5) var(--s-11); justify-content: center; }
-.home-hero .home-hero__setup { display: inline-flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 2px 8px; justify-content: center; margin: 0; }
-.home-hero__setup > span + span::before { content: "·"; content: "·" / ""; margin-right: 8px; }
 
 .fine { color: var(--mut); font-size: var(--fs-secondary); }
-
-.home-card { border-radius: var(--r-hero); margin-bottom: var(--s-7); }
-.home-card h2 { font-size: var(--fs-section); font-weight: 650; margin-bottom: var(--s-5); }
-.home-card .card__head { margin-bottom: var(--s-5); }
-.home-card .card__head h2 { margin: 0; }
 
 .btn.primary {
   background: var(--brand);
@@ -51,9 +40,16 @@
 
 .link-button { border: 0; color: var(--accfg); font-size: var(--fs-secondary); min-height: 0; padding: 2px 4px; }
 
-/* Earlier dictations: knots on one thread that runs down from the last pick on the stage.
-   Each knot takes its delivery status colour; the badge still names it. */
-.home .recent-list { --spool-time: calc(var(--fs-mono) * 5.6); --knot-x: calc(var(--spool-time) + 19px); --knot-y: 50%; gap: 0; }
+/* Earlier dictations: knots on one thread, hanging under the weft on the open page
+   (ui-iter-29, home-page.css). There is no pill: the knot's shape says how the words ended,
+   filled typed, ring copied, dotted unconfirmed, and the key beneath names each once. */
+.home .recent-list {
+  --spool-time: calc(var(--fs-mono) * 5.6);
+  --row-lh: calc(var(--fs-body) * 1.08 * 1.55);
+  --knot-x: calc(var(--spool-time) + 19px);
+  --knot-y: calc(10px + var(--row-lh) / 2);
+  gap: 0;
+}
 /* Each row draws its piece of the thread, so it ends exactly at the first and last knots. */
 .home .recent-row::after {
   background: color-mix(in srgb, var(--accfg) 40%, var(--line));
@@ -67,45 +63,31 @@
 .home .recent-row:first-child::after { background: linear-gradient(transparent, color-mix(in srgb, var(--accfg) 40%, var(--line)) var(--knot-y)); }
 .home .recent-row:last-child::after { bottom: auto; height: var(--knot-y); }
 .home .recent-row {
+  align-items: baseline;
   border-top: 0;
   gap: 4px 14px;
-  grid-template-areas: "time knot text badge copy";
-  grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto auto;
+  grid-template-areas: "time knot text copy";
+  grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto;
   padding: 10px 0;
   position: relative;
 }
 .home .recent-row::before {
-  background: var(--panel);
+  align-self: start;
+  background: var(--ok);
   border-radius: 50%;
-  box-shadow: inset 0 0 0 2px var(--ok);
   content: "";
   grid-area: knot;
   height: 12px;
+  margin-top: calc((var(--row-lh) - 12px) / 2);
   position: relative;
   width: 12px;
   z-index: 1;
 }
-.home .recent-row[data-status="copied"]::before { box-shadow: inset 0 0 0 2px var(--info); }
-.home .recent-row[data-status="unverified"]::before { border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); box-shadow: none; }
+.home .recent-row[data-status="copied"]::before { background: var(--panel); box-shadow: inset 0 0 0 2px var(--info); }
+.home .recent-row[data-status="unverified"]::before { border: 2px dotted color-mix(in srgb, var(--warn) 45%, var(--mut)); background: var(--panel); }
 .home .recent-row > .timestamp { grid-area: time; text-align: right; }
-.home .recent-row > p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); grid-area: text; letter-spacing: .003em; }
-.home .recent-row > .badge { grid-area: badge; }
-.home .recent-row > .ib { grid-area: copy; }
-
-/* Narrow: time and words keep sharing a line (QA #59 gap and alignment); the status badge
-   drops beneath the words, and the knot sits on their first line. */
-@media (max-width: 780px) {
-  .home .recent-list { --knot-y: 22px; }
-  .home .recent-row {
-    align-items: start;
-    grid-template-areas: "time knot text copy" ". knot badge .";
-    grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) auto;
-  }
-  .home .recent-row::before { margin-top: 6px; }
-  .home .recent-row > .timestamp,
-  .home .recent-row > p { align-self: baseline; }
-  .home .recent-row > .badge { justify-self: start; }
-}
+.home .recent-row > p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); grid-area: text; letter-spacing: .003em; line-height: 1.55; }
+.home .recent-row > .ib { align-self: start; grid-area: copy; margin-top: calc((var(--row-lh) - 28px) / 2); }
 
 @media (prefers-reduced-motion: reduce) {
   .rec-dot { animation: none; }
@@ -119,6 +101,6 @@
 }
 
 /* BUS-229: why the Home writing-style picker is disabled, and the one fix. */
-.home-hero .hs-note { align-items: center; color: var(--mut); display: flex; flex-basis: 100%; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 4px 10px; line-height: 1.5; margin: -4px 0 0; }
-.home-hero .hs-note .btn.ghost { color: var(--fg); font-size: var(--fs-secondary); margin-left: -8px; min-height: 28px; padding: 3px 8px; text-decoration: underline; text-decoration-color: var(--ctl-line); text-underline-offset: 3px; }
-.home-hero .hs-note .bar { height: 5px; width: 160px; }
+.home-colophon .hs-note { align-items: center; color: var(--mut); display: flex; flex-basis: 100%; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 4px 10px; line-height: 1.5; margin: -4px 0 0; }
+.home-colophon .hs-note .btn.ghost { color: var(--fg); font-size: var(--fs-secondary); margin-left: -8px; min-height: 28px; padding: 3px 8px; text-decoration: underline; text-decoration-color: var(--ctl-line); text-underline-offset: 3px; }
+.home-colophon .hs-note .bar { height: 5px; width: 160px; }

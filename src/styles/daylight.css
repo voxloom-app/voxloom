@@ -22,9 +22,10 @@
   --brand-b: #3cf0ff;
 }
 
-/* Daylight tokens for every frame surface (each re-declares the night set). Text holds AA
-   over the frame's darkest stop, the sunlit glows, the selected nav and the segmented track. */
-[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head) {
+/* Daylight tokens for every frame surface (each re-declares the night set), including Home's
+   open page (ui-iter-29). Text holds AA over the frame's darkest stop, the sunlit glows, the
+   selected nav and the segmented track. */
+[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head, .main .home-page) {
   color-scheme: light;
   --panel: #efebe3;
   --field: #fbfaf7;

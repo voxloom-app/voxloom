@@ -26,11 +26,13 @@ const dogfood = (): UseDogfoodCaptureResult => ({
 const layers = (page: Element) => [...page.children].map((child) => child.classList[0]);
 
 describe('The loom frame (ui-iter-08): each page is a beam on the frame and a sheet of cloth', () => {
-  it('Home: the voice stage is the beam; earlier dictations lie on the cloth', () => {
+  it('Home: the voice stage is the beam; earlier dictations hang under it on the open page (ui-iter-29)', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const home = document.querySelector('.home')!;
-    expect(layers(home)).toEqual(['stage', 'cloth']);
-    expect(home.querySelector('.cloth #recent-title')).toHaveTextContent('Earlier dictations');
+    // No sheet between your last words and the earlier ones: Home is the one page without cloth.
+    expect(layers(home)).toEqual(['stage', 'home-page']);
+    expect(home.querySelector('.cloth')).toBeNull();
+    expect(home.querySelector('.home-page #recent-title')).toHaveTextContent('Earlier dictations');
     expect(home.querySelector('.stage .recent-list')).toBeNull();
   });
 

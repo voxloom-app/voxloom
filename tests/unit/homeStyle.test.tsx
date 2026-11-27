@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useApp } from '../../src/app/AppContext';
 import { initialSettings } from '../../src/domain/fixtures';
 import type { Settings } from '../../src/domain/types';
-import { HomeHero } from '../../src/features/home/HomeHero';
+import { HomeColophon } from '../../src/features/home/HomeColophon';
 import { homeStyleState } from '../../src/features/home/homeStyleState';
 import type { CleanupModelView } from '../../src/features/settings/cleanupCopy';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
@@ -56,7 +56,7 @@ function Probe({ settings }: { settings?: Partial<Settings> }) {
 }
 
 async function renderHome(store: CleanupModelStore, settings?: Partial<Settings>) {
-  renderWithApp(<><Probe settings={settings} /><HomeHero cleanupModelStore={store} isNative /></>);
+  renderWithApp(<><Probe settings={settings} /><HomeColophon cleanupModelStore={store} isNative /></>);
   await waitFor(() => expect(store.status).toHaveBeenCalled());
   await act(async () => { await Promise.resolve(); });
 }
@@ -154,7 +154,7 @@ describe('Home writing style while cleanup is off (BUS-229)', () => {
   });
 
   it('the browser preview keeps today\'s live picker', () => {
-    renderWithApp(<><Probe /><HomeHero isNative={false} /></>);
+    renderWithApp(<><Probe /><HomeColophon isNative={false} /></>);
     expect(screen.getByText('Writing style')).toBeInTheDocument();
     expect(picker()).not.toHaveAttribute('aria-disabled');
     expect(note()).toBeNull();
@@ -167,7 +167,7 @@ function Screens({ settings, store }: { settings?: Partial<Settings>; store: Cle
     <>
       <Probe settings={settings} />
       <button onClick={() => setScreen(screen === 'home' ? 'history' : 'home')} type="button">Switch screen</button>
-      {screen === 'home' ? <HomeHero cleanupModelStore={store} isNative /> : <p>History</p>}
+      {screen === 'home' ? <HomeColophon cleanupModelStore={store} isNative /> : <p>History</p>}
     </>
   );
 }

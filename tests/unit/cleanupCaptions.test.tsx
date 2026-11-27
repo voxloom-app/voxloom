@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useApp } from '../../src/app/AppContext';
 import { initialSettings } from '../../src/domain/fixtures';
 import type { Settings } from '../../src/domain/types';
-import { HomeHero } from '../../src/features/home/HomeHero';
+import { HomeColophon } from '../../src/features/home/HomeColophon';
 import { CleanupPane } from '../../src/features/settings/CapturePanes';
 import { Settings as SettingsWindow } from '../../src/features/settings/Settings';
 import type { CleanupModelStore } from '../../src/services/cleanup/contracts';
@@ -42,7 +42,7 @@ function Start({ settings }: { settings?: Partial<Settings> }) {
 async function renderBoth(models: CleanupModelStore, settings?: Partial<Settings>) {
   renderWithApp(<>
     <Start settings={settings} />
-    <HomeHero cleanupModelStore={models} isNative />
+    <HomeColophon cleanupModelStore={models} isNative />
     <CleanupPane cleanupModelStore={models} />
   </>);
   await waitFor(() => expect(models.status).toHaveBeenCalledTimes(1));
@@ -125,12 +125,12 @@ describe('one cleanup model status read per window', () => {
 
   it('Home and the Cleanup pane share one result; remounting Home reads nothing new', async () => {
     const models = store(status(true));
-    const first = renderWithApp(<HomeHero cleanupModelStore={models} isNative />);
+    const first = renderWithApp(<HomeColophon cleanupModelStore={models} isNative />);
     await waitFor(() => expect(screen.getByText(OFF_NOTE)).toBeInTheDocument());
     first.unmount();
     // Back to Home (as after History or Dictionary), then Settings → Cleanup.
     renderWithApp(<>
-      <HomeHero cleanupModelStore={models} isNative />
+      <HomeColophon cleanupModelStore={models} isNative />
       <CleanupPane cleanupModelStore={models} />
     </>);
     expect(screen.getByText('Local cleanup')).toBeInTheDocument();
@@ -144,7 +144,7 @@ describe('one cleanup model status read per window', () => {
     const models = store(status(true));
     vi.mocked(models.status).mockResolvedValueOnce(status(true)).mockResolvedValueOnce(status(false));
     renderWithApp(<>
-      <HomeHero cleanupModelStore={models} isNative />
+      <HomeColophon cleanupModelStore={models} isNative />
       <CleanupPane cleanupModelStore={models} />
     </>);
     await user.click(await screen.findByRole('button', { name: 'Check again' }));

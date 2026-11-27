@@ -76,7 +76,6 @@
 /* Title band. No mic readout above it since ui-iter-25: Start and the rail say the state. */
 .stage .home-hero__title { padding: 30px 0 26px; }
 .stage .home-hero__lede { margin-top: 0; }
-.stage .home-hero .hs-note { justify-content: center; }
 .stage .home-hero h1 { color: #f6f6f9; }
 .banner + .home { margin-top: var(--s-6); }
 
@@ -130,8 +129,8 @@
   transform: translateY(3px);
 }
 
-/* The stage ends on the writing style: no deck beneath it since ui-iter-15. */
-.home > .stage { padding-bottom: var(--s-11); }
+/* The stage ends on the weft and its tag; the earlier dictations hang beneath (ui-iter-29). */
+.home > .stage { padding-bottom: var(--s-4); }
 /* Manual recovery: the run's own transcript, only when History didn't keep it. Dictating
    from the window starts on the stage's weft (ui-iter-21, loom-bar.css). */
 .stage .stage__recovery {

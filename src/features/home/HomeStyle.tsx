@@ -67,7 +67,7 @@ export function HomeStyle({ isNative, model }: { isNative: boolean; model: Clean
     </button>
   );
   return (
-    <div className="home-hero__style" ref={rootRef}>
+    <div className="home-style" ref={rootRef}>
       <span className="fine">
         {kind === 'browser' || !enabled ? HOME_STYLE_CAPTION : HOME_STYLE_CAPTION_ON}
       </span>

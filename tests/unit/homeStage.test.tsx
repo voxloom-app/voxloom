@@ -41,7 +41,7 @@ describe('stagePhase (ui-iter-01 voice stage)', () => {
 });
 
 describe('Home voice stage', () => {
-  it('holds the hero, with model and output on its foot line; no mic readout above it', () => {
+  it('holds the hero; model and output close the page, not the stage; no mic readout above it', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'idle');
     expect(stage().querySelector('#home-title')).not.toBeNull();
@@ -49,8 +49,9 @@ describe('Home voice stage', () => {
     // ui-iter-25: the readout row is gone; Start and the rail say what the mic is doing.
     expect(stage().querySelector('.stage__readout')).toBeNull();
     expect(screen.queryByText('Mic off')).toBeNull();
-    // Model and output are named for screen readers and shown as values.
-    expect(stage().querySelector('.home-hero__setup')).toHaveTextContent('Model Whisper BaseOutput Insert, fall back to Copy');
+    // Model and output are named for screen readers and shown as values, on the page's colophon.
+    expect(document.querySelector('.home-page .home-colophon__setup')).toHaveTextContent('Model Whisper BaseOutput Insert, fall back to Copy');
+    expect(stage().querySelector('.home-colophon')).toBeNull();
     // The recent list stays outside the stage.
     expect(stage().querySelector('.recent-list')).toBeNull();
   });
@@ -83,13 +84,17 @@ describe('Home voice stage', () => {
     expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
   });
 
-  it('says how your words are made once, on the foot line after the weft (ui-iter-25)', () => {
+  it('says how your words are made once, as the colophon after the earlier dictations (ui-iter-29)', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
-    const foot = stage().querySelector('.home-hero__foot')!;
-    const bar = stage().querySelector('.loom-bar')!;
-    expect(bar.compareDocumentPosition(foot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(foot.querySelector('.home-hero__setup')).not.toBeNull();
-    expect(within(foot as HTMLElement).getByRole('radiogroup', { name: 'Current writing style' })).toBeInTheDocument();
+    const page = document.querySelector('.home > .home-page')!;
+    const colophon = page.querySelector('.home-colophon')!;
+    // Nothing stands between the weft and the earlier words: the colophon is the page's last part.
+    expect(page.lastElementChild).toBe(colophon);
+    expect(screen.getByRole('region', { name: 'Earlier dictations' }).compareDocumentPosition(colophon))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(colophon.querySelector('.home-colophon__setup')).not.toBeNull();
+    expect(within(colophon as HTMLElement).getByRole('radiogroup', { name: 'Current writing style' })).toBeInTheDocument();
+    expect(within(stage() as HTMLElement).queryByRole('radiogroup')).toBeNull();
     // The last pick keeps its heading for screen readers; the stage shows no label above the words.
     expect(screen.getByRole('heading', { level: 2, name: 'Last dictation' })).toHaveClass('sr-only');
     expect(document.querySelector('.home-hero')).toHaveAttribute('data-words');
@@ -105,13 +110,16 @@ describe('Home voice stage', () => {
     expect(stage()).toHaveAttribute('data-phase', 'speaking');
   });
 
-  it('marks each earlier row with its delivery status for the spool knot', () => {
+  it('marks each earlier row with its delivery status for the spool knot, named for screen readers', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     // The newest dictation is the stage's last pick; the spool holds the four before it.
     const rows = [...document.querySelectorAll('.home .recent-row')];
     expect(rows).toHaveLength(4);
+    const names = { copied: 'Copied', inserted: 'Inserted', unverified: 'Unverified' } as Record<string, string>;
     for (const row of rows) {
-      expect(row.getAttribute('data-status')).toBe(row.querySelector('.badge')!.getAttribute('data-status'));
+      // ui-iter-29: no pill; the knot's shape shows the status and the row still names it.
+      expect(row.querySelector('.badge')).toBeNull();
+      expect(row.querySelector('.sr-only')).toHaveTextContent(names[row.getAttribute('data-status')!]);
     }
   });
 });

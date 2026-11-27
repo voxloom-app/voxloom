@@ -5,8 +5,9 @@ import { isTauriEnv } from '../../services/capture/captureService';
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCapture';
 import { wovenRecords } from './pickWords';
+import { EarlierDictations } from './EarlierDictations';
+import { HomeColophon } from './HomeColophon';
 import { HomeHero } from './HomeHero';
-import { RecentCard } from './RecentCard';
 import { stagePhase } from './stagePhase';
 
 interface HomeProps {
@@ -47,8 +48,6 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
       <div className="stage" data-phase={phase}>
         <HomeHero
           capture={{ dogfood, isNative, onCopy: (t) => { void copy(t); } }}
-          cleanupModelStore={cleanupModelStore}
-          isNative={isNative}
           pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }}
         />
         {recovery && (
@@ -64,9 +63,12 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
           </section>
         )}
       </div>
-      {/* The cloth: what the loom wove before the last pick, on the window's one sheet (frame.css). */}
-      <div className="cloth">
-        <RecentCard earlier={woven.slice(1, 6)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} />
+      {/* The open page (ui-iter-29): what the loom wove before the last pick hangs straight
+          under the weft, on the same surface, with no sheet between your words. How they are
+          made closes the page as its colophon. Other pages keep their cloth (frame.css). */}
+      <div className="home-page">
+        <EarlierDictations earlier={woven.slice(1, 6)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} />
+        <HomeColophon cleanupModelStore={cleanupModelStore} isNative={isNative} />
       </div>
     </div>
   );
