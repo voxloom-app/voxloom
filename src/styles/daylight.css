@@ -22,10 +22,10 @@
   --brand-b: #3cf0ff;
 }
 
-/* Daylight tokens for every frame surface (each re-declares the night set), including Home's
-   open page (ui-iter-29). Text holds AA over the frame's darkest stop, the sunlit glows, the
-   selected nav and the segmented track. */
-[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head, .main .home-page) {
+/* Daylight tokens for every frame surface (each re-declares the night set), including the
+   open pages (Home since ui-iter-29, every page since ui-iter-31). Text holds AA over the
+   frame's darkest stop, the sunlit glows, the selected nav and the segmented track. */
+[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head, .main .page-body, .settings-window > .settings-panel, section[aria-busy] > .boot-loading, .main .home-page) {
   color-scheme: light;
   --panel: #efebe3;
   --field: #fbfaf7;
@@ -57,14 +57,9 @@
 }
 [data-appearance-resolved="light"] :is(.main, .settings-window-root) > section[aria-busy] > .page-head h1 { color: var(--fg); }
 
-/* The cloth: bleached paper laid on the linen, lifted by a soft shadow instead of a black edge. */
-[data-appearance-resolved="light"] :is(.main .cloth, .settings-window > .settings-panel, section[aria-busy] > .boot-loading) {
-  box-shadow: 0 0 0 1px rgba(70, 56, 30, .1), 0 1px 0 rgba(70, 56, 30, .06), 0 28px 56px -34px rgba(70, 56, 30, .5);
-}
-[data-appearance-resolved="light"] :is(.main .cloth, .settings-window > .settings-panel)::before { opacity: .45; }
-[data-appearance-resolved="light"] :is(.main .cloth, .settings-window > .settings-panel)::after { box-shadow: 0 0 10px 1px rgba(60, 240, 255, .45); opacity: .9; }
-[data-appearance-resolved="light"] .sidebar:is([data-phase="listening"], [data-phase="speaking"]) ~ .main :is(.cloth, .settings-panel)::before { --reed-light: #b6ff3c; opacity: 1; }
-[data-appearance-resolved="light"] .sidebar[data-phase="processing"] ~ .main :is(.cloth, .settings-panel)::before { --reed-light: #3cf0ff; opacity: 1; }
+/* The open pages lie on the linen too (ui-iter-31): the surface they fill knots and tints
+   with is the linen itself, not the night sheet. */
+[data-appearance-resolved="light"] :is(.main .page-body, .main .home-page, .settings-window > .settings-panel, section[aria-busy] > .boot-loading) { --bg: var(--linen); }
 
 /* ---- The rail by daylight ---- */
 [data-appearance-resolved="light"] :is(.sidebar, .guided-rail) {

@@ -1,9 +1,11 @@
 /* History's time index: a strip of stamped periods with an impression of
    when you spoke. The strip uses the stage's own graphite / linen tokens. */
-.history-stage { padding: var(--s-10) var(--stage-pad) var(--s-6); }
-.history-stage__title { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-10); justify-content: space-between; }
-.history-stage h1 { color: var(--fg); font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; margin: 0; }
-.history-stage__lede { color: var(--mut); flex: 0 1 48ch; font-size: var(--fs-secondary); margin: 0; }
+/* A running head, not a poster (ui-iter-31): the rail already names the page, so the title
+   sits small beside its lede, as on Settings and the Dictionary. */
+.history-stage { padding: var(--s-9) var(--stage-pad) var(--s-6); }
+.history-stage__title { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px var(--s-6); }
+.history-stage h1 { color: var(--fg); font-size: var(--fs-section); font-weight: 700; letter-spacing: 0; margin: 0; }
+.history-stage__lede { color: var(--mut); flex: 0 1 auto; font-size: var(--fs-label); margin: 0; }
 
 .time-index {
   align-items: stretch;

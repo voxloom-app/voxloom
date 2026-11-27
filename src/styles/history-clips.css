@@ -18,7 +18,7 @@
   background: var(--bg); box-shadow: 0 1px 0 var(--line); margin-inline: calc(var(--s-4) * -1);
   padding: var(--s-4); position: sticky; top: 0; z-index: 3;
 }
-.history .cloth:has(.history-tools[data-clipping]) .history-timeline :focus { scroll-margin-top: 6em; }
+.history .page-body:has(.history-tools[data-clipping]) .history-timeline :focus { scroll-margin-top: 6em; }
 /* The empty sheet still shows the packet of slips. */
 .clip-mark { display: block; width: 72px; }
 .clip-mark__back { fill: var(--navon); stroke: var(--ctl-line); }

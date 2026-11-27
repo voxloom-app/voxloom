@@ -62,7 +62,7 @@ export function Dictionary() {
           </button>
         </div>
       </header>
-      <div className="cloth dictionary-book">
+      <div className="page-body dictionary-book">
         <WordIndex
           onDelete={(word) => dictionary.delete(word)} onEdit={edit}
           onInspect={inspect} onQuery={setQuery} query={query} selectedRef={indexButton}

@@ -133,7 +133,7 @@ describe('voice path styles', () => {
   it('drops the open stop’s thread into its pane, and holds it still under reduced motion', () => {
     const panes = css('settings-panes.css');
     expect(css('index.css')).toMatch(/@import "\.\/settings-path\.css";\n@import "\.\/settings-panes\.css";/);
-    // The bar has to let the thread hang past it, over the cloth's fell.
+    // The bar has to let the thread hang past it, onto the pane's top rule.
     expect(panes).toMatch(/\.settings-window__bar\.stage \{ overflow: visible; z-index: 1; \}/);
     expect(panes).toMatch(/\.voice-path li\[data-current\] > \.voice-path__stop::after \{[^}]*animation: pane-drop/);
     expect(panes).toMatch(/\.voice-path li\[data-current\] > \.voice-path__stop \{[^}]*inset 0 -2px 0 var\(--knot\)/);

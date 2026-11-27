@@ -198,22 +198,30 @@ describe('Dictionary spelling stage', () => {
       return (x + 0.05) / (y + 0.05);
     };
     const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
+    // Both leaves lie open on the page (ui-iter-31): the night page over the frame's stops, and
+    // the daylight page on linen with the daylight tokens.
     const tokens = readFileSync('src/styles/tokens.css', 'utf8');
-    const themeTokens = tokens.split('[data-appearance-resolved="light"] {');
+    const night = tokens.slice(0, tokens.indexOf('[data-appearance-resolved="light"] {'));
+    const daylight = readFileSync('src/styles/daylight.css', 'utf8');
+    const day = daylight.slice(daylight.indexOf('.main .page-body, .settings-window > .settings-panel'));
     const css = readFileSync('src/styles/dictionary-stage.css', 'utf8');
     const indexCss = readFileSync('src/styles/dictionary.css', 'utf8');
-    expect(indexCss).toContain('var(--linen, var(--panel)) 55%, var(--bg)');
+    expect(indexCss).not.toMatch(/\.word-index \{[^}]*background/);
     expect(indexCss).toContain('var(--accfg) 8%, var(--bg)');
     expect(css).toContain('background: var(--field);');
     expect(css).toContain('background: color-mix(in srgb, var(--brand-a) 9%, transparent);');
-    for (const [i, paper, indexTint] of [[0, '#121219', '#1a1a23'], [1, '#ffffff', '#f4f1ea']] as const) {
-      const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(themeTokens[i])![1];
-      for (const surface of [paper, mix(indexTint, paper, .55), mix(token('accfg'), paper, .08), token('field')]) {
+    const themes = [
+      { block: night, paper: '#121219', ground: ['#17171f', '#0a0a0e'], highlight: .09 },
+      { block: day, paper: '#f4f1ea', ground: ['#e9e4da'], highlight: .42 },
+    ];
+    for (const { block, paper, ground, highlight } of themes) {
+      const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(block)![1];
+      for (const surface of [paper, ...ground, mix(token('accfg'), paper, .08), token('field')]) {
         for (const ink of ['mut', 'fg', 'accfg']) {
           expect(ratio(token(ink), surface), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
         }
       }
-      expect(ratio(token('accfg'), mix('#b6ff3c', paper, i ? .42 : .09))).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(token('accfg'), mix('#b6ff3c', paper, highlight))).toBeGreaterThanOrEqual(4.5);
     }
   });
 

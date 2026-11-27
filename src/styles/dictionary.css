@@ -1,7 +1,7 @@
 /* The left leaf is a lookup index, not a second specimen. Thumb letters mark
-   the beginning of each run; only the facing page shows the heard forms. */
+   the beginning of each run; only the facing page shows the heard forms. Both
+   leaves lie open on the page (ui-iter-31): only the binding divides them. */
 .word-index {
-  background: color-mix(in srgb, var(--linen, var(--panel)) 55%, var(--bg));
   display: flex;
   flex-direction: column;
   min-height: 0;

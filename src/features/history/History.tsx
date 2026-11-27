@@ -106,7 +106,7 @@ export function History({ onToast }: HistoryProps) {
         </div>
         <TimeIndex groups={groups} key={`${status}:${query}`} />
       </header>
-      <div className="cloth">
+      <div className="page-body">
         <div className="history-tools" data-clipping={passages.length > 0 || undefined}>
           <SearchField label="Search history" onChange={setQuery} placeholder="Search transcripts" value={query} />
           <SegmentedControl label="History status" onChange={setStatus} options={filters} size="sm" value={status} />

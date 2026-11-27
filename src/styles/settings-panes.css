@@ -1,9 +1,9 @@
 /* Settings panes (ui-iter-13): the voice path is the Settings tablist. The open stop lifts
-   off the beam on a plate, ties its knot and drops one lit thread through the reed into
-   the cloth, where its pane is named and introduced. Appearance hangs loose at the end of
-   the path, because nothing in it changes a dictation. */
+   off the beam on a plate, ties its knot and drops one lit thread onto the open page's top
+   rule (ui-iter-31), where its pane is named and introduced. Appearance hangs loose at the
+   end of the path, because nothing in it changes a dictation. */
 
-/* The bar lets the dropped thread hang through the reed and over the cloth's fell. */
+/* The bar lets the dropped thread hang past it, onto the pane's top rule. */
 .settings-window__bar.stage { overflow: visible; z-index: 1; }
 
 .voice-path__stops > li { --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b)); }
@@ -21,8 +21,8 @@
 .voice-path li[data-current] > .voice-path__stop:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .035)); }
 .voice-path li[data-current] .voice-path__value { color: #f6f6f9; }
 
-/* The dropped thread: from the plate's edge, through the reed, onto the fell, with a bead
-   where it enters the cloth. The gap it spans is the cloth's margin (frame.css). */
+/* The dropped thread: from the plate's edge to a bead on the pane's top rule. The gap it
+   spans is the open page's margin (frame.css). */
 .voice-path li[data-current] > .voice-path__stop::after {
   animation: pane-drop .45s cubic-bezier(.2, .7, .2, 1) both;
   background:
@@ -57,7 +57,7 @@
 .voice-path li[data-off-path] .voice-path__thread::after { animation: none; display: none; }
 .voice-path li[data-off-path]:not([data-current]) .voice-path__thread i { box-shadow: inset 0 0 0 2px var(--ctl-line); background: transparent; }
 
-/* The pane head names the stop the cloth belongs to, in the stop's own thread colour. */
+/* The pane head names the stop the pane belongs to, in the stop's own thread colour. */
 .settings-panel { --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--stop, 0) * 20%), var(--brand-b)); }
 .settings-panel[data-pane="appearance"] { --knot: var(--mut); }
 .settings-pane__head { animation: pane-in .35s ease-out both; margin-bottom: var(--s-9); }

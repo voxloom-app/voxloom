@@ -1,8 +1,8 @@
 /* The open page (ui-iter-29). Home is one surface from the shortcut to the colophon: the
    earlier dictations hang straight under the stage's weft, with no sheet, reed or card
    head between them and your last words, and how your words are made closes the page.
-   Other pages keep their cloth (frame.css). Light gives the page the frame's linen
-   tokens (daylight.css). Rows and knots: home.css. */
+   Since ui-iter-31 every page lies open like this (frame.css). Light gives the page the
+   frame's linen tokens (daylight.css). Rows and knots: home.css. */
 .home-page {
   display: flex;
   flex: 1 0 auto;

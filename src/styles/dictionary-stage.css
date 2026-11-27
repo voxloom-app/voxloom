@@ -1,10 +1,11 @@
 /* The Dictionary masthead and the sentence proof on its reading leaf. The two
    knots join the editable Heard line to the spellings the matcher produces. */
-.dictionary-stage { flex-shrink: 0; margin-bottom: var(--s-9); padding: var(--s-10) var(--stage-pad) 0; }
-.dictionary-stage__top { align-items: flex-start; display: flex; gap: var(--s-8) var(--s-11); justify-content: space-between; }
-.dictionary-stage__title { min-width: 0; }
-.dictionary-stage h1 { color: #f6f6f9; font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; line-height: 1.05; margin: 0 0 6px; }
-.dictionary-stage__lede { color: var(--mut); font-size: var(--fs-secondary); margin: 0; max-width: 64ch; }
+/* The masthead is a running head like History's and Settings' (ui-iter-31). */
+.dictionary-stage { flex-shrink: 0; padding: var(--s-9) var(--stage-pad) 0; }
+.dictionary-stage__top { align-items: center; display: flex; gap: var(--s-8) var(--s-11); justify-content: space-between; }
+.dictionary-stage__title { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px var(--s-6); min-width: 0; }
+.dictionary-stage h1 { color: #f6f6f9; font-size: var(--fs-section); font-weight: 700; letter-spacing: 0; margin: 0; }
+.dictionary-stage__lede { color: var(--mut); font-size: var(--fs-label); margin: 0; max-width: 64ch; }
 .dictionary-stage__top > .btn { flex-shrink: 0; white-space: nowrap; }
 
 .proof {

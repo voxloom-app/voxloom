@@ -65,7 +65,7 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
       </div>
       {/* The open page (ui-iter-29): what the loom wove before the last pick hangs straight
           under the weft, on the same surface, with no sheet between your words. How they are
-          made closes the page as its colophon. Other pages keep their cloth (frame.css). */}
+          made closes the page as its colophon. Every page lies open since ui-iter-31 (frame.css). */}
       <div className="home-page">
         <EarlierDictations earlier={woven.slice(1, 6)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} />
         <HomeColophon cleanupModelStore={cleanupModelStore} isNative={isNative} />
