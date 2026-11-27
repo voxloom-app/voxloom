@@ -45,6 +45,40 @@ for (const theme of ['dark', 'light']) for (const width of [640, 1000, 1440]) {
   });
 }
 
+for (const theme of ['dark', 'light']) {
+  test(`${theme} Get connected fits the minimum window with outstanding and completed checks`, async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 620 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const preview = `/tests/fixtures/guided-preview.html?step=1&theme=${theme}`;
+    const cases = [
+      ['&mic=off&access=off&ready=0', 'Allow microphone access.'],
+      ['&mic=denied&access=off&ready=0', 'Allow microphone access.'],
+      ['&access=off&pack=downloading', 'Turn on Accessibility.'],
+      ['&ready=0', 'Get your voice pack.'],
+      ['&pack=downloading', 'Downloading your voice pack.'],
+      ['&pack=failed', 'Retry the download.'],
+      ['', 'You’re connected.'],
+    ];
+    for (const [query, title] of cases) {
+      await page.goto(preview + query);
+      await page.addStyleTag({ content: ':root, html, body { --font: Verdana, sans-serif !important; }' });
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeFocused();
+      const content = page.locator('.guided-content');
+      expect(await content.evaluate(el => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect(page.getByRole('list', { name: 'Connection checks' }).getByRole('listitem')).toHaveCount(3);
+      await expect(page.locator('.guided-footer button')).toHaveText(['Back', 'Set up later', 'Continue →']);
+      if (query) await expect(page.getByRole('button', { name: 'Continue →' })).toBeDisabled();
+      else await expect(page.getByRole('button', { name: 'Continue →' })).toBeEnabled();
+      expect((await new AxeBuilder({ page }).include('.setup-window').analyze()).violations).toEqual([]);
+    }
+    // The same three confirmations sit beside (not below) the instruction in a large window.
+    await page.setViewportSize({ width: 1468, height: 888 });
+    const task = await page.getByRole('heading', { name: 'You’re connected.' }).boundingBox();
+    const receipt = await page.getByRole('heading', { name: 'Connection checks' }).boundingBox();
+    expect(receipt!.x).toBeGreaterThan(task!.x + task!.width);
+  });
+}
+
 // BUS-224/BUS-225: Welcome with the voice pack not downloaded yet, and the finish step ready and not ready.
 const shot = async (page: import('@playwright/test').Page, testInfo: import('@playwright/test').TestInfo, filename: string) =>
   page.screenshot({ path: process.env.GUIDED_EVIDENCE_DIR ? join(process.env.GUIDED_EVIDENCE_DIR, filename) : testInfo.outputPath(filename) });

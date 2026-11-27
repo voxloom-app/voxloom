@@ -20,17 +20,6 @@
 .guided-content .guided-intro { line-height: 1.55; margin: 0 0 22px; max-width: 430px; font-size: var(--fs-body); }
 .guided-content p { line-height: 1.55; }
 .guided-mini { font-size: var(--fs-label); line-height: 1.65; }
-.guided-permission { display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--line); padding: 14px 0; }
-.guided-permission > div:first-child { flex: 1; min-width: 0; }
-.guided-permission strong { font-size: var(--fs-secondary); font-weight: 550; }
-.guided-permission p { font-size: var(--fs-label); margin: 4px 0; }
-.guided-permission small { color: var(--mut); font-size: var(--fs-micro); }
-.guided-permission-actions { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; max-width: 46%; }
-.guided-permission .btn { white-space: normal; font-size: var(--fs-label); padding: 7px 10px; }
-.guided-pack { display: flex; flex-direction: column; gap: 8px; background: var(--field); border: 1px solid var(--line); border-radius: 9px; padding: 15px; margin: 18px 0; font-size: var(--fs-label); }
-.guided-pack span, .guided-pack small { color: var(--mut); }
-.guided-pack progress { width: 100%; accent-color: var(--accent); }
-.guided-pack .btn { align-self: flex-end; }
 .guided-shortcut { background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 22px; margin: 16px 0 22px; display: flex; flex-direction: column; gap: 18px; }
 .guided-shortcut > span:first-child { font-size: var(--fs-label); color: var(--mut); }
 .guided-shortcut .kbd, .guided-content > .key-combo .kbd { height: 44px; min-width: 38px; font-size: var(--fs-bigkey); }
@@ -97,8 +86,6 @@
   .guided-brand { font-size: var(--fs-secondary); gap: 7px; }
   .guided-content { padding: 30px 22px 18px; }
   .guided-footer { padding: 14px 22px 18px; }
-  .guided-permission { align-items: flex-start; flex-wrap: wrap; }
-  .guided-permission-actions { max-width: 100%; align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
   .guided-content .btn { min-height: 44px; }
   .guided-disclosure { padding: 10px 22px; }
 }

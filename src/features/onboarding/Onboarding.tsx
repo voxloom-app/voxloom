@@ -11,11 +11,12 @@ import { subscribe as subscribeSettings } from '../../services/settingsWindow';
 import { listenShortcutBound } from '../../services/shortcut/bindingEvents';
 import { listenModelsChanged } from '../../services/stt/modelsChanged';
 import { createOverlayBridge } from '../../services/shortcut';
-import { createGuidedSetup, permissionClear, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
+import { createGuidedSetup, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
 import { registerPracticeHandler, resetPracticeGestures } from './practiceBridge';
 import { LoomLine } from './LoomLine';
 import { createSetupBoundary } from './setupBoundary';
 import { SetupThread } from './SetupThread';
+import { ConnectionStep } from './ConnectionStep';
 import { SetupWindow } from './SetupWindow';
 import { SetupBrand, WelcomeCover } from './WelcomeCover';
 
@@ -36,10 +37,6 @@ const localProgress: SetupProgressStorage = {
 export function clearGuidedProgress(): void {
   try { localProgress.clear?.(); } catch { /* Unavailable storage has nothing to resume. */ }
 }
-const permissions = [
-  { kind: 'microphone', key: 'microphone', title: 'Hear your voice', name: 'Microphone', copy: 'Microphone access captures your speech when you dictate.' },
-  { kind: 'accessibility', key: 'accessibility', title: 'Type where you’re writing', name: 'Accessibility', copy: 'Accessibility lets Voxloom insert words into your text field. It also lets Esc cancel dictation and makes single-key shortcuts work.' },
-] as const;
 /** The other gesture than this try expects: say which one it wants instead of ignoring it. */
 const wrongGesture = {
   hold: 'That was a double-tap. For this try, hold your shortcut, speak, then release.',
@@ -201,8 +198,6 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
   useEffect(() => () => { sequence.current++; controller.cancelPractice(); }, [controller]);
 
   const allPermissions = permissionsClear(guided.permissions);
-  // Only Windows reports Accessibility as not required, so this selects its setup copy.
-  const onWindows = guided.permissions.accessibility === 'not-required';
   const connected = io.native && allPermissions && guided.modelReady && !guided.checking;
   const both = guided.holdDone && guided.tapDone;
   // Step 4 not ready shows a specific error in place of its attention line, so it is never shown twice.
@@ -226,30 +221,13 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
       {/* ui-iter-07: the content column is the loom's stage, in both themes. */}
       <div className="guided-main stage">
         <section className="guided-content" aria-labelledby="guided-heading" tabIndex={0}>
-          {guided.step === 0 ? <WelcomeCover heading={heading} shortcut={state.settings.shortcut} /> : <>
-            <div className="guided-kicker">{['01 / Get connected', '02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step - 1]}</div>
-            <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
+          {guided.step === 0 ? <WelcomeCover heading={heading} shortcut={state.settings.shortcut} /> : guided.step === 1 ?
+            <ConnectionStep guided={guided} heading={heading} modelLabel={modelLabel} size={size} connected={connected} native={io.native} error={shownError}
+              permission={permission} refresh={() => void action(controller.refresh)} download={() => void action(controller.download)}
+              cancelDownload={id => void action(() => io.cancelDownload(id))} /> : <>
+            <div className="guided-kicker">{['02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step - 2]}</div>
+            <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
               {guided.step === 4 && <LoomLine />}</div>
-          </>}
-          {guided.step === 1 && <>
-            <p className="guided-intro">{onWindows ? 'Windows has no typing permission to turn on. Microphone access is a Windows privacy setting, so Voxloom can only check it when you first dictate.' : 'Two permissions connect your microphone, typing and keyboard controls. We’ll check each before moving on.'}</p>
-            <div className="guided-permissions">{permissions.map((item) => {
-              const status = guided.permissions[item.key];
-              return <div className="guided-permission" key={item.kind}>
-                <div><strong>{item.title}</strong><p>{item.copy}</p><small>{status === 'authorized' ? '✓ Allowed' : status === 'not-granted' ? 'Access is off or has not been granted.' : status === 'not-determined' ? 'Not requested yet.' : status === 'unknown' ? 'Checking access…' : status === 'not-required' ? 'Not needed on Windows.' : status === 'unverified' ? 'Checked when you first dictate.' : status}</small></div>
-                {!permissionClear(status) && <div className="guided-permission-actions"><button className="btn" disabled={!io.native} onClick={() => void permission(item.kind)} type="button">{item.kind === 'accessibility' ? 'Open Accessibility Settings' : `Allow ${item.name}`}</button>{status !== 'not-determined' && item.kind !== 'accessibility' && <button className="btn ghost" disabled={!io.native} onClick={() => void permission(item.kind, true)} type="button">Open {item.name} Settings</button>}</div>}
-              </div>;
-            })}</div>
-            <p className="guided-mini">{onWindows ? 'If Voxloom can’t hear you when you dictate, open Windows Settings > Privacy & security > Microphone and turn on Microphone access and Let desktop apps access your microphone.' : 'Enable Voxloom in System Settings → Privacy & Security, then return and check again. If macOS asks you to quit and reopen Voxloom, do so, then resume setup. If Accessibility shows as off, Voxloom can’t tell whether access was denied or never requested.'}</p>
-            <button className="btn ghost" onClick={() => void action(controller.refresh)} type="button">Check again</button>
-            <div className="guided-pack"><strong>{guided.modelReady ? '✓ Voice pack verified · engine available' : guided.downloading ? `Downloading ${STT_MODEL_CATALOG.find((item) => item.id === guided.downloading)?.label ?? guided.downloading}…` : 'Voice pack needs attention'}</strong><span>{modelLabel} · {size}</span>
-              {guided.progress && <progress aria-label="Voice pack download" max={guided.progress.bytesTotal || undefined} value={guided.progress.bytesReceived} />}
-              {guided.downloading && !guided.progress && <progress aria-label="Voice pack download" />}
-              {!guided.modelReady && !guided.downloading && <button className="btn" disabled={!io.native || guided.checking || guided.modelState !== 'missing'} onClick={() => void action(controller.download)} type="button">Retry download</button>}
-              {guided.downloading && <button className="btn ghost" onClick={() => void action(() => io.cancelDownload(guided.downloading!))} type="button">Cancel download</button>}
-              <small>One verified download, then offline dictation. Interrupted downloads restart on Retry.</small>
-            </div>
-            <details><summary>What happens to my voice?</summary><p>The selected speech model runs locally. The download needs internet; speech is not sent to a cloud model. Text cleanup stays off during practice.</p></details>
           </>}
           {guided.step === 2 && <>
             <p className="guided-intro">Hold these keys and talk, and Voxloom types your words where you’re writing. Keep them, or pick your own.</p>
@@ -278,7 +256,7 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
             <div className="guided-shortcut"><KeyCombo combo={state.settings.shortcut} /><p>Hold for a quick thought. Double-tap to go hands-free. Press once more to finish.</p></div>
             <p className="guided-mini">Your shortcut works in other apps once setup closes. If an app won’t take typed text, Voxloom may copy your words so you can paste them.</p>
           </>}
-          {shownError && !(guided.step === 4 && !guided.ready) && <p className="form-error" role="alert">{shownError}</p>}
+          {shownError && guided.step !== 1 && !(guided.step === 4 && !guided.ready) && <p className="form-error" role="alert">{shownError}</p>}
         </section>
         {guided.step === 0 && <p className="guided-mini guided-disclosure">{modelId === 'whisper-base.en' ? 'Starting setup downloads Whisper Base (English)' : `Starting setup prepares your selected ${modelLabel}`} ({size}) if needed. Your dictation is processed on this Mac. Larger voice packs are optional in Settings.</p>}
         <footer className="guided-footer">

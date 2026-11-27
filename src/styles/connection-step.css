@@ -1,0 +1,64 @@
+/* One instruction facing a short connection record. As each check clears,
+   its actions disappear; the footer is the only next step once all are clear. */
+.guided-setup[data-step="1"] .guided-main {
+  --connection-edge: max(22px, min(4cqw, 56px), calc((100cqw - 64rem) / 2));
+}
+.guided-setup[data-step="1"] :is(.guided-content, .guided-footer) { padding-inline: var(--connection-edge); }
+.guided-setup[data-step="1"] .guided-content { display: flex; flex-direction: column; }
+.connection { margin-block: auto; padding-block: 18px; }
+.connection__folio { display: flex; align-items: center; gap: 18px; margin: 0 0 36px; }
+.connection__folio span { flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), color-mix(in srgb, var(--brand-b) 40%, var(--line))); }
+.connection__spread { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; gap: clamp(24px, 6cqw, 84px); }
+.connection__task { min-width: 0; }
+.guided-content .connection__task h2 {
+  font: 500 calc(var(--fs-hero) * 1.7)/1.04 var(--font-words);
+  letter-spacing: -.045em; text-wrap: balance; margin: 0 0 16px; padding: 0;
+}
+.connection__task p { margin: 0; max-width: 48ch; }
+.connection__task .connection__note { font-size: var(--fs-secondary); margin-top: 10px; color: var(--mut); }
+.connection__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.connection__actions:not(:empty) { margin-top: 22px; }
+.connection .btn { font-size: var(--fs-secondary); justify-content: center; min-height: 38px; }
+.connection .btn:not(.primary), .guided-footer .btn.ghost { background: var(--field); border: 1px solid var(--ctl-line); color: var(--fg); }
+.connection .btn:not(.primary):hover:not(:disabled), .guided-footer .btn.ghost:hover { background: var(--segon); border-color: var(--mut); }
+.connection progress { width: 100%; display: block; margin-top: 8px; accent-color: var(--accfg); }
+.connection__receipt { padding: 0 0 8px; }
+.connection__caption { align-items: baseline; display: flex; justify-content: space-between; gap: 12px; padding-bottom: 11px; border-bottom: 1px solid var(--ctl-line); }
+.connection__caption h3 { font-weight: 600; font-size: var(--fs-emph); margin: 0; }
+.connection__caption > span { font: 500 var(--fs-label)/1.3 var(--mono); color: var(--mut); }
+.connection__receipt ul { list-style: none; padding: 0; margin: 0; }
+.connection__receipt li {
+  display: grid; grid-template-columns: 24px auto minmax(0, 1fr); align-items: center;
+  column-gap: 10px; padding-block: 10px; border-bottom: 1px solid var(--line); font-size: var(--fs-secondary);
+}
+.connection__receipt li > .icon { color: var(--mut); justify-self: center; }
+.connection__receipt li > strong { font-weight: 550; }
+.connection__receipt li > span { text-align: end; color: var(--mut); font-size: var(--fs-label); }
+.connection__receipt li[data-verified] > span { color: var(--accfg); }
+.connection__receipt li[data-verified] > span::before { display: inline-block; content: ''; width: 7px; height: 4px; margin: 0 6px 3px 0; border: solid currentColor; border-width: 0 0 1.5px 1.5px; transform: rotate(-45deg); }
+.connection__receipt small, .connection__row-action, .connection__receipt progress, .connection__receipt .form-error { grid-column: 2 / -1; }
+.connection__receipt small { color: var(--mut); font-size: var(--fs-label); }
+.connection__row-action { margin-top: 6px; }
+.connection__receipt details { border: none; margin: 0; padding: 8px 0 0; }
+.connection__receipt summary { width: fit-content; padding-block: 4px; text-decoration: underline; text-underline-offset: 3px; }
+.connection__receipt details p { margin: 6px 0 0; }
+.connection .form-error { margin: 16px 0 0; }
+@container (max-width: 720px) {
+  .connection__spread { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+  .connection__folio { margin-bottom: 18px; }
+  .guided-content .connection__task h2 { font-size: calc(var(--fs-hero) * 1.25); }
+}
+@media (max-height: 680px) {
+  .guided-setup[data-step="1"] .guided-content { padding-block: 14px; }
+  .connection { padding-block: 0; }
+  .connection__folio { margin-bottom: 12px; }
+  .connection__spread { gap: 16px; }
+  .guided-content .connection__task h2 { margin-bottom: 8px; }
+  .connection__actions:not(:empty) { margin-top: 12px; }
+  .connection__receipt li { padding-block: 5px; }
+  .connection__caption { padding-bottom: 5px; }
+  .connection__row-action { margin-top: 4px; }
+  .connection__receipt { padding-bottom: 0; }
+  .connection__receipt details { padding-top: 4px; }
+  .connection .form-error { margin-top: 8px; }
+}
