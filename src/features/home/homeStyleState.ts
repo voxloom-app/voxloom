@@ -69,7 +69,7 @@ export function homeStyleNote(state: HomeStyleState, ratio: number): string | nu
     case 'downloading':
       return `Downloading the cleanup model… ${downloadPercent(ratio)}%`;
     case 'failed':
-      return 'Couldn’t download the cleanup model. You can also add it in Settings → Cleanup.';
+      return 'Couldn’t download the cleanup model.';
     case 'on-missing':
       return 'The cleanup model is missing, so styles aren’t applied.';
     default:

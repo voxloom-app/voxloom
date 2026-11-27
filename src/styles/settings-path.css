@@ -135,8 +135,8 @@ li[data-stop="transcripts"] > .voice-path__stop .voice-path__thread::before { -w
 /* Keyboard focus in a pane's rows wears a lime selvedge. */
 .settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
 
-/* Narrow windows: the thread runs down the left and each stop becomes a row. */
-@container (max-width: 600px) {
+/* Below the desktop minimum: the thread runs down the left instead. */
+@container (max-width: 399px) {
   .voice-path__stops { grid-auto-flow: row; grid-template-columns: 1fr; padding: 0 var(--s-6); }
   .voice-path__stop {
     align-items: center;

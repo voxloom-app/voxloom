@@ -12,6 +12,7 @@ import type {
   Screen,
   Settings,
 } from '../domain/types';
+import type { SettingsTab } from '../features/settings/SettingsTabs';
 import type { AppAction } from './actions';
 import { createInitialState } from './initialState';
 import {
@@ -39,6 +40,8 @@ export interface AppState {
   onboarding: OnboardingState;
   records: DictationRecord[];
   screen: Screen;
+  /** Optional destination pane for a contextual Settings link; never persisted. */
+  settingsTab?: SettingsTab;
   settings: Settings;
   words: string[];
 }
@@ -89,7 +92,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       },
     };
   }
-  if (action.type === 'set-screen') return { ...state, screen: action.screen };
+  if (action.type === 'set-screen') return { ...state, screen: action.screen, settingsTab: action.settingsTab };
   if (action.type === 'set-setting') {
     return {
       ...state,

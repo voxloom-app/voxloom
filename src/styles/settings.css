@@ -94,6 +94,12 @@
   .settings-panel { padding: var(--s-8); }
 }
 
+.settings-stop-link {
+  background: none; border: 0; color: inherit; font: inherit; padding: 0;
+  text-decoration: underline; text-underline-offset: .16em;
+}
+.settings-stop-link:hover { color: var(--fg); }
+
 /* Native Settings window (UI PR 6b): the card fills its own window. */
 .settings-window-root { background: var(--panel); min-height: 100vh; }
 .settings-window-root > .banner { margin: var(--s-4) var(--s-8) 0; }

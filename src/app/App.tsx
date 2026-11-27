@@ -10,7 +10,7 @@ import { stagePhase } from '../features/home/stagePhase';
 import { clearGuidedProgress, Onboarding } from '../features/onboarding/Onboarding';
 import { Settings } from '../features/settings/Settings';
 import { isTauriEnv } from '../services/capture/captureService';
-import { listenOnboardingOpen, openSettingsWindow, subscribe } from '../services/settingsWindow';
+import { listenOnboardingOpen, listenSettingsOpen, subscribe } from '../services/settingsWindow';
 import { disarmCleanupPrewarm, prewarmCleanup } from '../services/cleanup/prewarm';
 import { useCleanupPrewarm } from '../services/stt/useCleanupPrewarm';
 import { useDogfoodCapture } from '../services/stt/useDogfoodCapture';
@@ -20,6 +20,7 @@ import { BootHydratePlaceholder } from './shell/BootHydratePlaceholder';
 import { RailTools } from './shell/RailTools';
 import { Recall } from './shell/Recall';
 import { Sidebar } from './shell/Sidebar';
+import { hasOpenModal } from './modalState';
 import { useAppKeys } from './useAppKeys';
 import { useDevSession } from './useDevSession';
 import { toGestureDogfoodBridge, useShortcutGestures } from './useShortcutGestures';
@@ -88,20 +89,21 @@ export function App() {
     state,
   });
 
-  // Native: Settings is its own window (title bar, ⌥4, ⌘,); browser dev keeps it in-page.
   const native = isTauriEnv();
-  const navigate = useCallback((screen: Screen) => {
-    if (screen === 'settings' && native) void openSettingsWindow()
-      .catch((error: unknown) => announceError(`Couldn't open Settings: ${String(error)}`));
-    else dispatch({ screen, type: 'set-screen' });
-  }, [announceError, dispatch, native]);
+  const recallInput = useRef<HTMLInputElement | null>(null);
+  const navigate = useCallback((screen: Screen) => dispatch({ screen, type: 'set-screen' }), [dispatch]);
+  useEffect(() => subscribe(() => listenSettingsOpen(() => {
+    // Match the keyboard route: never navigate away from an open editor or setup.
+    if (hasOpenModal()) return;
+    recallInput.current?.blur();
+    navigate('settings');
+  })), [navigate]);
   const openHelp = useCallback((opener: HTMLElement) => {
     modalOpener.current = opener;
     setShortcutOpen(true);
   }, []);
 
   // Recall (ui-iter-11): ⌘K or / from any screen picks up any thread you've said.
-  const recallInput = useRef<HTMLInputElement | null>(null);
   const openRecall = useCallback(() => {
     recallInput.current?.focus();
     recallInput.current?.select();
@@ -174,16 +176,16 @@ export function App() {
           <RailTools
             onHelp={openHelp}
             onSettings={() => navigate('settings')}
-            settingsOpen={!native && state.screen === 'settings'}
+            settingsOpen={state.screen === 'settings'}
           />
         )}
       />
       <main className="main">
         {bootReady && state.screen === 'home' && !onboardingOpen && !state.onboarding.complete && <div className="banner banner--info"><span className="banner__text">Setup is incomplete. Connect access and try both ways to dictate.</span><button className="btn ghost" onClick={(event) => { modalOpener.current = event.currentTarget; setOnboardingOpen(true); }} type="button">Resume setup</button></div>}
-        {(state.screen === 'home' || (native && state.screen === 'settings')) && <Home dogfood={dogfood} onToast={announce} />}
+        {state.screen === 'home' && <Home dogfood={dogfood} onToast={announce} />}
         {state.screen === 'history' && gated('History', <History onToast={announce} />)}
         {state.screen === 'dictionary' && gated('Dictionary', <Dictionary />)}
-        {!native && state.screen === 'settings' && gated('Settings', <Settings onSetup={openSetup} />)}
+        {state.screen === 'settings' && gated('Settings', <Settings focusOnOpen initialTab={state.settingsTab} onSetup={openSetup} />)}
       </main>
     </div>
     {onboardingOpen && <Onboarding key={setupRun} onClose={() => setOnboardingOpen(false)}

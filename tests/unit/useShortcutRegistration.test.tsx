@@ -31,7 +31,7 @@ function setup(outcome: RegisterOutcome, settingsOpen: boolean, registered: stri
     onShortcutError: (m: string) => { errors.push(m); },
     onShortcutRevert: (s: string) => { reverts.push(s); },
   } };
-  const open = async () => settingsOpen;
+  const open = () => settingsOpen;
   const hook = renderHook(
     ({ shortcut }) => useShortcutRegistration(shortcut, nativeRef, registeredRef, callbacksRef, open),
     { initialProps: { shortcut: 'Ctrl + Shift + Space' } },

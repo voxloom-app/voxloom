@@ -123,9 +123,11 @@
 
 @container (max-width: 560px) {
   .key-map { grid-template-columns: minmax(0, 1fr); }
-  .key-map__plot { border-radius: 8px 8px 0 0; padding: var(--s-6); }
+  .key-map__plot { border-radius: 8px 8px 0 0; grid-template-columns: 1fr auto; padding: var(--s-6); }
+  .key-map__scale { grid-area: 1 / 2; }
+  .key-map__diagram { grid-column: 1 / -1; }
   .key-map__legend { align-items: center; border: 0; border-top: 1px dashed var(--ctl-line); gap: 4px 12px; grid-template-columns: 1fr auto; padding: var(--s-6); }
-  .key-map__eyebrow { grid-column: 1 / -1; }
+  .key-map__eyebrow { display: none; }
   .key-map__chord { font-size: var(--fs-sheet); }
   .shortcut-station__help { flex-basis: 100%; text-align: start; }
 }

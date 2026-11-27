@@ -8,6 +8,7 @@ import { VoicePath } from './VoicePath';
 interface SettingsProps {
   onSetup: (opener: HTMLElement) => void;
   initialTab?: SettingsTab;
+  focusOnOpen?: boolean;
   /** In the native Settings window: name the window after the open pane. */
   onTabTitle?: (title: string) => void;
 }
@@ -21,7 +22,7 @@ const prefersReducedMotion = () =>
  * a dictation passes opens its own pane, so Settings reads in the order your
  * words travel, from the key you hold to the transcript that stays.
  */
-export function Settings({ onSetup, initialTab = 'shortcut', onTabTitle }: SettingsProps) {
+export function Settings({ onSetup, initialTab = 'shortcut', focusOnOpen, onTabTitle }: SettingsProps) {
   const [tab, setTab] = useState<SettingsTab>(initialTab);
   const section = useRef<HTMLElement>(null);
   const panel = useRef<HTMLDivElement>(null);
@@ -31,6 +32,9 @@ export function Settings({ onSetup, initialTab = 'shortcut', onTabTitle }: Setti
   const previous = onPath && index > 0 ? settingsPanes[index - 1] : null;
   const next = onPath && index < PATH_LENGTH - 1 ? settingsPanes[index + 1] : null;
   useEffect(() => { onTabTitle?.(title); }, [title, onTabTitle]);
+  useEffect(() => {
+    if (focusOnOpen) section.current?.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]')?.focus();
+  }, [focusOnOpen]);
 
   /** Walk to a neighbouring stop from the pane's foot: keep focus in the pane, show the path. */
   function walk(to: SettingsTab) {

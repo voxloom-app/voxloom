@@ -1,6 +1,5 @@
-//! The Settings window (UI PR 6b): a second webview opened from the app
-//! menu ("Settings… ⌘,"), the main title-bar button and ⌥4. At most one
-//! exists; opening again focuses it.
+//! The app menu opens Settings in main. The original standalone Settings
+//! window and its commands are retained, but no longer used by navigation.
 
 use serde::Serialize;
 #[cfg(target_os = "macos")]
@@ -10,6 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuild
 pub const SETTINGS_LABEL: &str = "settings";
 pub const MAIN_LABEL: &str = "main";
 pub const SETTINGS_MENU_ID: &str = "open-settings";
+pub const SETTINGS_OPEN_EVENT: &str = "settings:open";
 pub const SETTINGS_CHANGED_EVENT: &str = "settings:changed";
 pub const ONBOARDING_OPEN_EVENT: &str = "onboarding:open";
 const SETTINGS_URL: &str = "settings.html";
@@ -61,13 +61,17 @@ pub fn settings_window_open(app: AppHandle) -> Result<(), String> {
 /// "Set up shortcuts…" from the Settings window: focus main and open onboarding there.
 #[tauri::command]
 pub fn settings_request_onboarding(app: AppHandle) -> Result<(), String> {
+    show_main_page(&app, ONBOARDING_OPEN_EVENT)
+}
+
+pub fn show_main_page<R: Runtime>(app: &AppHandle<R>, event: &str) -> Result<(), String> {
     let main = app
         .get_webview_window(MAIN_LABEL)
         .ok_or_else(|| "main window is not open".to_string())?;
     let _ = main.unminimize();
     main.show().map_err(|e| e.to_string())?;
     main.set_focus().map_err(|e| e.to_string())?;
-    main.emit_to(MAIN_LABEL, ONBOARDING_OPEN_EVENT, ())
+    main.emit_to(MAIN_LABEL, event, ())
         .map_err(|e| e.to_string())
 }
 
@@ -102,7 +106,8 @@ mod tests {
 
     #[test]
     fn labels_and_events_match_the_frontend_contract() {
-        // Mirrors src/services/settingsWindow/constants.ts.
+        // Mirrors src/services/settingsWindow/index.ts.
+        assert_eq!(SETTINGS_OPEN_EVENT, "settings:open");
         assert_eq!(SETTINGS_LABEL, "settings");
         assert_eq!(SETTINGS_CHANGED_EVENT, "settings:changed");
         assert_eq!(ONBOARDING_OPEN_EVENT, "onboarding:open");

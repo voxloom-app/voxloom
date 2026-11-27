@@ -11,7 +11,7 @@ export function MicrophoneRows() {
   const {
     captureReady, captureState, deviceListError, devices, devicesLoading, permissionStatus,
     prepareDeviceChange, refreshDevices, requestMicPermission, runMicTest, stopMicTest,
-  } = useCaptureState();
+  } = useCaptureState({ adoptActive: false }); // Leaving this pane must never cancel a product dictation.
 
   const isNative = isTauriEnv();
   const micAuthorized = permissionStatus === 'authorized';

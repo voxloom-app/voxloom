@@ -8,7 +8,7 @@ export const navScreens: { icon: IconName; label: string; value: Screen }[] = [
   { icon: 'book', label: 'Dictionary', value: 'dictionary' },
 ];
 
-/** Alt+1…4 → screen; 4 opens Settings (in-page until the Settings window lands in UI PR 6). */
+/** Alt+1…4 → screen; 4 opens the in-app Settings page. */
 export function screenForAltDigit(key: string): Screen | null {
   if (!/^[1-4]$/.test(key)) return null;
   return key === '4' ? 'settings' : navScreens[Number(key) - 1].value;

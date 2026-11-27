@@ -7,6 +7,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export const SETTINGS_WINDOW_LABEL = 'settings';
+export const SETTINGS_OPEN_EVENT = 'settings:open';
 export const SETTINGS_CHANGED_EVENT = 'settings:changed';
 export const ONBOARDING_OPEN_EVENT = 'onboarding:open';
 
@@ -71,6 +72,11 @@ export function listenSettingsChanged(
 
 export function isForeignSave(payload: SettingsChangedPayload | null, ownLabel: string | null): boolean {
   return typeof payload?.contents === 'string' && payload.source !== ownLabel;
+}
+
+/** The macOS app menu has brought main forward; open its Settings page. */
+export function listenSettingsOpen(handler: () => void) {
+  return listenTo<null>(SETTINGS_OPEN_EVENT, handler);
 }
 
 export function listenOnboardingOpen(handler: () => void) {

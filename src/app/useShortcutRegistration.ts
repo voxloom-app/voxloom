@@ -3,7 +3,6 @@ import { useEffect, useRef, type MutableRefObject } from 'react';
 import type { NativeShortcutController } from '../services/shortcut';
 import { emitShortcutBound, listenShortcutRetry } from '../services/shortcut/bindingEvents';
 import { fromPluginHotkey, toPluginHotkey } from '../services/shortcut/formatHotkey';
-import { isSettingsWindowOpen } from '../services/settingsWindow';
 import { noneActiveText, usingInsteadText } from '../features/settings/shortcutCopy';
 
 /** `held` (plugin format, from native) as a Settings value: the registered one if it matches. */
@@ -36,7 +35,7 @@ export function useShortcutRegistration(
   nativeRef: MutableRefObject<NativeShortcutController | null>,
   registeredRef: MutableRefObject<string | null>,
   callbacksRef: MutableRefObject<RegistrationCallbacks>,
-  settingsOpen: () => Promise<boolean> = isSettingsWindowOpen,
+  settingsOpen: () => boolean,
   ready = true,
 ) {
   const boundShortcutRef = useRef<string | null>(null);
@@ -70,7 +69,7 @@ export function useShortcutRegistration(
       boundShortcutRef.current = revertTo;
       callbacksRef.current.onShortcutRevert?.(revertTo);
     }
-    if (await settingsOpen()) return;
+    if (settingsOpen()) return;
     callbacksRef.current.onShortcutError?.(active === null
       ? noneActiveText(target, previous)
       : usingInsteadText(target, active));

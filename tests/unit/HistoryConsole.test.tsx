@@ -24,7 +24,7 @@ describe('History empty states (UI PR 4)', () => {
 
   it('names the real Settings section in the retention line', () => {
     renderWithApp(<History onToast={vi.fn()} />);
-    expect(screen.getByText(/\(Settings › Transcripts\)/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Transcripts' }).parentElement).toHaveTextContent('(Settings › Transcripts)');
   });
 });
 

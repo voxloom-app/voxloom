@@ -8,6 +8,7 @@ import { canRetry } from '../../domain/records';
 import type { DictationRecord, HistoryStatus, Settings } from '../../domain/types';
 import { isTauriEnv } from '../../services/capture/captureService';
 import { canClip, ClippingSheet } from './ClippingSheet';
+import { SettingsStopLink } from '../settings/SettingsStopLink';
 import { TimeIndex } from './TimeIndex';
 import { HistoryRow } from './HistoryRow';
 import { groupByDay } from './historyLoom';
@@ -28,9 +29,9 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 const retentionCopy: Record<Settings['transcriptRetention'], string> = {
-  '30-days': 'Kept for 30 days (Settings › Transcripts).',
-  forever: 'Kept until you delete them (Settings › Transcripts).',
-  off: 'Transcript retention is off (Settings › Transcripts).',
+  '30-days': 'Kept for 30 days',
+  forever: 'Kept until you delete them',
+  off: 'Transcript retention is off',
 };
 
 /** The time index leads into day-grouped transcripts. Each day states its
@@ -96,7 +97,7 @@ export function History({ onToast }: HistoryProps) {
         <div className="history-stage__title">
           <h1 id="history-title">History</h1>
           <p className="history-stage__lede">
-            {retentionCopy[state.settings.transcriptRetention]}{' '}
+            {retentionCopy[state.settings.transcriptRetention]} (Settings › <SettingsStopLink tab="transcripts">Transcripts</SettingsStopLink>).{' '}
             {isNative
               ? 'Audio isn’t saved, so audio retry isn’t available in the desktop app.'
               : 'Failed dictations can be retried while their temporary recovery buffer lasts.'}
