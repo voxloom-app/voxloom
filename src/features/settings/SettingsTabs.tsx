@@ -1,51 +1,33 @@
-import { useRef, type KeyboardEvent } from 'react';
-import { Icon, type IconName } from '../../components/Icon';
+/**
+ * Settings panes (ui-iter-13): one per stop a dictation passes on the voice
+ * path, in that order, plus Appearance, which sits off the path because
+ * nothing in it changes a dictation. The path in the header is their tablist.
+ */
+export type SettingsTab = 'shortcut' | 'microphone' | 'speech' | 'cleanup' | 'output' | 'transcripts' | 'appearance';
 
-export type SettingsTab = 'capture' | 'models' | 'appearance' | 'privacy';
+export interface SettingsPane {
+  value: SettingsTab;
+  /** Visible pane heading and the native Settings window title. */
+  title: string;
+  intro: string;
+}
 
-export const settingsTabs: { value: SettingsTab; label: string; title: string; icon: IconName }[] = [
-  { value: 'capture', label: 'Capture', title: 'Capture & Output', icon: 'mic' },
-  { value: 'models', label: 'Models', title: 'Speech-to-text models', icon: 'download' },
-  { value: 'appearance', label: 'Appearance', title: 'Appearance', icon: 'gear' },
-  { value: 'privacy', label: 'Privacy', title: 'Privacy & Recovery', icon: 'check' },
+export const settingsPanes: readonly SettingsPane[] = [
+  { value: 'shortcut', title: 'Shortcut',
+    intro: 'Where every dictation starts. Hold it in any app, speak, and let go.' },
+  { value: 'microphone', title: 'Microphone',
+    intro: 'What Voxloom listens to while you dictate.' },
+  { value: 'speech', title: 'Speech',
+    intro: 'The speech-to-text model on this Mac that turns your voice into words.' },
+  { value: 'cleanup', title: 'Cleanup',
+    intro: 'An optional tidy-up on this Mac, after speech and before your words arrive.' },
+  { value: 'output', title: 'Output',
+    intro: 'Your words go into the app you’re using when they’re ready. Voxloom never presses Return or Send for you.' },
+  { value: 'transcripts', title: 'Transcripts & privacy',
+    intro: 'What stays on this Mac after a dictation, and how to recover when something goes wrong.' },
+  { value: 'appearance', title: 'Appearance',
+    intro: 'How Voxloom looks. This is off the path: nothing here changes a dictation.' },
 ];
 
-const step: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1 };
-
-/** Settings toolbar: a tablist (arrows, Home, End) over the four tab panels. */
-export function SettingsTabs({ value, onChange }: { value: SettingsTab; onChange: (tab: SettingsTab) => void }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const current = settingsTabs.findIndex((tab) => tab.value === value);
-
-  function onKeyDown(event: KeyboardEvent) {
-    const n = settingsTabs.length;
-    const next = event.key in step ? (current + step[event.key] + n) % n
-      : event.key === 'Home' ? 0 : event.key === 'End' ? n - 1 : -1;
-    if (next < 0) return;
-    event.preventDefault();
-    onChange(settingsTabs[next].value);
-    refs.current[next]?.focus();
-  }
-
-  return (
-    <div aria-label="Settings sections" className="settings-tabs" onKeyDown={onKeyDown} role="tablist">
-      {settingsTabs.map((tab, index) => (
-        <button
-          aria-controls={`settings-panel-${tab.value}`}
-          aria-selected={tab.value === value}
-          className="settings-tab"
-          id={`settings-tab-${tab.value}`}
-          key={tab.value}
-          onClick={() => onChange(tab.value)}
-          ref={(el) => { refs.current[index] = el; }}
-          role="tab"
-          tabIndex={tab.value === value ? 0 : -1}
-          type="button"
-        >
-          <Icon name={tab.icon} size={18} />
-          <span>{tab.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
+/** The stops on the path; Appearance is the one pane off it. */
+export const PATH_LENGTH = 6;

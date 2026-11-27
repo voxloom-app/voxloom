@@ -1,0 +1,157 @@
+/* Settings panes (ui-iter-13): the voice path is the Settings tablist. The open stop lifts
+   off the beam on a plate, ties its knot and drops one lit thread through the reed into
+   the cloth, where its pane is named and introduced. Appearance hangs loose at the end of
+   the path, because nothing in it changes a dictation. */
+
+/* The bar lets the dropped thread hang through the reed and over the cloth's fell. */
+.settings-window__bar.stage { overflow: visible; z-index: 1; }
+
+.voice-path__stops > li { --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b)); }
+.voice-path__stops > li[data-off-path] { --knot: var(--fg); margin-left: var(--s-4); }
+.voice-path__stop { position: relative; transition: background-color .2s ease, box-shadow .2s ease; }
+
+/* The open stop: a raised plate on the beam, edged in its thread colour where the thread
+   leaves for the pane, so the selection never rests on the knot's fill alone. */
+.voice-path li[data-current] > .voice-path__stop {
+  --plate-line: rgba(255, 255, 255, .09);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .085), rgba(255, 255, 255, .025));
+  border-radius: 12px 12px 4px 4px;
+  box-shadow: inset 0 0 0 1px var(--plate-line), inset 0 -2px 0 var(--knot);
+}
+.voice-path li[data-current] > .voice-path__stop:hover { background: linear-gradient(180deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .035)); }
+.voice-path li[data-current] .voice-path__value { color: #f6f6f9; }
+
+/* The dropped thread: from the plate's edge, through the reed, onto the fell, with a bead
+   where it enters the cloth. The gap it spans is the cloth's margin (frame.css). */
+.voice-path li[data-current] > .voice-path__stop::after {
+  animation: pane-drop .45s cubic-bezier(.2, .7, .2, 1) both;
+  background:
+    radial-gradient(circle at 50% calc(100% - 5px), var(--knot) 0 3.5px, transparent 4px),
+    linear-gradient(180deg, var(--knot), color-mix(in srgb, var(--knot) 70%, transparent) 60%, var(--knot)) 50% 0 / 2px calc(100% - 8px) no-repeat,
+    radial-gradient(50% 5px at 50% calc(100% - 5px), color-mix(in srgb, var(--knot) 60%, transparent), transparent);
+  content: "";
+  height: calc(var(--s-9) + 7px);
+  left: calc(50% - 44px);
+  pointer-events: none;
+  position: absolute;
+  top: 100%;
+  transform-origin: 50% 0;
+  width: 88px;
+}
+/* Appearance opens its pane on a dashed thread: it is off the path. */
+.voice-path li[data-off-path][data-current] > .voice-path__stop::after {
+  background:
+    radial-gradient(circle at 50% calc(100% - 5px), var(--knot) 0 3.5px, transparent 4px),
+    repeating-linear-gradient(180deg, var(--knot) 0 3px, transparent 3px 6px) 50% 0 / 2px calc(100% - 8px) no-repeat;
+}
+@keyframes pane-drop { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
+
+/* Off the path: a short loose thread, dashed, that ties into nothing. */
+.voice-path li[data-off-path] .voice-path__thread::before {
+  background: repeating-linear-gradient(90deg, var(--ctl-line) 0 4px, transparent 4px 8px);
+  inset: 8px 18% auto;
+  -webkit-mask-image: none;
+  mask-image: none;
+  opacity: .9;
+}
+.voice-path li[data-off-path] .voice-path__thread::after { animation: none; display: none; }
+.voice-path li[data-off-path]:not([data-current]) .voice-path__thread i { box-shadow: inset 0 0 0 2px var(--ctl-line); background: transparent; }
+
+/* The pane head names the stop the cloth belongs to, in the stop's own thread colour. */
+.settings-panel { --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--stop, 0) * 20%), var(--brand-b)); }
+.settings-panel[data-pane="appearance"] { --knot: var(--mut); }
+.settings-pane__head { animation: pane-in .35s ease-out both; margin-bottom: var(--s-9); }
+.settings-pane__where {
+  align-items: center;
+  color: var(--mut);
+  display: flex;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  gap: 9px;
+  letter-spacing: .08em;
+  margin: 0 0 var(--s-4);
+  text-transform: uppercase;
+}
+.settings-pane__where i {
+  background: var(--knot);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--knot) 22%, transparent), 0 0 10px color-mix(in srgb, var(--knot) 40%, transparent);
+  height: 9px;
+  width: 9px;
+}
+.settings-panel[data-pane="appearance"] .settings-pane__where i { background: transparent; box-shadow: inset 0 0 0 2px var(--ctl-line); }
+.settings-pane__head h2 {
+  color: var(--fg);
+  font-family: var(--font-words);
+  font-size: calc(var(--fs-sheet) * 1.5);
+  font-weight: 600;
+  letter-spacing: -.005em;
+  line-height: 1.15;
+  margin: 0;
+}
+.settings-pane__intro { color: var(--mut); font-size: var(--fs-body); line-height: 1.45; margin: var(--s-3) 0 0; max-width: 62ch; }
+@keyframes pane-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* The pane's foot walks the path: back to the stop before, on to the next. */
+.settings-pane__walk {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-6);
+  justify-content: space-between;
+  margin-top: var(--s-10);
+  padding-top: var(--s-9);
+}
+.settings-pane__step {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--fg);
+  column-gap: var(--s-6);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  grid-template-areas: "arrow small" "arrow to";
+  grid-template-columns: auto 1fr;
+  min-width: 11em;
+  padding: var(--s-5) var(--s-8);
+  text-align: left;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.settings-pane__step[data-dir="next"] { grid-template-areas: "small arrow" "to arrow"; grid-template-columns: 1fr auto; margin-left: auto; text-align: right; }
+.settings-pane__step small { color: var(--mut); font-size: var(--fs-micro); font-weight: 700; grid-area: small; letter-spacing: .08em; text-transform: uppercase; }
+.settings-pane__to { font-family: var(--font-words); font-size: var(--fs-emph); font-weight: 600; grid-area: to; }
+.settings-pane__arrow { color: var(--mut); font-size: var(--fs-emph); grid-area: arrow; transition: transform .15s ease, color .15s ease; }
+.settings-pane__step:hover { border-color: var(--ctl-line); }
+.settings-pane__step:hover .settings-pane__arrow { color: var(--accfg); }
+.settings-pane__step[data-dir="previous"]:hover .settings-pane__arrow { transform: translateX(-2px); }
+.settings-pane__step[data-dir="next"]:hover .settings-pane__arrow { transform: translateX(2px); }
+.settings-pane__step:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* The 760-wide native window: seven stops share the width, so they give up some padding. */
+@container (min-width: 601px) and (max-width: 840px) {
+  .voice-path__stops { padding-inline: var(--s-4); }
+  .voice-path__stop { --pad: 3px; }
+  .voice-path__value .key-combo__caps { gap: 2px; }
+}
+
+/* Narrow windows: the path runs down the left, so the open stop's plate edges that side. */
+@container (max-width: 600px) {
+  .voice-path__stops > li[data-off-path] { margin: var(--s-4) 0 0; }
+  .voice-path li[data-current] > .voice-path__stop { border-radius: 4px 12px 12px 4px; box-shadow: inset 0 0 0 1px var(--plate-line), inset 3px 0 0 var(--knot); }
+  .voice-path li[data-current] > .voice-path__stop::after { display: none; }
+  .voice-path li[data-off-path] .voice-path__thread::before {
+    background: repeating-linear-gradient(180deg, var(--ctl-line) 0 4px, transparent 4px 8px);
+    inset: 22% 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The thread is simply there, and the pane head doesn't rise. */
+  .voice-path li[data-current] > .voice-path__stop::after { animation: none; }
+  .settings-pane__head { animation: none; }
+  .voice-path__stop,
+  .settings-pane__step,
+  .settings-pane__arrow { transition: none; }
+}

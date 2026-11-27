@@ -12,14 +12,14 @@ const transcriptOptions: { value: Settings['transcriptRetention']; label: string
   { value: 'off', label: 'Off' },
 ];
 
-/** Privacy & Recovery tab (R1–R3, E1). */
+/** Transcripts & privacy pane (R1–R3, E1): retention, recovery and licenses. */
 export function PrivacyTab() {
   const { settings, state } = useApp();
   const isNative = isTauriEnv();
   const recovery: [string, string][] = [
     ['Microphone denied', 'Enable in System Settings › Privacy & Security › Microphone.'],
     ['Shortcut collision', 'Choose another combo; your prior binding is kept.'],
-    ['Model unavailable', 'Download a speech-to-text model in Models.'],
+    ['Model unavailable', 'Download a speech-to-text model in Speech.'],
     ['No audio activity detected', 'No transcript is created.'],
     ['Insertion failed', 'The clipboard result is reported truthfully.'],
     ['Transcription failed', isNative

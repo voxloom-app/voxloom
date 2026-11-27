@@ -1,8 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CaptureTab } from '../../src/features/settings/CaptureTab';
-import { ModelsTab } from '../../src/features/settings/ModelsTab';
+import { SpeechPane } from '../../src/features/settings/CapturePanes';
 import { isTauriEnv } from '../../src/services/capture/captureService';
 import { renderWithApp } from './testUtils';
 
@@ -12,7 +11,7 @@ describe('Parakeet existing settings integration', () => {
   it('offers both explicit local models and shows automatic multilingual recognition only for v3', async () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     const user = userEvent.setup();
-    renderWithApp(<><ModelsTab /><CaptureTab onSetup={vi.fn()} /></>);
+    renderWithApp(<SpeechPane />);
     const v3 = await screen.findByRole('radio', { name: /Parakeet v3/ });
     const v2 = screen.getByRole('radio', { name: /Parakeet v2/ });
     expect(screen.getByText(/Local Whisper and Parakeet models/)).toBeInTheDocument();

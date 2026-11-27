@@ -1,5 +1,6 @@
 import { useApp } from '../../app/AppContext';
 import { SegmentedControl } from '../../components/SegmentedControl';
+import { ShuttleGlyph } from '../../components/ShuttleGlyph';
 import type { Appearance, TextSize } from '../../domain/types';
 
 const appearances: { label: string; value: Appearance }[] = [
@@ -14,7 +15,7 @@ const textSizeOptions: { label: string; value: TextSize }[] = [
   { label: 'Large', value: 'large' },
 ];
 
-/** Appearance tab (A1): theme swatch cards, plus Text size (BUS-41). */
+/** Appearance pane (A1): theme swatch cards, Text size (BUS-41) and the recording indicator. */
 export function AppearanceTab() {
   const { settings, state } = useApp();
   return (
@@ -50,6 +51,13 @@ export function AppearanceTab() {
           size="sm"
           value={state.settings.textSize}
         />
+      </div>
+      <div className="frow">
+        <span className="frow__label">
+          <span>Recording indicator</span>
+          <small className="frow__help">Fixed bottom-center while listening or transcribing.</small>
+        </span>
+        <ShuttleGlyph />
       </div>
     </div>
     </>

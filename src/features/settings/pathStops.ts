@@ -6,21 +6,18 @@ import { resolveTranscriptionModelId } from '../../services/stt/resolveModelId';
 import { STT_MODEL_CATALOG } from '../../services/stt/types';
 import type { SettingsTab } from './SettingsTabs';
 
-export type PathStopId = 'shortcut' | 'microphone' | 'speech' | 'cleanup' | 'output' | 'transcripts';
-
-/** One stop on the path a dictation travels, from the key you hold to the text it leaves. */
+/**
+ * One stop on the path a dictation travels, from the key you hold to the text
+ * it leaves; each is also the Settings pane of the same id (ui-iter-13).
+ */
 export interface PathStop {
-  id: PathStopId;
+  id: SettingsTab;
   label: string;
-  /** The Settings tab that owns this stop's control. */
-  tab: SettingsTab;
   /** Visible value; the shortcut stop draws key caps instead. */
   value: string;
   detail: string;
   /** Accessible name: starts with the visible label (WCAG 2.5.3). */
   name: string;
-  /** Rows to land on, most specific first (`data-path-stop` on a row). */
-  targets: readonly string[];
 }
 
 const styleNames: Record<Settings['style'], string> = {
@@ -29,13 +26,14 @@ const styleNames: Record<Settings['style'], string> = {
   'very-casual': 'Very Casual',
 };
 
+const looks: Record<Settings['appearance'], string> = { dark: 'Dark', light: 'Light', system: 'System' };
+const sizes: Record<Settings['textSize'], string> = { default: 'Default text', large: 'Large text', small: 'Small text' };
+
 const kept: Record<Settings['transcriptRetention'], string> = {
   '30-days': 'Kept 30 days',
   forever: 'Kept until deleted',
   off: 'Not kept',
 };
-
-const row = (id: string) => `[data-path-stop="${id}"]`;
 
 /** "Whisper Base (English)" → ["Whisper Base", "English"]; unknown ids show as given. */
 export function speechModel(raw: string): { name: string; language: string | null } {
@@ -63,46 +61,22 @@ export function voicePathStops(settings: Settings, shortcutActive: boolean, mac?
   const keys = settings.shortcut ? spokenCombo(settings.shortcut, mac) : 'none';
   return [
     { detail: shortcutDetail, id: 'shortcut', label: 'Shortcut', name: `Shortcut: ${keys}. ${shortcutDetail}`,
-      tab: 'capture', targets: [row('shortcut')], value: settings.shortcut || 'None' },
-    { detail: 'Input device', id: 'microphone', label: 'Microphone', name: `Microphone: ${mic}`,
-      tab: 'capture', targets: [row('microphone')], value: mic },
+      value: settings.shortcut || 'None' },
+    { detail: 'Input device', id: 'microphone', label: 'Microphone', name: `Microphone: ${mic}`, value: mic },
     { detail: speechDetail, id: 'speech', label: 'Speech', name: `Speech: ${speech.name}, ${speechDetail}`,
-      tab: 'models', targets: ['.stt-model-row[data-selected]', '.stt-model-row'], value: speech.name },
+      value: speech.name },
     { detail: cleanupDetail, id: 'cleanup', label: 'Cleanup', name: `Cleanup: ${cleanupOn ? 'on' : 'off'}, ${cleanupDetail}`,
-      tab: 'capture', targets: [row('cleanup'), row('style')], value: cleanupOn ? 'On' : 'Off' },
-    { detail: output, id: 'output', label: 'Output', name: `Output: insert, ${output.toLowerCase()}`,
-      tab: 'capture', targets: [row('output')], value: 'Insert' },
-    { detail: transcriptDetail, id: 'transcripts', label: 'Transcripts', name: `Transcripts: ${transcripts.toLowerCase()}, ${transcriptDetail.toLowerCase()}`,
-      tab: 'privacy', targets: [row('transcripts')], value: transcripts },
+      value: cleanupOn ? 'On' : 'Off' },
+    { detail: output, id: 'output', label: 'Output', name: `Output: insert, ${output.toLowerCase()}`, value: 'Insert' },
+    { detail: transcriptDetail, id: 'transcripts', label: 'Transcripts',
+      name: `Transcripts: ${transcripts.toLowerCase()}, ${transcriptDetail.toLowerCase()}`, value: transcripts },
   ];
 }
 
-const FOCUSABLE = [
-  'select:not([disabled])',
-  'input:checked:not([disabled])',
-  'input:not([type="radio"]):not([disabled])',
-  'button:not([disabled]):not([tabindex="-1"]):not([aria-disabled="true"])',
-  '[tabindex="0"]',
-].join(', ');
-
-/** The row a stop lands on in `panel`, or null while it hasn't rendered yet. */
-export function findStopRow(panel: ParentNode, stop: Pick<PathStop, 'targets'>): HTMLElement | null {
-  for (const selector of stop.targets) {
-    const found = panel.querySelector<HTMLElement>(selector);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * Land on a row: mark it, bring it into view and focus its first usable
- * control. Disabled rows (browser preview) still land; focus goes to the panel.
- */
-export function landOn(panel: HTMLElement, target: HTMLElement, reduced: boolean): HTMLElement {
-  panel.querySelectorAll('[data-landed]').forEach((node) => node.removeAttribute('data-landed'));
-  target.setAttribute('data-landed', '');
-  const control = target.querySelector<HTMLElement>(FOCUSABLE) ?? panel;
-  control.focus({ preventScroll: true });
-  target.scrollIntoView?.({ behavior: reduced ? 'auto' : 'smooth', block: 'nearest' });
-  return control;
+/** Appearance sits off the path: it shows the look, and changes nothing a dictation does. */
+export function appearanceStop(settings: Settings): PathStop {
+  const look = looks[settings.appearance] ?? 'System';
+  const size = sizes[settings.textSize] ?? 'Default text';
+  const spoken = look === 'System' ? 'follow system' : look.toLowerCase();
+  return { detail: size, id: 'appearance', label: 'Appearance', name: `Appearance: ${spoken}, ${size.toLowerCase()}`, value: look };
 }

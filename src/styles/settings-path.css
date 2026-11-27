@@ -1,7 +1,8 @@
 /* The voice path (ui-iter-04): the Settings header becomes the stage material (stage.css)
    in both themes, so Settings shares the rail's, Home's and History's instrument. One
    brand thread runs left to right through a knot per stop a dictation passes; each stop
-   shows its saved value and opens its control. The open tab ties its stops (filled knots).
+   shows its saved value. Since ui-iter-13 the stops are the Settings tabs (settings-panes.css):
+   the open stop is tied (a filled knot), and Appearance hangs loose at the end, off the path.
    Voice comes in on the lime side, text leaves on the cyan side, as on the Home loom. */
 .settings-window__bar.stage {
   align-items: stretch;
@@ -10,7 +11,6 @@
     linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat,
     linear-gradient(180deg, #17171f, #0a0a0e);
   border-bottom: 0;
-  container: settings-bar / inline-size;
   border-radius: 0;
   box-shadow: none;
   gap: 0;
@@ -26,7 +26,7 @@
 .voice-path__stops {
   display: grid;
   grid-auto-flow: column;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(0, .9fr);
   list-style: none;
   margin: 0;
   padding: 0 var(--s-9);
@@ -78,7 +78,7 @@
   opacity: .55;
 }
 li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
-li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(270deg, transparent, #000 45%); mask-image: linear-gradient(270deg, transparent, #000 45%); }
+li[data-stop="transcripts"] > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(270deg, transparent, #000 45%); mask-image: linear-gradient(270deg, transparent, #000 45%); }
 
 /* A pulse of light carries a dictation stop to stop, then the path rests (12 s loop). */
 .voice-path__thread::after {
@@ -106,9 +106,8 @@ li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-ima
   z-index: 1;
 }
 
-/* The open tab's stops are tied: a filled knot in that stop's colour, with a soft glow. */
+/* The open stop is tied: a filled knot in that stop's colour, with a soft glow. */
 .voice-path li[data-current] .voice-path__thread i {
-  --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b));
   background: var(--knot);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--knot) 22%, transparent), 0 0 12px color-mix(in srgb, var(--knot) 38%, transparent);
 }
@@ -133,26 +132,8 @@ li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-ima
 }
 .voice-path__value[data-inactive] .kbd { color: var(--mut); }
 
-/* The tabs become the stage's deck: chapters of the same path. */
-.settings-window__bar.stage .settings-tabs {
-  border-top: 1px solid rgba(255, 255, 255, .08);
-  flex-wrap: wrap;
-  margin: var(--s-4) calc(var(--s-11) * -1) 0;
-  padding: var(--s-4) var(--s-11);
-}
-.settings-window__bar.stage .settings-tab { flex-direction: row; gap: 7px; min-width: 0; padding: 7px 12px; }
-.settings-window__bar.stage .settings-tab:hover:not([aria-selected="true"]) { background: rgba(255, 255, 255, .05); color: var(--fg); }
-
-/* Landing: the row a stop opens wears a lime selvedge, and a tint that fades. */
-.settings-panel [data-landed],
-.settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); }
-.settings-panel [data-landed] { animation: path-land 2.4s ease-out; }
-.settings-rows .frow[data-landed],
-.settings-rows .frow:has(:focus-visible) { margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
-@keyframes path-land {
-  from { background-color: color-mix(in srgb, var(--accfg) 16%, transparent); }
-  to { background-color: transparent; }
-}
+/* Keyboard focus in a pane's rows wears a lime selvedge. */
+.settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
 
 /* Narrow windows: the thread runs down the left and each stop becomes a row. */
 @container (max-width: 600px) {
@@ -170,7 +151,7 @@ li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-ima
   .voice-path__thread::after { height: auto; inset: 0 8px; width: 2px; }
   .voice-path__thread::before { background: linear-gradient(180deg, var(--brand-a), var(--brand-b)) 0 calc(var(--i) * 20%) / 100% 600%; }
   li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(180deg, transparent, #000 45%); mask-image: linear-gradient(180deg, transparent, #000 45%); }
-  li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(0deg, transparent, #000 45%); mask-image: linear-gradient(0deg, transparent, #000 45%); }
+  li[data-stop="transcripts"] > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(0deg, transparent, #000 45%); mask-image: linear-gradient(0deg, transparent, #000 45%); }
   .voice-path__thread::after { animation: none; display: none; }
   .voice-path__label { grid-column: 2; grid-row: 1; }
   .voice-path__value { grid-column: 3; grid-row: 1; }
@@ -178,13 +159,8 @@ li:last-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-ima
   .voice-path__value .key-combo__caps { justify-content: flex-start; }
 }
 
-@container settings-bar (max-width: 600px) {
-  .settings-window__bar.stage .settings-tab { flex-direction: column; gap: 3px; min-width: 76px; padding: 6px 8px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  /* No travelling light and no fading tint: the landed row keeps its selvedge only. */
+  /* No travelling light along the path. */
   .voice-path__thread::after { animation: none; display: none; }
-  .settings-panel [data-landed] { animation: none; }
   .voice-path__thread i { transition: none; }
 }

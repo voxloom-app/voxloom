@@ -38,7 +38,7 @@ test('cleanup: a failed first status check offers Check again, which recovers', 
     w.__TAURI_EVENT_PLUGIN_INTERNALS__ = { unregisterListener: () => {} };
   });
   await page.goto('/settings.html');
-  await page.getByRole('tab', { name: /^Capture/ }).click();
+  await page.getByRole('tab', { name: /^Cleanup/ }).click();
   const note = page.locator('#settings-cleanup-model-note');
   await expect(note).toHaveText('Couldn\'t check the cleanup model: model status task failed.');
   await page.getByRole('button', { name: 'Check again', exact: true }).click();

@@ -89,6 +89,7 @@ describe('App integration', () => {
         'Keep the TypeScript boundary small and explicit.',
       )).not.toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Settings' }));
+      await user.click(screen.getByRole('tab', { name: /^Cleanup/ }));
       await user.click(within(
         screen.getByRole('radiogroup', { name: 'Current style' }),
       ).getByRole('radio', { name: 'Casual' }));

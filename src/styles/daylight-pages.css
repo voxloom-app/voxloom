@@ -45,8 +45,9 @@
 [data-appearance-resolved="light"] .voice-path__stop:hover { background: rgba(255, 255, 255, .5); }
 [data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__thread i { background-color: var(--knot); }
 [data-appearance-resolved="light"] .voice-path__thread::before { opacity: .8; }
-[data-appearance-resolved="light"] .settings-window__bar.stage .settings-tabs { border-top-color: rgba(70, 56, 30, .12); }
-[data-appearance-resolved="light"] .settings-window__bar.stage .settings-tab:hover:not([aria-selected="true"]) { background: rgba(255, 255, 255, .55); }
+[data-appearance-resolved="light"] .voice-path li[data-current] > .voice-path__stop { --plate-line: rgba(70, 56, 30, .18); background: rgba(255, 255, 255, .62); }
+[data-appearance-resolved="light"] .voice-path li[data-current] > .voice-path__stop:hover { background: rgba(255, 255, 255, .8); }
+[data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__value { color: var(--fg); }
 
 /* ---- Setup: the welcome, the thread and the steps ---- */
 [data-appearance-resolved="light"] .guided-main.stage { --sheet: transparent; --bg: var(--linen); }

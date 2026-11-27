@@ -212,9 +212,11 @@ describe('BUS-48 contrast tokens', () => {
     expect(css('shell.css')).toMatch(/\.tb-help \{[^}]*border: 1px solid var\(--ctl-line\)/);
   });
 
-  it('marks selected nav, settings tab and segment with --sel-edge', () => {
+  it('marks selected nav and segment with --sel-edge', () => {
+    // ui-iter-13: the Settings tabs became the voice path's stops; the open stop's plate edge
+    // takes its thread colour instead (contrast checked in voicePath.test.tsx).
     expect(css('rail.css')).toMatch(/\.nav-button\[aria-current="page"\] \{[^}]*box-shadow: inset 3px 0 0 var\(--sel-edge\)/);
-    expect(css('settings.css')).toMatch(/\.settings-tab\[aria-selected="true"\] \{[^}]*box-shadow: inset 0 -2px 0 var\(--sel-edge\)/);
+    expect(css('settings.css')).not.toContain('.settings-tab');
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*box-shadow: inset 0 0 0 1px var\(--sel-edge\)/);
   });
 });

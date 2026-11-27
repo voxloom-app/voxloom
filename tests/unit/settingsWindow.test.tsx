@@ -103,7 +103,7 @@ describe('main window in the native app', () => {
 });
 
 describe('Settings window root', () => {
-  it('renders the tabbed Settings and routes "Set up shortcuts" to main', async () => {
+  it('renders the voice-path Settings and routes "Set up shortcuts" to main', async () => {
     const user = userEvent.setup();
     render(<AppProvider><SettingsWindowApp /></AppProvider>);
     expect(screen.getByRole('tablist', { name: 'Settings sections' })).toBeInTheDocument();
@@ -112,16 +112,16 @@ describe('Settings window root', () => {
   });
 });
 
-describe('Settings window title follows the tab (designer #42)', () => {
-  it('calls onTabTitle with the tab label', async () => {
+describe('Settings window title follows the open pane (designer #42)', () => {
+  it('calls onTabTitle with the pane title', async () => {
     const { Settings } = await import('../../src/features/settings/Settings');
     const { renderWithApp } = await import('./testUtils');
     const { default: userEvent } = await import('@testing-library/user-event');
     const { screen } = await import('@testing-library/react');
     const onTabTitle = vi.fn();
     renderWithApp(<Settings onSetup={() => {}} onTabTitle={onTabTitle} />);
-    expect(onTabTitle).toHaveBeenLastCalledWith('Capture');
-    await userEvent.setup().click(screen.getByRole('tab', { name: 'Models' }));
-    expect(onTabTitle).toHaveBeenLastCalledWith('Models');
+    expect(onTabTitle).toHaveBeenLastCalledWith('Shortcut');
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Speech/ }));
+    expect(onTabTitle).toHaveBeenLastCalledWith('Speech');
   });
 });

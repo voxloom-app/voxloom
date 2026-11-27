@@ -1,4 +1,5 @@
-/* Settings (UI PR 6a): Console Settings window layout — toolbar tabs, rows, callout, recovery grid. */
+/* Settings (UI PR 6a): Console Settings window layout — rows, callout, recovery grid. The tabs
+   are the voice path's stops since ui-iter-13 (settings-path.css, settings-panes.css). */
 .settings-window {
   background: var(--panel);
   border: 1px solid var(--line);
@@ -19,24 +20,6 @@
 }
 
 .settings-window__bar h1 { color: var(--mut); font-size: var(--fs-secondary); font-weight: 600; letter-spacing: 0; margin: 0; }
-.settings-tabs { display: flex; gap: var(--s-2); }
-
-.settings-tab {
-  align-items: center;
-  border: 0;
-  border-radius: 8px;
-  color: var(--mut);
-  display: flex;
-  flex-direction: column;
-  font-size: var(--fs-secondary);
-  font-weight: 500;
-  gap: 3px;
-  min-width: 84px;
-  padding: 6px 10px;
-}
-
-.settings-tab[aria-selected="true"] { background: var(--navon); box-shadow: inset 0 -2px 0 var(--sel-edge); color: var(--fg); }
-.settings-tab[aria-selected="true"] .icon { color: var(--accfg); }
 .settings-panel { padding: var(--s-8); }
 .settings-panel:focus-visible { outline-offset: -3px; }
 /* Two-column FormRow rows (designer #42): label | control, hairline dividers, no filled cards. */

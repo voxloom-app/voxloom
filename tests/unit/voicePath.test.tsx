@@ -1,26 +1,23 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { spokenCombo } from '../../src/components/KeyCombo';
 import { initialSettings } from '../../src/domain/fixtures';
 import { Settings } from '../../src/features/settings/Settings';
-import { speechModel, voicePathStops } from '../../src/features/settings/pathStops';
+import { appearanceStop, speechModel, voicePathStops } from '../../src/features/settings/pathStops';
 import { renderWithApp } from './testUtils';
 
 const css = (name: string) => readFileSync(join(__dirname, '../../src/styles', name), 'utf8');
-const path = () => screen.getByRole('navigation', { name: 'Voice path' });
-const stops = () => within(path()).getAllByRole('button');
+const path = () => screen.getByRole('tablist', { name: 'Settings sections' });
+const stops = () => within(path()).getAllByRole('tab');
 const tied = () => [...path().querySelectorAll('li[data-current]')].map((li) => li.getAttribute('data-stop'));
-
-afterEach(() => { vi.useRealTimers(); });
 
 describe('voice path stops (ui-iter-04)', () => {
   it('lists the six stops in the order a dictation passes them, from saved settings only', () => {
     const path = voicePathStops(initialSettings, true, true);
     expect(path.map((s) => s.id)).toEqual(['shortcut', 'microphone', 'speech', 'cleanup', 'output', 'transcripts']);
-    expect(path.map((s) => s.tab)).toEqual(['capture', 'capture', 'models', 'capture', 'capture', 'privacy']);
     expect(path.map((s) => [s.value, s.detail])).toEqual([
       ['Ctrl + Shift + Space', 'Hold to dictate'],
       ['System default', 'Input device'],
@@ -58,63 +55,60 @@ describe('voice path stops (ui-iter-04)', () => {
     expect(byId.transcripts).toMatchObject({ detail: 'Last one stays on Home', value: 'Not kept' });
     expect(speechModel('whisper-base.en')).toEqual({ language: 'English', name: 'Whisper Base' });
   });
+
+  it('adds Appearance off the path, summarising the look and the text size', () => {
+    expect(appearanceStop(initialSettings)).toEqual({
+      detail: 'Default text', id: 'appearance', label: 'Appearance', name: 'Appearance: follow system, default text', value: 'System',
+    });
+    expect(appearanceStop({ ...initialSettings, appearance: 'dark', textSize: 'large' }))
+      .toMatchObject({ detail: 'Large text', name: 'Appearance: dark, large text', value: 'Dark' });
+  });
 });
 
-describe('voice path in Settings', () => {
-  it('draws one stop button per stop and ties the open tab’s stops', async () => {
+describe('voice path in Settings: the stops are the tabs (ui-iter-13)', () => {
+  it('draws one tab per stop plus Appearance, and ties only the open stop', async () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
     expect(stops().map((b) => b.getAttribute('aria-label')?.split(':')[0]))
-      .toEqual(['Shortcut', 'Microphone', 'Speech', 'Cleanup', 'Output', 'Transcripts']);
-    expect(tied()).toEqual(['shortcut', 'microphone', 'cleanup', 'output']);
-    expect(path().querySelectorAll('.voice-path__thread[aria-hidden="true"]')).toHaveLength(6);
-    await user.click(screen.getByRole('tab', { name: 'Appearance' }));
-    expect(tied()).toEqual([]);
-    // The settings tabs keep their own names and roles.
-    expect(screen.getByRole('tablist', { name: 'Settings sections' })).toBeInTheDocument();
+      .toEqual(['Shortcut', 'Microphone', 'Speech', 'Cleanup', 'Output', 'Transcripts', 'Appearance']);
+    expect(tied()).toEqual(['shortcut']);
+    expect(path().querySelectorAll('.voice-path__thread[aria-hidden="true"]')).toHaveLength(7);
+    expect(path().querySelector('li[data-off-path]')).toHaveAttribute('data-stop', 'appearance');
+    expect(screen.queryByRole('navigation', { name: 'Voice path' })).toBeNull();
+    await user.click(screen.getByRole('tab', { name: /^Appearance:/ }));
+    expect(tied()).toEqual(['appearance']);
   });
 
-  it('lands on the control a stop names: row marked, control focused', async () => {
+  it('opens a stop’s pane, and changing the setting there updates the stop', async () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: /^Output:/ }));
-    const fallback = screen.getByRole('switch', { name: 'Clipboard fallback' });
-    expect(fallback).toHaveFocus();
-    expect(fallback.closest('.frow')).toHaveAttribute('data-landed');
-    // Changing the setting there updates the stop.
-    await user.click(fallback);
-    expect(screen.getByRole('button', { name: 'Output: insert, no clipboard fallback' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /^Output:/ }));
+    expect(tied()).toEqual(['output']);
+    const panel = screen.getByRole('tabpanel', { name: /^Output:/ });
+    expect(panel).toHaveAttribute('data-pane', 'output');
+    expect(panel).toHaveTextContent('Stop 5 of 6');
+    expect(panel).toHaveTextContent('never presses Return or Send');
+    await user.click(within(panel).getByRole('switch', { name: 'Clipboard fallback' }));
+    expect(screen.getByRole('tab', { name: 'Output: insert, no clipboard fallback' })).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('switches to the owning tab first: Transcripts opens Privacy on the checked option', async () => {
+  it('Transcripts opens retention and recovery; Speech opens the model list', async () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: /^Transcripts:/ }));
-    expect(screen.getByRole('tab', { name: 'Privacy' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('tab', { name: /^Transcripts:/ }));
     expect(tied()).toEqual(['transcripts']);
-    const retention = screen.getByRole('radiogroup', { name: 'Transcript retention' });
-    expect(within(retention).getByRole('radio', { name: '30 days' })).toHaveFocus();
-    expect(retention.closest('.frow')).toHaveAttribute('data-landed');
+    expect(screen.getByRole('radiogroup', { name: 'Transcript retention' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /^Speech:/ }));
+    expect(await screen.findByText('whisper-base.en')).toBeInTheDocument();
+    expect(screen.getByLabelText('Language')).toBeInTheDocument();
   });
 
-  it('waits for the model list before landing on the selected speech model', async () => {
-    const user = userEvent.setup();
-    renderWithApp(<Settings onSetup={vi.fn()} />);
-    await user.click(screen.getByRole('button', { name: /^Speech:/ }));
-    expect(screen.getByRole('tab', { name: 'Models' })).toHaveAttribute('aria-selected', 'true');
-    await waitFor(() => expect(document.querySelector('.stt-model-row[data-landed]')).not.toBeNull());
-    const landed = document.querySelector<HTMLElement>('.stt-model-row[data-landed]')!;
-    expect(landed.contains(document.activeElement)).toBe(true);
-  });
-
-  it('lets the landing mark fade, so only the selvedge of the focused row stays', () => {
-    vi.useFakeTimers();
-    renderWithApp(<Settings onSetup={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /^Cleanup:/ }));
-    const row = document.querySelector('[data-path-stop="cleanup"]')!;
-    expect(row).toHaveAttribute('data-landed');
-    act(() => { vi.advanceTimersByTime(2400); });
-    expect(row).not.toHaveAttribute('data-landed');
+  it('names the native window after the open pane', async () => {
+    const onTabTitle = vi.fn();
+    renderWithApp(<Settings onSetup={vi.fn()} onTabTitle={onTabTitle} />);
+    expect(onTabTitle).toHaveBeenLastCalledWith('Shortcut');
+    await userEvent.setup().click(screen.getByRole('tab', { name: /^Transcripts:/ }));
+    expect(onTabTitle).toHaveBeenLastCalledWith('Transcripts & privacy');
   });
 });
 
@@ -126,13 +120,27 @@ describe('voice path styles', () => {
     expect(css('index.css')).toMatch(/@import "\.\/settings\.css";\n@import "\.\/settings-path\.css";/);
   });
 
-  it('keeps the pulse dark at rest and stills it and the landing tint under reduced motion', () => {
+  it('keeps the pulse dark at rest and stills it under reduced motion', () => {
     const pulse = pathCss.slice(pathCss.indexOf('.voice-path__thread::after {\n  animation'));
     expect(pulse.slice(0, pulse.indexOf('}'))).toContain('opacity: 0;');
     const reduced = pathCss.slice(pathCss.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toContain('.voice-path__thread::after { animation: none; display: none; }');
-    expect(reduced).toContain('.settings-panel [data-landed] { animation: none; }');
     expect(reduced).toContain('.voice-path__thread i { transition: none; }');
+    // The landing mark went with ui-iter-13: a stop opens its pane instead.
+    expect(pathCss).not.toContain('data-landed');
+  });
+
+  it('drops the open stop’s thread into its pane, and holds it still under reduced motion', () => {
+    const panes = css('settings-panes.css');
+    expect(css('index.css')).toMatch(/@import "\.\/settings-path\.css";\n@import "\.\/settings-panes\.css";/);
+    // The bar has to let the thread hang past it, over the cloth's fell.
+    expect(panes).toMatch(/\.settings-window__bar\.stage \{ overflow: visible; z-index: 1; \}/);
+    expect(panes).toMatch(/\.voice-path li\[data-current\] > \.voice-path__stop::after \{[^}]*animation: pane-drop/);
+    expect(panes).toMatch(/\.voice-path li\[data-current\] > \.voice-path__stop \{[^}]*inset 0 -2px 0 var\(--knot\)/);
+    const reduced = panes.slice(panes.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('.voice-path li[data-current] > .voice-path__stop::after { animation: none; }');
+    expect(reduced).toContain('.settings-pane__head { animation: none; }');
+    expect(panes.split('\n').length).toBeLessThan(200);
   });
 
   it('keeps path text at AA over the stage, its glows, a hovered stop and a tied knot', () => {
@@ -153,7 +161,9 @@ describe('voice path styles', () => {
     const limeGlow = mix(lime, top, 0.09);
     const cyanGlow = mix('#3cf0ff', top, 0.088);
     const hover = mix('#ffffff', limeGlow, 0.04);
-    for (const surface of [top, '#0a0a0e', limeGlow, cyanGlow, hover]) {
+    // The open stop's plate at its brightest (hovered: 10% white).
+    const plate = mix('#ffffff', limeGlow, 0.1);
+    for (const surface of [top, '#0a0a0e', limeGlow, cyanGlow, hover, plate]) {
       expect(ratio(token('fg'), surface), `value on ${surface}`).toBeGreaterThanOrEqual(4.5);
       expect(ratio(token('mut'), surface), `label/detail on ${surface}`).toBeGreaterThanOrEqual(4.5);
       expect(ratio(lime, surface), `focus ring on ${surface}`).toBeGreaterThanOrEqual(3);
@@ -161,6 +171,10 @@ describe('voice path styles', () => {
     // A tied stop's label turns --fg, so it holds even inside the knot's halo.
     expect(pathCss).toContain('.voice-path li[data-current] .voice-path__label { color: var(--fg); }');
     expect(ratio(token('fg'), mix(lime, limeGlow, 0.2)), 'tied label').toBeGreaterThanOrEqual(4.5);
+    // The plate's edge (the stop's thread colour, lime to cyan; --fg off the path) marks the open stop at 3:1.
+    for (const edge of [lime, mix(lime, '#3cf0ff', 0.5), '#3cf0ff', token('fg')]) {
+      expect(ratio(edge, plate), `open stop edge ${edge}`).toBeGreaterThanOrEqual(3);
+    }
     // Key caps, live and inactive.
     expect(ratio('#f6f6f9', '#32323f'), 'key cap').toBeGreaterThanOrEqual(4.5);
     expect(ratio(token('mut'), '#32323f'), 'inactive key cap').toBeGreaterThanOrEqual(4.5);

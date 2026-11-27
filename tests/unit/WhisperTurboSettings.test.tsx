@@ -1,9 +1,8 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CaptureTab } from '../../src/features/settings/CaptureTab';
+import { SpeechPane } from '../../src/features/settings/CapturePanes';
 import { ModelCard } from '../../src/features/settings/ModelCard';
-import { ModelsTab } from '../../src/features/settings/ModelsTab';
 import { isTauriEnv } from '../../src/services/capture/captureService';
 import { renderWithApp } from './testUtils';
 
@@ -32,7 +31,7 @@ describe('Whisper Turbo settings', () => {
   it('selects Turbo without downloading and keeps native recognition English-first', async () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     const user = userEvent.setup();
-    renderWithApp(<><ModelsTab /><CaptureTab onSetup={vi.fn()} /></>);
+    renderWithApp(<SpeechPane />);
     const turbo = await screen.findByRole('radio', { name: /Whisper Large v3 Turbo \(English\)/ });
     expect(screen.getByRole('radio', { name: /Whisper Base/ })).toBeChecked();
     await user.click(turbo);

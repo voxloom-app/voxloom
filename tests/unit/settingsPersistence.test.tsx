@@ -45,7 +45,7 @@ describe('durable settings persistence', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Settings' }));
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
     const retention = await screen.findByRole('radiogroup', { name: 'Transcript retention' });
     expect(within(retention).getByRole('radio', { name: 'Until deleted' })).toHaveAttribute('aria-checked', 'true');
   });
@@ -70,7 +70,7 @@ describe('durable settings persistence', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Settings' }));
 
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
 
     const retention = await screen.findByRole('radiogroup', { name: 'Transcript retention' });
     await user.click(within(retention).getByRole('radio', { name: 'Off' }));
@@ -137,7 +137,7 @@ describe('durable settings persistence', () => {
 
     await user.click(screen.getByRole('button', { name: 'Set up later' }));
     await user.click(screen.getByRole('button', { name: 'Settings' }));
-    await user.click(await screen.findByRole('tab', { name: 'Privacy' }));
+    await user.click(await screen.findByRole('tab', { name: /^Transcripts/ }));
     const retention = await screen.findByRole('radiogroup', { name: 'Transcript retention' });
     expect(within(retention).getByRole('radio', { name: '30 days' })).toHaveAttribute('aria-checked', 'true');
   });
