@@ -1,4 +1,4 @@
-import { Icon } from './Icon';
+import { Knot } from './Knot';
 
 export type ToastTone = 'ok' | 'warn' | 'err';
 
@@ -6,8 +6,6 @@ interface ToastProps {
   message: string;
   tone?: ToastTone;
 }
-
-const icons = { err: 'warn', ok: 'check', warn: 'info' } as const;
 
 /**
  * Infer severity from the app's real strings (SPEC: toast gets an icon by
@@ -22,11 +20,16 @@ export function toastTone(message: string): ToastTone {
   return 'ok';
 }
 
-/** Bottom-center toast, announced politely; timings live in useToastMessages. */
+/**
+ * A tag that drops on a string from the toolbar beam, under Recall, and is tied off with
+ * the HUD's knots, so severity reads by shape as well as colour (ui-iter-19). It hangs
+ * over the page's header, never over the rows you are working in. Announced politely;
+ * timings live in useToastMessages.
+ */
 export function Toast({ message, tone = toastTone(message) }: ToastProps) {
   return (
     <div aria-live="polite" className={`toast t-${tone}${message ? ' visible' : ''}`}>
-      {message && <Icon name={icons[tone]} size={14} />}
+      {message && <Knot className="toast__knot" tone={tone} />}
       {message && tone === 'err' && <span className="sr-only">Error: </span>}
       {message}
     </div>

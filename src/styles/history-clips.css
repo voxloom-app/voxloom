@@ -55,11 +55,10 @@
 .history-row.recent-row[data-clipped] > .clip-tab { border-left-style: solid; }
 
 /* The reviewed packet: text, in order, not a second list of log metadata. */
-.overlay__panel:has(.clip-proof) {
-  border-radius: 3px; box-shadow: 4px 4px 0 var(--field), 5px 5px 0 var(--ctl-line), var(--shadow-dialog);
-  max-width: 580px; padding: 0;
-}
-.clip-proof { display: flex; flex-direction: column; max-height: calc(100dvh - 60px); }
+/* It hangs from the beam like every sheet (sheet-hang.css), a little wider, and scrolls its passages, not itself. */
+.overlay:has(.clip-proof) { --sheet-max: 580px; }
+.overlay__panel:has(.clip-proof) { overflow: hidden; padding: 0; }
+.clip-proof { display: flex; flex-direction: column; max-height: calc(var(--sheet-room) - 2px); }
 .clip-proof header { border-bottom: 1px solid var(--line); margin: 0 var(--s-11); padding: var(--s-11) 0 var(--s-8); }
 .clip-proof__imprint { align-items: center; color: var(--accfg); display: flex; font: 600 var(--fs-label)/1.4 var(--mono); gap: var(--s-4); margin-bottom: var(--s-6); }
 .clip-proof header h2 { font-size: calc(var(--fs-page) * 1.23); }
