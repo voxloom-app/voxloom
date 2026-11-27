@@ -1,6 +1,7 @@
 /* Home voice stage (ui-iter-01): the hero and the last dictation make one dark instrument,
-   the same material as the app tile and the HUD, in both themes. VoiceLoom threads converge
-   on the shortcut keys (voice in, left) and fan out (text out, right); data-phase drives them. */
+   the same material as the app tile and the HUD, in both themes. VoiceLoom threads gather
+   into Start (voice in, left) and fan out of Copy (text out, right) on the stage's weft
+   (ui-iter-25, loom-bar.css); data-phase drives them, and at rest they hold still. */
 .stage {
   /* Dark instrument tokens. The legacy aliases resolve where they are declared, so they are
      re-declared here too; otherwise children would inherit the light theme's values. */
@@ -72,39 +73,19 @@
 .stage[data-phase="processing"]::after { opacity: 1; }
 .stage[data-phase="processing"]::before { opacity: .3; }
 
-/* Readout: mic state on the left, model and output on the right. */
-.stage__readout { align-items: center; color: var(--mut); display: flex; flex-wrap: wrap; font-size: var(--fs-label); gap: 6px 18px; justify-content: space-between; }
-.stage__mic { align-items: center; color: var(--fg); display: inline-flex; font-weight: 600; gap: 8px; }
-.stage__mic i { background: var(--ctl-line); border-radius: 50%; box-shadow: 0 0 0 3px rgba(255, 255, 255, .06); height: 8px; width: 8px; }
-.stage[data-phase="listening"] .stage__mic i,
-.stage[data-phase="speaking"] .stage__mic i { animation: rec-pulse 1s ease-in-out infinite alternate; background: #ff453a; box-shadow: 0 0 0 3px rgba(255, 69, 58, .25); }
-.stage[data-phase="processing"] .stage__mic i { animation: rec-pulse .5s ease-in-out infinite alternate; background: var(--info); box-shadow: 0 0 0 3px color-mix(in srgb, var(--info) 22%, transparent); }
-.stage__meta { display: inline-flex; flex-wrap: wrap; gap: 2px 16px; }
-.stage__meta b { color: var(--fg); font-weight: 600; }
-
-/* Title band: full stage width so the threads reach both edges. */
-.stage .home-hero__title { margin-inline: calc(var(--stage-pad) * -1); padding: 44px var(--stage-pad) 40px; position: relative; }
+/* Title band. No mic readout above it since ui-iter-25: Start and the rail say the state. */
+.stage .home-hero__title { padding: 30px 0 26px; }
 .stage .home-hero__lede { margin-top: 0; }
 .stage .home-hero .hs-note { justify-content: center; }
-/* A halo the stage's colour carves the threads away from the letters. */
-.stage .home-hero h1 { color: #f6f6f9; text-shadow: 0 0 10px #121219, 0 0 22px #121219, 0 0 34px #121219; }
+.stage .home-hero h1 { color: #f6f6f9; }
 .banner + .home { margin-top: var(--s-6); }
 
-.loom {
-  height: 100%;
-  inset: 0;
-  /* Dim (not hide) the threads where they pass behind the heading. */
-  -webkit-mask-image: linear-gradient(90deg, #000 12%, rgba(0, 0, 0, .35) 34%, rgba(0, 0, 0, .35) 66%, #000 88%);
-  mask-image: linear-gradient(90deg, #000 12%, rgba(0, 0, 0, .35) 34%, rgba(0, 0, 0, .35) 66%, #000 88%);
-  pointer-events: none;
-  position: absolute;
-  width: 100%;
-  z-index: -1;
-}
+/* The loom's threads (placed on the weft in loom-bar.css). At rest they hold still; a light
+   travels them only while you speak (in) or Voxloom writes (out). */
 .loom path { fill: none; stroke-linecap: round; transition: opacity .4s ease; vector-effect: non-scaling-stroke; }
 .loom__warp { opacity: .26; stroke-width: 1.25; }
 /* The static offset staggers the pulses when animation is off or paused. */
-.loom__pulse { animation: loom-flow 8s linear infinite; animation-delay: calc(var(--i) * -1.15s); opacity: .5; stroke-dasharray: 12 88; stroke-dashoffset: calc(var(--i) * 14); stroke-width: 2.25; }
+.loom__pulse { animation: loom-flow 8s linear infinite; animation-delay: calc(var(--i) * -1.15s); opacity: 0; stroke-dasharray: 12 88; stroke-dashoffset: calc(var(--i) * 14); stroke-width: 2.25; }
 .loom__side { transform-box: view-box; transform-origin: 50% 50%; }
 @keyframes loom-flow { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes loom-swell { from { transform: scaleY(1); } to { transform: scaleY(1.32); } }
@@ -167,12 +148,11 @@
 
 @media (max-width: 780px) {
   .stage { --stage-pad: var(--s-9); }
-  .stage .home-hero__title { padding-block: 34px 30px; }
+  .stage .home-hero__title { padding-block: 26px 22px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* No travelling pulses or swell: the threads hold still and only brighten. */
   .loom__pulse { display: none; }
   .stage[data-phase] .loom__side { animation: none; }
-  .stage[data-phase] .stage__mic i { animation: none; }
 }

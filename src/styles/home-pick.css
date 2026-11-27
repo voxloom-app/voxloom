@@ -3,11 +3,13 @@
    weft thread and tied off with a knot in its delivery colour. Your words are set in that
    serif across the app; everything Voxloom says stays in the interface sans. */
 
-/* With a pick to show, the shortcut band steps back to one compact line above them. */
-.stage .home-hero[data-words] .home-hero__title { padding-block: 26px 18px; }
-.stage .home-hero[data-words] h1 { font-size: calc(var(--fs-hero) * .74); font-weight: 780; gap: 6px 10px; letter-spacing: -.025em; }
-.stage .home-hero[data-words] h1 .key-combo__caps { gap: 6px; }
-.stage .home-hero[data-words] h1 .kbd { border-radius: 9px; font-size: calc(var(--fs-bigkey) * .8); height: calc(var(--bigkey) * .76); min-width: calc(var(--bigkey) * .76); padding: 0 11px; }
+/* With a pick to show, the shortcut steps back to one quiet line of keys, so the words are
+   the only large thing on the stage (ui-iter-25). The keys still press while you speak. */
+.stage .home-hero[data-words] .home-hero__title { padding-block: 6px 26px; }
+.stage .home-hero[data-words] .home-hero__title h1 { color: var(--mut); font-size: var(--fs-secondary); font-weight: 600; gap: 4px 8px; letter-spacing: .01em; text-shadow: none; }
+.stage .home-hero[data-words] h1 .key-combo__caps { gap: 4px; }
+.stage .home-hero[data-words] h1 .kbd { border-radius: 7px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 0 #050508; font-size: var(--fs-label); height: 26px; margin-bottom: 2px; min-width: 26px; padding: 0 8px; }
+.stage:is([data-phase="listening"], [data-phase="speaking"]) .home-hero[data-words] h1 .kbd { box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-a) 45%, transparent), 0 0 14px -2px color-mix(in srgb, var(--brand-a) 55%, transparent); transform: translateY(2px); }
 
 .pick { margin-bottom: var(--s-7); }
 /* The knot on the weft beneath (loom-bar.css) takes the same outcome colour as the badge. */
@@ -15,7 +17,7 @@
 :is(.pick, .loom-bar)[data-status="copied"] { --pick-tone: var(--info); }
 :is(.pick, .loom-bar)[data-status="unverified"] { --pick-tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); }
 
-.pick__label { color: var(--mut); font-size: var(--fs-label); font-weight: 600; letter-spacing: .04em; margin: 0 0 var(--s-5); }
+/* .pick__label is .sr-only: the quote marks and the time already say what the words are. */
 
 .pick__words { margin: 0; }
 .stage .pick__words p {
@@ -105,7 +107,7 @@
 @keyframes pick-tie { from { transform: scale(0); } }
 
 @media (max-width: 780px) {
-  .stage .home-hero[data-words] .home-hero__title { padding-block: 22px 14px; }
+  .stage .home-hero[data-words] .home-hero__title { padding-block: 4px 20px; }
   .stage .pick__words p { font-size: calc(var(--fs-hero) * .84); }
   .stage .pick__words[data-measure="medium"] p { font-size: calc(var(--fs-hero) * .66); }
   .stage .pick__words[data-measure="long"] p { font-size: calc(var(--fs-hero) * .56); }

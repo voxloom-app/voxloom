@@ -17,6 +17,11 @@
 .home-hero h1 .kbd { font-size: var(--fs-emph); min-width: 30px; padding: 7px 8px; }
 .home-hero p { color: var(--mut); font-size: var(--fs-emph); margin: 0 auto var(--s-8); }
 .home-hero__style { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5); justify-content: center; }
+/* How your words are made, on one quiet line at the stage's foot (ui-iter-25): the model and
+   the output, which had a readout of their own above the shortcut, then the writing style. */
+.home-hero__foot { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-5) var(--s-11); justify-content: center; }
+.home-hero .home-hero__setup { display: inline-flex; flex-wrap: wrap; font-size: var(--fs-secondary); gap: 2px 8px; justify-content: center; margin: 0; }
+.home-hero__setup > span + span::before { content: "·"; content: "·" / ""; margin-right: 8px; }
 
 .fine { color: var(--mut); font-size: var(--fs-secondary); }
 

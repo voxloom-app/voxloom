@@ -7,7 +7,7 @@ import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCaptu
 import { wovenRecords } from './pickWords';
 import { HomeHero } from './HomeHero';
 import { RecentCard } from './RecentCard';
-import { stageLabel, stagePhase } from './stagePhase';
+import { stagePhase } from './stagePhase';
 
 interface HomeProps {
   /** Shared App-level dogfood capture (also driven by global gesture). */
@@ -42,15 +42,9 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
   return (
     <div className="home">
       {/* The voice stage: one dark instrument in both themes, alive while you dictate.
-          Dictating from the window starts on its weft, beside Copy (ui-iter-21). */}
+          Dictating from the window starts on its weft, beside Copy (ui-iter-21). The mic
+          readout is gone (ui-iter-25): the Start capsule and the rail already say it. */}
       <div className="stage" data-phase={phase}>
-        <div className="stage__readout">
-          <span className="stage__mic"><i aria-hidden="true" />{stageLabel(phase, dogfood.phase)}</span>
-          <span className="stage__meta">
-            <span>Model <b>{state.settings.transcriptionModel}</b></span>
-            <span>Output <b>{state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only'}</b></span>
-          </span>
-        </div>
         <HomeHero
           capture={{ dogfood, isNative, onCopy: (t) => { void copy(t); } }}
           cleanupModelStore={cleanupModelStore}

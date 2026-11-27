@@ -3,6 +3,7 @@ import { Icon } from '../../components/Icon';
 import type { DictationRecord } from '../../domain/types';
 import { type CaptureProps, runState } from './captureRun';
 import { RunOutcome } from './RunOutcome';
+import { VoiceLoom } from './VoiceLoom';
 
 /** Five bars held still at rest; they sway while you speak. The capsule never meters live audio. */
 const LEVEL = [0, 1, 2, 3, 4];
@@ -44,7 +45,8 @@ export type StagePick = { fresh: boolean; onCopy: (text: string) => void; record
  * The stage's weft (ui-iter-21): one lime-to-cyan thread under your last words. Voice goes
  * in on the left, where the Start capsule sits; the last pick is knotted in the middle in
  * its outcome's colour; text comes out on the right, as Copy. One place to dictate, see the
- * words land and take them away. Whatever the run says hangs beneath on a tag.
+ * words land and take them away. Whatever the run says hangs beneath on a tag. Since
+ * ui-iter-25 the stage's loom gathers here too: its threads run into Start and out of Copy.
  */
 export function LoomBar({ capture, pick }: { capture?: CaptureProps; pick: StagePick | null }) {
   if (!capture && !pick) return null;
@@ -52,6 +54,8 @@ export function LoomBar({ capture, pick }: { capture?: CaptureProps; pick: Stage
   const hang = capture && (recording || capture.dogfood.message || !capture.isNative);
   return (
     <div className="loom-bar" data-status={pick?.record.status}>
+      <VoiceLoom side="in" />
+      <VoiceLoom side="out" />
       <div className="loom-bar__in">{capture && <DictateCapsule dogfood={capture.dogfood} isNative={capture.isNative} />}</div>
       <span aria-hidden="true" className="pick__weft" data-fresh={pick?.fresh || undefined} key={`weft-${pick?.record.id ?? 'none'}`}>
         {pick && <i />}

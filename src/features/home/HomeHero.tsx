@@ -2,19 +2,20 @@ import { useApp } from '../../app/AppContext';
 import { KeyCombo } from '../../components/KeyCombo';
 import { useShortcutActive } from '../../services/shortcut/activeShortcut';
 import { NO_SHORTCUT_HEADING, NO_SHORTCUT_HINT } from '../settings/shortcutCopy';
+import { speechModel } from '../settings/pathStops';
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import { useCleanupModel } from '../settings/useCleanupModel';
 import type { CaptureProps } from './captureRun';
 import { HomeStyle } from './HomeStyle';
 import { LastDictation } from './LastDictation';
 import { LoomBar, type StagePick } from './LoomBar';
-import { VoiceLoom } from './VoiceLoom';
 
 /**
- * Hero: the shortcut as key caps on the voice loom, then the last pick (your
- * last dictation), the weft with Start and Copy, then the writing style (H1). Before
- * the first dictation the lede explains the gesture instead; once there are words,
- * the shortcut band steps back to a compact line and your words take the stage.
+ * Hero: the shortcut, then the last pick (your last dictation), the weft with Start and
+ * Copy, then how your words are made. Before the first dictation the shortcut is the
+ * headline and the lede explains the gesture; once there are words, the shortcut steps
+ * back to one quiet line of keys and your words take the stage (ui-iter-25). The stage's
+ * loom lives on the weft alone, and model, output and writing style share one foot line.
  */
 export function HomeHero({ capture, cleanupModelStore, isNative, pick = null }: {
   /** Dictating from the window: the Start capsule on the weft (ui-iter-21). */
@@ -28,10 +29,10 @@ export function HomeHero({ capture, cleanupModelStore, isNative, pick = null }: 
   const { state } = useApp();
   const active = useShortcutActive();
   const cleanupModel = useCleanupModel(isNative, cleanupModelStore);
+  const output = state.settings.clipboardFallback ? 'Insert, fall back to Copy' : 'Insert only';
   return (
     <section aria-labelledby="home-title" className="home-hero" data-words={pick ? '' : undefined}>
       <div className="home-hero__title">
-        {active && <VoiceLoom />}
         <h1 id="home-title">
           {active
             ? <>Hold <KeyCombo combo={state.settings.shortcut} /> to dictate</>
@@ -43,7 +44,13 @@ export function HomeHero({ capture, cleanupModelStore, isNative, pick = null }: 
         ? <LastDictation fresh={pick.fresh} record={pick.record} />
         : <p className="home-hero__lede">Speak in any app. Release to type. Transcribed locally with Whisper.</p>}
       <LoomBar capture={capture} pick={pick} />
-      <HomeStyle isNative={isNative} model={cleanupModel} />
+      <div className="home-hero__foot">
+        <p className="home-hero__setup">
+          <span><span className="sr-only">Model </span>{speechModel(state.settings.transcriptionModel).name}</span>
+          <span><span className="sr-only">Output </span>{output}</span>
+        </p>
+        <HomeStyle isNative={isNative} model={cleanupModel} />
+      </div>
     </section>
   );
 }

@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, screen } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { useApp } from '../../src/app/AppContext';
 import type { DictationState } from '../../src/domain/types';
 import { Home } from '../../src/features/home/Home';
-import { stageLabel, stagePhase } from '../../src/features/home/stagePhase';
+import { stagePhase } from '../../src/features/home/stagePhase';
 import type { UseDogfoodCaptureResult } from '../../src/services/stt/useDogfoodCapture';
 import { renderWithApp } from './testUtils';
 
@@ -38,47 +38,61 @@ describe('stagePhase (ui-iter-01 voice stage)', () => {
     expect(stagePhase('idle', false, { kind: 'success', recordId: 'r', runId: 1 })).toBe('idle');
     expect(stagePhase('idle', false, { kind: 'error', recordId: 'r', runId: 1 })).toBe('idle');
   });
-
-  it('labels the mic readout', () => {
-    expect(stageLabel('idle', 'idle')).toBe('Mic off');
-    expect(stageLabel('listening', 'recording')).toBe('Listening');
-    expect(stageLabel('speaking', 'idle')).toBe('Listening');
-    expect(stageLabel('processing', 'transcribing')).toBe('Transcribing');
-    expect(stageLabel('processing', 'cleaning')).toBe('Cleaning up');
-  });
 });
 
 describe('Home voice stage', () => {
-  it('holds the hero, with model and output in the readout; dictating lives on the rail', () => {
+  it('holds the hero, with model and output on its foot line; no mic readout above it', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'idle');
     expect(stage().querySelector('#home-title')).not.toBeNull();
     expect(stage().querySelector('#capture-title')).toBeNull();
-    expect(stage().querySelector('.stage__mic')).toHaveTextContent('Mic off');
-    expect(stage().querySelector('.stage__meta')).toHaveTextContent('Model whisper-base.enOutput Insert, fall back to Copy');
+    // ui-iter-25: the readout row is gone; Start and the rail say what the mic is doing.
+    expect(stage().querySelector('.stage__readout')).toBeNull();
+    expect(screen.queryByText('Mic off')).toBeNull();
+    // Model and output are named for screen readers and shown as values.
+    expect(stage().querySelector('.home-hero__setup')).toHaveTextContent('Model Whisper BaseOutput Insert, fall back to Copy');
     // The recent list stays outside the stage.
     expect(stage().querySelector('.recent-list')).toBeNull();
   });
 
-  it('draws the loom as decoration only: hidden, unfocusable, seven threads in and out', () => {
+  it('draws one loom, on the weft: hidden, unfocusable, seven threads into Start and out of Copy', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
-    const loom = stage().querySelector('svg.loom')!;
-    expect(loom).toHaveAttribute('aria-hidden', 'true');
-    expect(loom).toHaveAttribute('focusable', 'false');
-    expect(loom.querySelectorAll('.loom__side--in .loom__pulse')).toHaveLength(7);
-    expect(loom.querySelectorAll('.loom__side--out .loom__pulse')).toHaveLength(7);
-    expect(loom.querySelectorAll('.loom__warp')).toHaveLength(14);
+    const looms = [...stage().querySelectorAll('svg.loom')];
+    expect(looms).toHaveLength(2);
+    const bar = stage().querySelector('.loom-bar')!;
+    for (const loom of looms) {
+      expect(loom).toHaveAttribute('aria-hidden', 'true');
+      expect(loom).toHaveAttribute('focusable', 'false');
+      expect(loom.parentElement).toBe(bar);
+    }
+    expect(bar.querySelectorAll('.loom--in .loom__side--in .loom__pulse')).toHaveLength(7);
+    expect(bar.querySelectorAll('.loom--out .loom__side--out .loom__pulse')).toHaveLength(7);
+    expect(bar.querySelectorAll('.loom__warp')).toHaveLength(14);
+    // The shortcut heading no longer carries threads of its own.
+    expect(stage().querySelector('.home-hero__title svg')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Hold .* to dictate$/);
   });
 
   it('lights up while capturing and transcribing', () => {
     const { unmount } = renderWithApp(<Home dogfood={dogfood({ phase: 'recording' })} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'listening');
-    expect(stage().querySelector('.stage__mic')).toHaveTextContent('Listening');
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
     unmount();
     renderWithApp(<Home dogfood={dogfood({ phase: 'cleaning' })} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'processing');
-    expect(stage().querySelector('.stage__mic')).toHaveTextContent('Cleaning up');
+    expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
+  });
+
+  it('says how your words are made once, on the foot line after the weft (ui-iter-25)', () => {
+    renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
+    const foot = stage().querySelector('.home-hero__foot')!;
+    const bar = stage().querySelector('.loom-bar')!;
+    expect(bar.compareDocumentPosition(foot)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(foot.querySelector('.home-hero__setup')).not.toBeNull();
+    expect(within(foot as HTMLElement).getByRole('radiogroup', { name: 'Current writing style' })).toBeInTheDocument();
+    // The last pick keeps its heading for screen readers; the stage shows no label above the words.
+    expect(screen.getByRole('heading', { level: 2, name: 'Last dictation' })).toHaveClass('sr-only');
+    expect(document.querySelector('.home-hero')).toHaveAttribute('data-words');
   });
 
   it('follows the dictation machine (gesture and mock scenarios)', () => {
@@ -114,11 +128,24 @@ describe('voice stage styles', () => {
     expect(block).toContain('--seg-on-fg: #ececf1;');
   });
 
-  it('stills the loom, the swell and the mic pulse under reduced motion', () => {
+  it('stills the loom and the swell under reduced motion', () => {
     const reduced = stageCss.slice(stageCss.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toContain('.loom__pulse { display: none; }');
     expect(reduced).toContain('.stage[data-phase] .loom__side { animation: none; }');
-    expect(reduced).toContain('.stage[data-phase] .stage__mic i { animation: none; }');
+  });
+
+  it('holds the threads still at rest: a light travels them only while you speak or Voxloom writes', () => {
+    expect(stageCss).toMatch(/\n\.loom__pulse \{[^}]*opacity: 0;/);
+    expect(stageCss).toMatch(/\.stage\[data-phase="listening"\] \.loom__side--in \.loom__pulse,\s*\.stage\[data-phase="processing"\] \.loom__side--out \.loom__pulse \{[^}]*opacity: 1;/);
+    // Light used to lift the resting pulses back up; it must not.
+    expect(css('daylight-pages.css')).not.toMatch(/\.loom__pulse \{[^}]*opacity/);
+  });
+
+  it('lays the threads on the weft without changing its height (ui-iter-25)', () => {
+    const bar = css('loom-bar.css');
+    expect(bar).toMatch(/\.loom-bar \.loom \{[^}]*margin-block: calc\(\(var\(--bar-h\) - var\(--loom-h\)\) \/ 2\);[^}]*z-index: -1;/);
+    expect(bar).toMatch(/\.loom-bar \.loom--in \{ grid-column: 1;/);
+    expect(bar).toMatch(/\.loom-bar \.loom--out \{ grid-column: 3;/);
   });
 
   it('keeps every stage colour pair at AA', () => {

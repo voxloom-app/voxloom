@@ -20,10 +20,3 @@ export function stagePhase(
   if (dictation.kind === 'processing') return 'processing';
   return 'idle';
 }
-
-/** Short readout for the stage's mic indicator. */
-export function stageLabel(stage: StagePhase, phase: DogfoodPhase): string {
-  if (stage === 'listening' || stage === 'speaking') return 'Listening';
-  if (stage === 'processing') return phase === 'cleaning' ? 'Cleaning up' : 'Transcribing';
-  return 'Mic off';
-}
