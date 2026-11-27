@@ -1,4 +1,4 @@
-/* Home voice stage (ui-iter-01): the hero and the Dictate card become one dark instrument,
+/* Home voice stage (ui-iter-01): the hero and the last dictation make one dark instrument,
    the same material as the app tile and the HUD, in both themes. VoiceLoom threads converge
    on the shortcut keys (voice in, left) and fan out (text out, right); data-phase drives them. */
 .stage {
@@ -149,17 +149,21 @@
   transform: translateY(3px);
 }
 
-/* Deck: the Dictate card is the instrument's base, set off by a hairline. */
-.stage .home-card--dictate {
-  background: rgba(255, 255, 255, .025);
-  border: 0;
-  border-radius: 0;
-  border-top: 1px solid rgba(255, 255, 255, .08);
-  margin: var(--s-10) calc(var(--stage-pad) * -1) 0;
-  padding: var(--s-9) var(--stage-pad) var(--s-10);
+/* The stage ends on the writing style: no deck beneath it since ui-iter-15. */
+.home > .stage { padding-bottom: var(--s-11); }
+/* Manual recovery: the run's own transcript, only when History didn't keep it. Dictating
+   from the window moved to the rail's docked shuttle (ui-iter-15, rail-cloth.css). */
+.stage .stage__recovery {
+  align-items: center;
+  background: rgba(255, 255, 255, .035);
+  border: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  gap: var(--s-6);
+  justify-content: space-between;
+  margin: var(--s-9) auto 0;
+  max-width: 44rem;
 }
-.stage .home-card--dictate h2 { font-size: var(--fs-secondary); font-weight: 650; margin: 0; }
-.stage .home-card--dictate .form-error { margin-top: var(--s-6); }
+.stage .stage__recovery .dogfood-transcript__label + p { font-family: var(--font-words); font-size: calc(var(--fs-body) * 1.08); }
 
 @media (max-width: 780px) {
   .stage { --stage-pad: var(--s-9); }

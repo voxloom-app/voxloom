@@ -10,7 +10,7 @@
 [data-appearance-resolved="light"] .stage .home-hero h1 { color: var(--fg); text-shadow: 0 0 10px var(--linen), 0 0 22px var(--linen), 0 0 34px var(--linen); }
 [data-appearance-resolved="light"] .loom__warp { opacity: .42; }
 [data-appearance-resolved="light"] .loom__pulse { opacity: .7; }
-[data-appearance-resolved="light"] .stage .home-card--dictate { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
+[data-appearance-resolved="light"] .stage .stage__recovery { background: rgba(255, 255, 255, .42); border-color: rgba(70, 56, 30, .12); }
 [data-appearance-resolved="light"] .stage .pick__words p { color: #121419; text-shadow: 0 0 18px var(--linen); }
 [data-appearance-resolved="light"] .pick__weft::before { opacity: .8; }
 [data-appearance-resolved="light"] .stage .pick__copy { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: 0 1px 2px rgba(70, 56, 30, .1); }

@@ -1,0 +1,143 @@
+/* The rail is a working loom (ui-iter-15). The warp threads close in and carry today's
+   cloth, one pick per dictation, and end at the fell, where the HUD's shuttle is docked:
+   the window's own Start dictating control, on every page. The shuttle is dark glass in
+   both themes, like the HUD; the cloth is dyed with the rail's status tokens. */
+
+/* ---- Today's cloth ---- */
+.rail-cloth { bottom: 0; display: block; overflow: visible; position: absolute; }
+.rail-warp .rail-cloth { inset: auto auto 0; }
+.rail-cloth line,
+.rail-cloth path { fill: none; vector-effect: non-scaling-stroke; }
+.rail-cloth__row { --tone: var(--ok); }
+.rail-cloth__row[data-status="copied"] { --tone: var(--info); }
+.rail-cloth__row[data-status="unverified"] { --tone: var(--warn); }
+.rail-cloth__row[data-status="failed"] { --tone: var(--err); }
+.rail-cloth__pick { opacity: .62; stroke: var(--tone); stroke-linecap: round; }
+/* A pick that wasn't confirmed is laid loosely; a failed one frays off the selvedge. */
+.rail-cloth__row:is([data-status="unverified"], [data-status="failed"]) .rail-cloth__pick { stroke-dasharray: 9 3; stroke-linecap: butt; }
+.rail-cloth__loose { opacity: .8; stroke: var(--tone); stroke-dasharray: 2 2; stroke-linecap: round; stroke-width: 1.25px; }
+/* Where the warp passes over the pick: plain weave, read as a break in the pick. */
+.rail-cloth__over { stroke: #0f0f15; stroke-linecap: butt; stroke-width: 3px; }
+.rail-cloth__row[data-newest] .rail-cloth__pick { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tone) 70%, transparent)); opacity: 1; }
+/* Beaten in while you watch: a pick that lands with the window open runs across once. */
+.rail-cloth__row[data-fresh] .rail-cloth__pick { animation: cloth-pick .9s cubic-bezier(.2, .7, .2, 1) both; stroke-dasharray: 100; }
+.rail-cloth__row[data-fresh] .rail-cloth__over { animation: cloth-beat .3s ease-out .75s both; }
+@keyframes cloth-pick { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+@keyframes cloth-beat { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- The dock: shuttle, its run status, then the shortcut keys ---- */
+.rail-dock { display: grid; gap: var(--s-8); }
+.rail-capture { display: grid; gap: var(--s-4); position: relative; }
+.rail-shuttle {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: #f6f6f9;
+  display: grid;
+  font: inherit;
+  height: 42px;
+  isolation: isolate;
+  justify-items: center;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+button.rail-shuttle { cursor: pointer; }
+/* The weft runs through the shuttle from one side of the rail to the other. */
+.rail-shuttle::before {
+  background: linear-gradient(90deg, transparent, var(--brand-a) 12%, color-mix(in srgb, var(--brand-a) 35%, transparent) 30%,
+    color-mix(in srgb, var(--brand-b) 35%, transparent) 70%, var(--brand-b) 88%, transparent);
+  content: "";
+  height: 1.5px;
+  inset: calc(50% - .75px) calc(var(--s-5) * -1) auto;
+  opacity: .7;
+  position: absolute;
+  z-index: -1;
+}
+.rail-shuttle__hull { filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); height: 100%; inset: 0; overflow: visible; position: absolute; width: 100%; z-index: -1; }
+.rail-shuttle__body { stroke-width: 1.25px; transition: filter .2s ease; vector-effect: non-scaling-stroke; }
+.rail-shuttle__braid { opacity: .5; transform-box: fill-box; transform-origin: 50% 50%; transition: opacity .3s ease; }
+.rail-shuttle__braid path { vector-effect: non-scaling-stroke; }
+.rail-shuttle__eye { border-radius: 50%; height: 4px; position: absolute; top: calc(50% - 2px); width: 4px; }
+.rail-shuttle__eye--in { background: var(--brand-a); box-shadow: 0 0 5px 1px color-mix(in srgb, var(--brand-a) 70%, transparent); left: 6%; }
+.rail-shuttle__eye--out { background: var(--brand-b); box-shadow: 0 0 5px 1px color-mix(in srgb, var(--brand-b) 70%, transparent); right: 6%; }
+/* The name plate: always solid glass behind the words, so the braid never crosses them. */
+.rail-shuttle__face {
+  align-items: center;
+  background: #0b0b10;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  display: inline-flex;
+  font-size: var(--fs-label);
+  font-weight: 650;
+  gap: 6px;
+  letter-spacing: .01em;
+  padding: 3px 11px;
+  white-space: nowrap;
+}
+.rail-shuttle__face .rec-dot { height: 8px; width: 8px; }
+button.rail-shuttle:hover .rail-shuttle__body { filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-a) 55%, transparent)); }
+button.rail-shuttle:hover .rail-shuttle__braid { opacity: .85; }
+button.rail-shuttle:focus-visible { outline: none; }
+button.rail-shuttle:focus-visible .rail-shuttle__face { box-shadow: 0 0 0 2px #0b0b10, 0 0 0 4px var(--focus); }
+button.rail-shuttle:disabled { cursor: not-allowed; }
+button.rail-shuttle:disabled .rail-shuttle__face { color: #a9a9b8; }
+button.rail-shuttle:disabled :is(.rail-shuttle__braid, .rail-shuttle__eye) { opacity: .3; }
+button.rail-shuttle:disabled::before { opacity: .3; }
+
+/* Starting here focuses Voxloom: said over the cloth while the shuttle is pointed at. */
+.rail-capture__tip {
+  background: #0b0b10;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-tile);
+  bottom: calc(100% + var(--s-4));
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .8);
+  color: #c9c9d4;
+  font-size: var(--fs-label);
+  inset-inline: 0;
+  line-height: 1.4;
+  margin: 0;
+  opacity: 0;
+  padding: var(--s-4) var(--s-5);
+  pointer-events: none;
+  position: absolute;
+  transition: opacity .15s ease;
+  visibility: hidden;
+}
+.rail-capture[data-state="idle"]:has(button.rail-shuttle:is(:hover, :focus-visible)) .rail-capture__tip { opacity: 1; visibility: visible; }
+.rail-capture__cancel { justify-self: center; }
+.rail-capture__note,
+.rail-capture__status { color: var(--mut); font-size: var(--fs-label); line-height: 1.4; margin: 0; text-align: center; }
+.rail-capture__status .icon { margin-right: 2px; vertical-align: -2px; }
+.rail-capture__status[data-phase="success"] { color: var(--ok); }
+.rail-capture__status.form-error { color: var(--err); margin: 0; }
+.rail-capture__copy { justify-self: center; }
+
+/* ---- The shuttle in the run ---- */
+/* Recording: the rim lights lime and the braid swells as the thread is pulled through. */
+.rail-capture[data-state="recording"] .rail-shuttle__body { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--brand-a) 70%, transparent)); }
+.rail-capture[data-state="recording"] .rail-shuttle__braid { animation: dock-swell .9s ease-in-out infinite alternate; opacity: 1; }
+.rail-capture[data-state="recording"] .rail-shuttle::before { opacity: 1; }
+@keyframes dock-swell { from { transform: scaleY(.55); } to { transform: scaleY(1.15); } }
+/* Writing: the braid settles into a rope that shimmers cyan. */
+.rail-capture[data-state="busy"] .rail-shuttle__body { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--brand-b) 65%, transparent)); }
+.rail-capture[data-state="busy"] .rail-shuttle__braid { animation: dock-rope 1.3s ease-in-out infinite; transform: scaleY(.3); }
+@keyframes dock-rope { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+/* A shortcut run elsewhere lights the docked shuttle too. */
+.sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-capture[data-state="idle"] .rail-shuttle__braid { animation: dock-swell .9s ease-in-out infinite alternate; opacity: 1; }
+.sidebar[data-phase="processing"] .rail-capture[data-state="idle"] .rail-shuttle__braid { animation: dock-rope 1.3s ease-in-out infinite; transform: scaleY(.3); }
+
+/* ---- By daylight: dyed picks on linen; the shuttle stays lit glass ---- */
+[data-appearance-resolved="light"] .rail-shuttle { --brand-a: #b6ff3c; --brand-b: #3cf0ff; }
+[data-appearance-resolved="light"] .rail-shuttle__hull { filter: drop-shadow(0 5px 8px rgba(70, 56, 30, .35)); }
+[data-appearance-resolved="light"] .rail-cloth__pick { opacity: .78; }
+[data-appearance-resolved="light"] .rail-cloth__over { stroke: #ede9e0; }
+[data-appearance-resolved="light"] .rail-capture__tip { box-shadow: 0 10px 24px -10px rgba(70, 56, 30, .6); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Picks land already woven; the shuttle brightens instead of swelling. */
+  .rail-cloth__row[data-fresh] :is(.rail-cloth__pick, .rail-cloth__over) { animation: none; }
+  .rail-shuttle__braid { animation: none !important; }
+  .rail-capture__tip { transition: none; }
+}

@@ -1,9 +1,9 @@
-/* Warp rail, part two (ui-iter-03): today's weave, the warp threads and the shortcut dock.
+/* Warp rail, part two (ui-iter-03): today's card, the warp threads and the shortcut dock.
    The threads fill the rail's free space and run into the shortcut keys. At rest they hold
    still; while you speak, lime pulses run down into the keys and the keys press in; while
    Voxloom writes, cyan pulses run back up. */
 
-/* Today's weave: a knot per dictation so far today, coloured by delivery status. */
+/* Today in words; the day's cloth is woven on the warp below (rail-cloth.css). */
 .rail-today {
   background: rgba(255, 255, 255, .03);
   border: 1px solid rgba(255, 255, 255, .08);
@@ -27,29 +27,6 @@
   text-transform: uppercase;
 }
 .rail-today__head b { color: #f6f6f9; font-size: var(--fs-emph); letter-spacing: -.02em; }
-.rail-today__weave { display: block; height: 14px; position: relative; }
-/* The thread runs to now, then hangs loose. */
-.rail-today__weave::before,
-.rail-today__weave::after { content: ""; position: absolute; top: 50%; }
-.rail-today__weave::before { background: linear-gradient(90deg, var(--brand-a), var(--brand-b)); height: 1px; left: 0; opacity: .7; width: var(--now); }
-.rail-today__weave::after { border-top: 1px dashed var(--ctl-line); left: var(--now); right: 0; }
-.rail-today__weave[data-empty]::before { display: none; }
-.rail-today__knot {
-  --tone: var(--ok);
-  background: var(--panel);
-  border: 1.5px solid var(--tone);
-  border-radius: 50%;
-  height: 8px;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 8px;
-}
-.rail-today__knot[data-status="copied"] { --tone: var(--info); }
-.rail-today__knot[data-status="unverified"] { --tone: var(--warn); }
-/* A failed dictation frays: a broken ring instead of a tied knot. */
-.rail-today__knot[data-status="failed"] { --tone: var(--err); border-style: dashed; }
-.rail-today__knot[data-newest] { background: var(--tone); box-shadow: 0 0 8px 1px color-mix(in srgb, var(--tone) 60%, transparent); height: 10px; width: 10px; }
 .rail-today__sum { color: var(--mut); font-size: var(--fs-label); }
 .rail-today__loose { align-items: center; color: var(--warn); display: inline-flex; font-size: var(--fs-label); font-weight: 600; gap: 5px; }
 

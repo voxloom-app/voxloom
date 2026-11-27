@@ -49,11 +49,11 @@ describe('stagePhase (ui-iter-01 voice stage)', () => {
 });
 
 describe('Home voice stage', () => {
-  it('holds the hero and the Dictate deck, with model and output in the readout', () => {
+  it('holds the hero, with model and output in the readout; dictating lives on the rail', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'idle');
     expect(stage().querySelector('#home-title')).not.toBeNull();
-    expect(stage().querySelector('#capture-title')).toHaveTextContent('Dictate');
+    expect(stage().querySelector('#capture-title')).toBeNull();
     expect(stage().querySelector('.stage__mic')).toHaveTextContent('Mic off');
     expect(stage().querySelector('.stage__meta')).toHaveTextContent('Model whisper-base.enOutput Insert, fall back to Copy');
     // The recent list stays outside the stage.

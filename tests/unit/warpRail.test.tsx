@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { App } from '../../src/app/App';
 import { AppProvider, useApp } from '../../src/app/AppContext';
 import { RailWarp, warpPath } from '../../src/app/shell/RailWarp';
+import { clothLayout, pickHeight } from '../../src/app/shell/railCloth';
 import { Sidebar } from '../../src/app/shell/Sidebar';
+import type { DictationRecord } from '../../src/domain/types';
 import { renderWithApp } from './testUtils';
 
 const css = (name: string) => readFileSync(join(__dirname, '../../src/styles', name), 'utf8');
@@ -39,9 +41,41 @@ describe('warp rail (ui-iter-03)', () => {
     expect(warp.querySelector('svg')).toHaveAttribute('focusable', 'false');
     expect(warp.querySelectorAll('.rail-warp__thread')).toHaveLength(7);
     expect(warp.querySelectorAll('.rail-warp__pulse')).toHaveLength(7);
-    // Every thread starts across the top and lands near the middle of the dock.
-    expect(warpPath(-42, 0)).toMatch(/^M8 0 .* 43\.28 100$/);
+    // Every thread starts across the top and closes in to carry the cloth down to the shuttle.
+    expect(warpPath(-42, 0)).toMatch(/^M8 0 .* 23\.96 100$/);
     expect(warpPath(0, 3)).toMatch(/^M50 0 .* 50 100$/);
+  });
+
+  it('weaves today\'s cloth into the warp: a pick per dictation, newest at the fell', () => {
+    renderWithApp(<RailWarp />, NOON);
+    const cloth = document.querySelector('.rail-warp[aria-hidden="true"] svg.rail-cloth')!;
+    expect(cloth).toHaveAttribute('focusable', 'false');
+    const rows = [...cloth.querySelectorAll('.rail-cloth__row')];
+    expect(rows).toHaveLength(6);
+    expect(cloth.querySelectorAll('[data-newest]')).toHaveLength(1);
+    expect(rows.at(-1)).toHaveAttribute('data-newest');
+    // Plain weave: each pick passes over alternate warp threads.
+    expect(rows.map((row) => row.querySelectorAll('.rail-cloth__over').length)).toEqual([3, 4, 3, 4, 3, 4]);
+    const failed = cloth.querySelectorAll('.rail-cloth__row[data-status="failed"]');
+    expect(failed).toHaveLength(1);
+    expect(failed[0].querySelector('.rail-cloth__loose')).not.toBeNull();
+    expect(cloth.querySelectorAll('.rail-cloth__loose')).toHaveLength(1);
+    // Picks already woven when the rail opens don't replay their weave-in.
+    expect(cloth.querySelector('[data-fresh]')).toBeNull();
+  });
+
+  it('beats a new pick in once, and lays no cloth on a fresh day', () => {
+    let api: ReturnType<typeof useApp> | null = null;
+    function Probe() { api = useApp(); return null; }
+    renderWithApp(<><Probe /><RailWarp /></>, NOON);
+    act(() => api!.dispatch({
+      record: { createdAt: NOON(), durationSeconds: 4, id: 'synthetic-new', model: null, recoveryExpiresAt: null, status: 'copied', style: 'formal', text: 'Synthetic words.' },
+      type: 'append-record',
+    }));
+    const fresh = document.querySelectorAll('.rail-cloth__row[data-fresh]');
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0]).toHaveAttribute('data-newest');
+    expect(fresh[0]).toHaveAttribute('data-status', 'copied');
   });
 
   it('summarises today in the card name and opens History from it', async () => {
@@ -49,9 +83,9 @@ describe('warp rail (ui-iter-03)', () => {
     renderWithApp(<App />, NOON);
     await user.click(screen.getByRole('button', { name: 'Set up later' }));
     const card = screen.getByRole('button', { name: 'Today: 6 dictations, 41 words, 1 loose thread' });
-    expect(card.querySelectorAll('.rail-today__knot')).toHaveLength(6);
-    expect(card.querySelectorAll('.rail-today__knot[data-newest]')).toHaveLength(1);
-    expect(card.querySelector('.rail-today__knot[data-status="failed"]')).not.toBeNull();
+    // The card says the day in words; the rail's cloth below it is the picture.
+    expect(rail().querySelectorAll('.rail-warp .rail-cloth__row')).toHaveLength(6);
+    expect(rail().querySelector('.rail-cloth__row[data-status="failed"]')).not.toBeNull();
     expect(card).toHaveTextContent('41 words · 1m 42s spoken');
     await user.click(card);
     expect(current()).toBe('History');
@@ -72,7 +106,65 @@ describe('warp rail (ui-iter-03)', () => {
     expect(document.querySelectorAll('.rail-key .kbd').length).toBe(3);
     const card = screen.getByRole('button', { name: 'Today: no dictations yet' });
     expect(card).toHaveTextContent('Nothing woven yet');
-    expect(card.querySelector('.rail-today__weave')).toHaveAttribute('data-empty', 'true');
+    expect(document.querySelector('.rail-cloth')).toBeNull();
+  });
+});
+
+describe('today\'s cloth layout (ui-iter-15)', () => {
+  const record = (id: string, createdAt: number, durationSeconds = 6, status: DictationRecord['status'] = 'inserted'): DictationRecord =>
+    ({ createdAt, durationSeconds, id, model: null, recoveryExpiresAt: null, status, style: 'formal', text: 'Synthetic.' });
+
+  it('weaves oldest first, alternating picks, with the newest passing over the even threads', () => {
+    expect(clothLayout([])).toEqual({ height: 0, picks: [] });
+    const { picks } = clothLayout([record('c', 3), record('a', 1), record('b', 2)]);
+    expect(picks.map((pick) => pick.id)).toEqual(['a', 'b', 'c']);
+    expect(picks.map((pick) => pick.over)).toEqual([0, 1, 0]);
+    expect(picks.map((pick) => pick.newest)).toEqual([false, false, true]);
+    expect(picks[1].y).toBeGreaterThan(picks[0].y);
+  });
+
+  it('lays a heavier pick for a longer dictation, within bounds', () => {
+    expect(pickHeight(1)).toBeLessThan(pickHeight(20));
+    expect(pickHeight(0)).toBe(3);
+    expect(pickHeight(600)).toBe(7.5);
+  });
+
+  it('beats a busy day tighter so the cloth keeps to its budget', () => {
+    const busy = Array.from({ length: 60 }, (_, index) => record(`r${index}`, index, 30));
+    const { height, picks } = clothLayout(busy);
+    expect(picks).toHaveLength(60);
+    expect(height).toBeLessThanOrEqual(180);
+    for (const [index, pick] of picks.entries()) {
+      if (index) expect(pick.y, pick.id).toBeGreaterThan(picks[index - 1].y);
+    }
+  });
+});
+
+describe('the docked shuttle styles (ui-iter-15)', () => {
+  const clothCss = css('rail-cloth.css');
+
+  it('loads after the HUD shuttle and stills its motion under reduced motion', () => {
+    expect(css('index.css')).toMatch(/@import "\.\/hud-shuttle\.css";\n@import "\.\/rail-cloth\.css";/);
+    const reduced = clothCss.slice(clothCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('.rail-cloth__row[data-fresh] :is(.rail-cloth__pick, .rail-cloth__over) { animation: none; }');
+    expect(reduced).toContain('.rail-shuttle__braid { animation: none !important; }');
+  });
+
+  it('keeps the shuttle\'s words on solid glass at AA in both themes', () => {
+    const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+    const hex = (s: string) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
+    const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
+    const ratio = (a: string, b: string) => {
+      const [x, y] = [lum(hex(a)), lum(hex(b))].sort((m, n) => n - m);
+      return (x + 0.05) / (y + 0.05);
+    };
+    const face = /\.rail-shuttle__face \{[^}]*background: (#[0-9a-f]{6});/.exec(clothCss)![1];
+    expect(clothCss).toMatch(/\.rail-shuttle \{[^}]*color: #f6f6f9;/);
+    expect(ratio('#f6f6f9', face), 'shuttle label').toBeGreaterThanOrEqual(4.5);
+    expect(ratio(/button\.rail-shuttle:disabled \.rail-shuttle__face \{ color: (#[0-9a-f]{6});/.exec(clothCss)![1], face), 'disabled label').toBeGreaterThanOrEqual(4.5);
+    const tip = /\.rail-capture__tip \{[^}]*background: (#[0-9a-f]{6});[^}]*color: (#[0-9a-f]{6});/.exec(clothCss)!;
+    expect(ratio(tip[2], tip[1]), 'tip').toBeGreaterThanOrEqual(4.5);
+    expect(ratio('#b6ff3c', face), 'focus ring').toBeGreaterThanOrEqual(3);
   });
 });
 

@@ -7,6 +7,7 @@ import type { StagePhase } from '../../features/home/stagePhase';
 import { navScreens } from './screens';
 import { RailToday } from './RailToday';
 import { RailWarp } from './RailWarp';
+import { ShuttleDock, type ShuttleDockProps } from './ShuttleDock';
 import { useShortcutActive } from '../../services/shortcut/activeShortcut';
 import { NO_SHORTCUT } from '../../features/settings/shortcutCopy';
 
@@ -18,14 +19,18 @@ type Props = {
   phase?: StagePhase;
   onNavigate: (screen: Screen) => void;
   onReset: () => void;
+  /** Dictating from the window: the shuttle docked at the fell (ui-iter-15). */
+  capture?: ShuttleDockProps;
 };
 
 /**
  * The warp rail (ui-iter-03): the window's frame, in the Home stage's dark
- * material in both themes. It stays put while pages scroll; its threads run
- * into the shortcut keys and move only while you speak or Voxloom writes.
+ * material in both themes. It stays put while pages scroll. Since ui-iter-15 it
+ * is a working loom: today's dictations are woven across its warp, and the
+ * shuttle docked at the fell starts a dictation from any page. The threads move
+ * only while you speak or Voxloom writes.
  */
-export function Sidebar({ screen, shortcut, status, phase = 'idle', onNavigate, onReset }: Props) {
+export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset }: Props) {
   const active = useShortcutActive();
   return (
     <aside className="sidebar" data-phase={phase}>
@@ -55,14 +60,17 @@ export function Sidebar({ screen, shortcut, status, phase = 'idle', onNavigate, 
       </nav>
       <RailToday onOpen={() => onNavigate('history')} />
       <RailWarp />
-      <div className="rail-key">
-        {active && <span className="rail-key__caps"><KeyCombo combo={shortcut} /></span>}
-        <p className="sidebar__hint">
-          {active ? <>
-            Hold the shortcut in any app to dictate. Release to insert, or it
-            copies if insertion isn’t safe.
-          </> : NO_SHORTCUT}
-        </p>
+      <div className="rail-dock">
+        {capture && <ShuttleDock {...capture} />}
+        <div className="rail-key">
+          {active && <span className="rail-key__caps"><KeyCombo combo={shortcut} /></span>}
+          <p className="sidebar__hint">
+            {active ? <>
+              Hold the shortcut in any app to dictate. Release to insert, or it
+              copies if insertion isn’t safe.
+            </> : NO_SHORTCUT}
+          </p>
+        </div>
       </div>
       {import.meta.env.DEV && (
         <details className="dev-panel">

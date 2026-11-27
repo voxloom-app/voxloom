@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app/App';
 import { Switch } from '../../src/components/Switch';
 import { screenForAltDigit } from '../../src/app/shell/screens';
+import { ShuttleDock } from '../../src/app/shell/ShuttleDock';
 import { Sidebar } from '../../src/app/shell/Sidebar';
 import { TitleBar } from '../../src/app/shell/TitleBar';
 import { Home } from '../../src/features/home/Home';
@@ -144,31 +145,72 @@ describe('Home (UI PR 3)', () => {
     rows.forEach((row) => expect(row.querySelector('.badge')).not.toBeNull());
   });
 
-  it('hides the browser-only Start capture note in the native app', () => {
+  it('keeps the writing style caption ahead of its control', () => {
     vi.mocked(isTauriEnv).mockReturnValue(true);
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
-    expect(screen.queryByText(/Native capture requires the Tauri shell/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start capture' })).toBeEnabled();
     const caption = screen.getByText('Writing style');
     // Caption precedes the segmented control.
     expect(caption.compareDocumentPosition(screen.getByRole('radiogroup', { name: 'Current writing style' })))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
+});
 
-  it('shows Stop/Cancel while recording and Transcribing… while busy', () => {
-    const { unmount } = renderWithApp(<Home dogfood={dogfood({ phase: 'recording' })} onToast={vi.fn()} />);
-    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    unmount();
-    renderWithApp(<Home dogfood={dogfood({ phase: 'transcribing' })} onToast={vi.fn()} />);
+describe('Docked shuttle (ui-iter-15)', () => {
+  const dock = (over: Partial<UseDogfoodCaptureResult> = {}, isNative = true) => {
+    const run = dogfood(over);
+    render(<ShuttleDock dogfood={run} isNative={isNative} onCopy={vi.fn()} />);
+    return run;
+  };
+
+  it('starts a run from the window and says where the words may go', async () => {
+    const run = dock();
+    const start = screen.getByRole('button', { name: 'Start dictating' });
+    expect(start).toBeEnabled();
+    expect(start).toHaveAccessibleDescription('Starting here focuses Voxloom, so the words may be copied instead of inserted.');
+    expect(screen.queryByText(/needs the Voxloom desktop app/)).not.toBeInTheDocument();
+    await userEvent.setup().click(start);
+    expect(run.start).toHaveBeenCalledOnce();
+  });
+
+  it('is disabled with a note in the browser preview', () => {
+    dock({}, false);
+    expect(screen.getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    expect(screen.getByText('Dictating here needs the Voxloom desktop app.')).toBeInTheDocument();
+  });
+
+  it('shows Stop/Cancel while recording and Transcribing… while busy', async () => {
+    const user = userEvent.setup();
+    const run = dock({ phase: 'recording' });
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+    expect(run.stop).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(run.cancel).toHaveBeenCalledOnce();
+    cleanup();
+    dock({ phase: 'transcribing' });
     expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
-    expect(screen.queryByRole('button', { name: 'Start capture' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('shows Cleaning up… while local cleanup runs (BUS-16)', () => {
-    renderWithApp(<Home dogfood={dogfood({ phase: 'cleaning' })} onToast={vi.fn()} />);
+    dock({ phase: 'cleaning' });
     expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
-    expect(screen.queryByRole('button', { name: 'Start capture' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+  });
+
+  it('hangs a run\'s outcome beneath the shuttle', () => {
+    dock({ message: 'Inserted into the focused app.', phase: 'success' });
+    expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
+  });
+
+  it('docks on the rail of every page', async () => {
+    const user = await renderShell();
+    const rail = () => document.querySelector('.sidebar') as HTMLElement;
+    expect(within(rail()).getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    await user.click(within(screen.getByRole('navigation', { name: 'Voxloom screens' })).getByRole('button', { name: 'History' }));
+    expect(current()).toBe('History');
+    expect(within(rail()).getByRole('button', { name: 'Start dictating' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dictate' })).not.toBeInTheDocument();
   });
 });
 

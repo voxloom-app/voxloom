@@ -43,17 +43,16 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*color: var\(--seg-on-fg, var\(--fg\)\);/);
   });
 
-  it('marks the Dictate card with home-card--dictate', () => {
-    const src = readFileSync(join(root, 'features/home/DictateCard.tsx'), 'utf8');
-    expect(src).toContain('className="card home-card home-card--dictate"');
-    expect(src).not.toContain(':has(#capture-title)');
+  it('docks dictating from the window on the rail instead of a Home deck (ui-iter-15)', () => {
+    expect(readFileSync(join(root, 'features/home/Home.tsx'), 'utf8')).not.toContain('home-card--dictate');
+    expect(readFileSync(join(root, 'app/shell/ShuttleDock.tsx'), 'utf8')).toContain('className="rail-shuttle"');
+    expect(css('stage.css')).not.toContain('.home-card--dictate');
   });
 
   it('scopes V3 Layered rules to Home actions, keeps ghost links, and stills motion', () => {
     // ui-iter-01: Home actions sit on the dark stage in both themes: no light-only washes,
-    // one set of attached shadows, and the Dictate card is the stage's deck.
+    // one set of attached shadows; the stage ends on the hero since ui-iter-15.
     expect(actions).not.toContain('[data-appearance-resolved=');
-    expect(css('stage.css')).toMatch(/\.stage \.home-card--dictate \{[^}]*border-top: 1px solid/);
     expect(actions).toMatch(/\.btn\.primary\.big:not\(:disabled\) \{[^}]*box-shadow:/);
     expect(actions).toContain('.btn.primary.big');
     expect(actions).toContain('.home .btn:not(.primary):not(.ghost)');

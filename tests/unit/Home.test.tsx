@@ -1,7 +1,9 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { useApp } from '../../src/app/AppContext';
 import { Home } from '../../src/features/home/Home';
+import { wovenRecords } from '../../src/features/home/pickWords';
 import type { UseDogfoodCaptureResult } from
   '../../src/services/stt/useDogfoodCapture';
 import { renderWithApp } from './testUtils';
@@ -56,11 +58,35 @@ describe('Home', () => {
     expect(toast).toHaveBeenCalledWith('Copy failed');
   });
 
-  it('shows the Dictate capture panel on Home', () => {
-    renderWithApp(<Home dogfood={stubDogfood()} onToast={vi.fn()} />);
-    expect(screen.getByRole('heading', { name: 'Dictate' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start capture' })).toBeDisabled();
-    expect(screen.getByText(/Native capture requires the Tauri shell/i))
-      .toBeInTheDocument();
+  it('leaves dictating from the window to the rail: Home has no Dictate deck', () => {
+    renderWithApp(<Home dogfood={stubDogfood({ phase: 'recording' })} onToast={vi.fn()} />);
+    expect(screen.queryByRole('heading', { name: 'Dictate' })).not.toBeInTheDocument();
+    for (const name of ['Start dictating', 'Start capture', 'Stop', 'Cancel']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+  });
+
+  it('offers the run\'s transcript for manual recovery when History did not keep it', async () => {
+    const user = userEvent.setup();
+    const toast = vi.fn();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    const text = 'Synthetic recovery sentence that History did not keep.';
+    renderWithApp(<Home dogfood={stubDogfood({ transcript: { text } as UseDogfoodCaptureResult['transcript'] })} onToast={toast} />);
+    const recovery = screen.getByRole('region', { name: 'Last transcript' });
+    expect(recovery).toHaveTextContent(text);
+    expect(recovery).toHaveTextContent('Available for manual recovery even when History retention is Off.');
+    await user.click(within(recovery).getByRole('button', { name: 'Copy last transcript' }));
+    expect(toast).toHaveBeenCalledWith('Copied to clipboard');
+  });
+
+  it('shows the transcript once when it is already the last dictation', () => {
+    let newest = '';
+    function Probe() { newest = wovenRecords(useApp().state.records)[0]!.text; return null; }
+    const { unmount } = renderWithApp(<Probe />);
+    unmount();
+    renderWithApp(<Home dogfood={stubDogfood({ transcript: { text: newest } as UseDogfoodCaptureResult['transcript'] })} onToast={vi.fn()} />);
+    expect(screen.queryByRole('region', { name: 'Last transcript' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy last transcript' })).not.toBeInTheDocument();
   });
 });

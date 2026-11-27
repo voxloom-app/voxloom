@@ -105,7 +105,7 @@ export function App() {
     recallInput.current?.focus();
     recallInput.current?.select();
   }, []);
-  const copyRecalled = useCallback((text: string) => {
+  const copyText = useCallback((text: string) => {
     clipboard.copy(text).then(() => announce('Copied to clipboard'), () => announce('Copy failed'));
   }, [announce, clipboard]);
   // History renders in the same commit as the screen change, so its row exists once this task runs.
@@ -165,13 +165,14 @@ export function App() {
         <Recall
           inputRef={recallInput}
           now={now}
-          onCopy={copyRecalled}
+          onCopy={copyText}
           onNavigate={navigate}
           onShow={showRecalled}
           records={state.records}
         />
       </TitleBar>
       <Sidebar
+        capture={{ dogfood, isNative: native, onCopy: copyText }}
         onNavigate={navigate}
         onReset={dev.requestReset}
         phase={phase}
