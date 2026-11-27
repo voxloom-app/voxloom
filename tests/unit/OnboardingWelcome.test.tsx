@@ -32,8 +32,8 @@ describe('guided setup welcome (step 0)', () => {
     const spine = within(screen.getByRole('complementary', { name: 'Setup progress' })).getAllByRole('listitem').map((item) => item.querySelector('span')?.textContent);
     expect(titles).toEqual(['Get connected', 'Your shortcut', 'First words']);
     expect(titles).toEqual(spine);
-    expect(rows[0]).toHaveTextContent('Allow Microphone and Accessibility so Voxloom can hear you and type for you.');
-    expect(rows[2]).toHaveTextContent('Hold your shortcut and say a short sentence, then try it hands-free.');
+    expect(rows[0]).toHaveTextContent('Allow Microphone and Accessibility.');
+    expect(rows[2]).toHaveTextContent('Try a short dictation both ways.');
     for (const [index, row] of rows.entries()) {
       const badge = row.querySelector('.guided-steps-badge');
       expect(badge).toHaveTextContent(String(index + 1));
@@ -44,6 +44,30 @@ describe('guided setup welcome (step 0)', () => {
     expect(screen.queryByText(/Connect your microphone, typing and keyboard access/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Input Monitoring/)).not.toBeInTheDocument();
     expect(screen.getByText(/Starting setup downloads Whisper Base/)).toHaveTextContent('148 MB');
+  });
+
+  it('teaches both gestures before setup without requesting access or downloading a model', async () => {
+    const user = userEvent.setup();
+    const io = setupBoundary();
+    renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={storage()} />);
+    const guide = screen.getByRole('region', { name: 'Gesture guide' });
+    const hold = within(guide).getByRole('radio', { name: 'Hold to talk' });
+    const handsFree = within(guide).getByRole('radio', { name: 'Hands-free' });
+    expect(hold).toBeChecked();
+    await user.click(hold);
+    await user.keyboard('{ArrowRight}');
+    expect(handsFree).toHaveFocus();
+    expect(handsFree).toBeChecked();
+    expect(guide).toHaveTextContent('Double-tap, speak with the keys up, then press once to finish.');
+    await user.click(within(guide).getByRole('button', { name: 'Watch example' }));
+    expect(guide).toHaveTextContent('Tracing gesture…');
+    await user.click(hold);
+    expect(hold).toBeChecked();
+    expect(guide).toHaveTextContent('Meet me at noon.');
+    expect(guide).toHaveTextContent('Hold your shortcut while you speak. Release to finish.');
+    expect(io.request).not.toHaveBeenCalled();
+    expect(io.download).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Start setup/ })).toBeEnabled();
   });
 
   it('shows the live shortcut as key caps in the shortcut row', async () => {

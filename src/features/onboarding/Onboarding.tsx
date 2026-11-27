@@ -13,6 +13,7 @@ import { listenModelsChanged } from '../../services/stt/modelsChanged';
 import { createOverlayBridge } from '../../services/shortcut';
 import { createGuidedSetup, permissionClear, permissionsClear, type PermissionKind, type SetupBoundary, type SetupProgressStorage } from './guidedSetup';
 import { registerPracticeHandler, resetPracticeGestures } from './practiceBridge';
+import { GestureGuide } from './GestureGuide';
 import { LoomLine } from './LoomLine';
 import { createSetupBoundary } from './setupBoundary';
 import { SetupThread } from './SetupThread';
@@ -227,12 +228,12 @@ function HydratedOnboarding({ onClose, opener, boundary, progressStorage }: Onbo
       <div className="guided-main stage">
         <section className="guided-content" aria-labelledby="guided-heading" tabIndex={0}>
           <div className="guided-kicker">{['Your voice. Your Mac.', '01 / Get connected', '02 / Make it yours', '03 / First words', 'Ready for your next thought'][guided.step]}</div>
-          <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 0 ? <>Less typing.<br />More you.</> : guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
+          <div className="guided-hero"><h2 id="guided-heading" ref={heading} tabIndex={-1}>{guided.step === 0 ? <>Less typing.<em>More you.</em></> : guided.step === 1 ? <>A few permissions.<br />A smoother first dictation.</> : guided.step === 2 ? <>Your shortcut.<br />Ready when you are.</> : guided.step === 3 ? both ? 'Both ways. All yours.' : guided.mode === 'tap' ? 'Now, go hands-free.' : 'First, hold to talk.' : <>You speak.<br />Voxloom types.</>}</h2>
             {guided.step === 0 ? <LoomLine shortcut={state.settings.shortcut} /> : guided.step === 4 && <LoomLine />}</div>
           {guided.step === 0 && <>
-            <p className="guided-intro">Speak naturally. Voxloom turns your words into text, right where you’re writing.</p>
+            <p className="guided-intro">Speak naturally. Voxloom types your words where you’re writing.</p>
+            <GestureGuide />
             <WelcomeSteps shortcut={state.settings.shortcut} />
-
           </>}
           {guided.step === 1 && <>
             <p className="guided-intro">{onWindows ? 'Windows has no typing permission to turn on. Microphone access is a Windows privacy setting, so Voxloom can only check it when you first dictate.' : 'Two permissions connect your microphone, typing and keyboard controls. We’ll check each before moving on.'}</p>
