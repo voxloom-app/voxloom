@@ -13,7 +13,9 @@
 .badge--copied,
 .badge--downloading { background: color-mix(in srgb, var(--info) 10%, transparent); color: var(--info); }
 .badge--failed { background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
-.badge--unverified { background: color-mix(in srgb, var(--warn) 10%, transparent); color: var(--warn); }
+/* Unverified is unknown, not broken (ui-iter-23): quiet text in a dotted ring, so a day of
+   unconfirmed deliveries doesn't turn every list amber. The label still names it. */
+.badge--unverified { background: transparent; color: var(--mut); outline: 1px dotted color-mix(in srgb, var(--warn) 60%, var(--mut)); outline-offset: -1px; }
 .badge--missing { background: var(--tag-bg); color: var(--tag-fg); } /* neutral grey (designer #43) */
 
 .banner {

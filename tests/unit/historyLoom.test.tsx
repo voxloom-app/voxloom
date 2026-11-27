@@ -73,35 +73,31 @@ describe('history loom helpers (ui-iter-02)', () => {
   });
 });
 
-describe('History woven day (ui-iter-02)', () => {
-  it('tallies the latest day in the masthead and groups the timeline under it', () => {
+describe('History woven day (ui-iter-02, said once since ui-iter-23)', () => {
+  it('names the loom\'s day without repeating the rail\'s tally, and groups the timeline under it', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
     const stage = document.querySelector('.history-stage')!;
     expect(stage).toHaveClass('stage');
     expect(within(stage as HTMLElement).getByRole('heading', { level: 1 })).toHaveTextContent('History');
     expect(stage.querySelector('.history-stage__day')).toHaveTextContent('Today');
-    const tallies = [...stage.querySelectorAll('dl > div')].map((d) => d.textContent);
-    expect(tallies).toEqual(['Dictations6', 'Words41', 'Spoken1m 42s']);
+    // The rail's Today beam and the day heading already count the day.
+    expect(stage.querySelector('dl')).toBeNull();
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Today');
     expect(screen.getByText('6 dictations · 1m 42s spoken')).toBeInTheDocument();
     expect(knots()).toHaveLength(6);
     expect(document.querySelector('.day-loom')).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('calls out loose threads and toggles the timeline to them', () => {
+  it('leaves loose threads to the status filter, which fades the knots it hides', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
-    const deck = document.querySelector<HTMLElement>('.history-stage__deck')!;
-    expect(deck).toHaveTextContent('1 loose thread · 1 failed. Check it before you copy or retry.');
-    const show = within(deck).getByRole('button', { name: 'Show failed' });
-    expect(within(deck).queryByRole('button', { name: 'Show unverified' })).toBeNull();
-    fireEvent.click(show);
-    expect(show).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('radio', { name: 'Failed' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('button', { name: /^Show (failed|unverified)$/ })).toBeNull();
+    const failed = screen.getByRole('radio', { name: 'Failed' });
+    fireEvent.click(failed);
+    expect(failed).toHaveAttribute('aria-checked', 'true');
     expect(screen.getAllByRole('article')).toHaveLength(1);
     // Knots stay on the loom; the ones the filter hides fade.
     expect(knots().filter((k) => k.dataset.match === 'false')).toHaveLength(5);
-    fireEvent.click(show);
-    expect(show).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
     expect(screen.getAllByRole('article')).toHaveLength(6);
   });
 
@@ -119,12 +115,12 @@ describe('History woven day (ui-iter-02)', () => {
     expect(activeKnots()).toEqual([]);
   });
 
-  it('keeps an empty loom, and no tally or deck, when there is no history', () => {
+  it('keeps an empty loom, with no day caption or clipping sheet, when there is no history', () => {
     renderWithApp(<History onToast={vi.fn()} />, () => NOW);
     for (const button of screen.getAllByRole('button', { name: 'Delete transcript' })) fireEvent.click(button);
     expect(document.querySelector('.day-loom')).toHaveAttribute('data-empty', 'true');
-    expect(document.querySelector('.history-stage__tally')).toBeNull();
-    expect(document.querySelector('.history-stage__deck')).toBeNull();
+    expect(document.querySelector('.history-stage__day')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Open clipping sheet/ })).toBeNull();
     expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
     expect(screen.getByText('No dictations yet')).toBeInTheDocument();
   });
@@ -143,21 +139,18 @@ describe('History woven day (ui-iter-02)', () => {
     const css = readFileSync('src/styles/history-stage.css', 'utf8');
     // Pin the surfaces this test measures, so a restyle has to revisit it.
     expect(css).toContain('.day-loom__waiting { background: #15151c;');
-    expect(css).toContain('background: rgba(255, 255, 255, .025);');
-    expect(css).toContain('.history-stage__jump .btn:hover { background: rgba(255, 255, 255, .09); }');
+    expect(css).not.toContain('rgba(255, 255, 255, .025)'); // the loose-threads deck is gone
     const top = '#17171f';
     const surfaces = [
       '#15151c', // waiting chip
-      mix('#ffffff', top, 0.025), // loose-threads deck
-      mix('#ffffff', top, 0.09), // hovered deck button
       mix('#b6ff3c', top, 0.18), // brightest lime glow
       mix('#3cf0ff', top, 0.16), // brightest cyan glow
     ];
     for (const surface of surfaces) {
       expect(ratio(token('mut'), surface), `mut on ${surface}`).toBeGreaterThanOrEqual(4.5);
       expect(ratio(token('fg'), surface), `fg on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio('#b6ff3c', surface), `TODAY / NOW on ${surface}`).toBeGreaterThanOrEqual(4.5);
-      expect(ratio('#f6f6f9', surface), `title and tally on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio('#b6ff3c', surface), `day caption / NOW on ${surface}`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio('#f6f6f9', surface), `title on ${surface}`).toBeGreaterThanOrEqual(4.5);
     }
   });
 

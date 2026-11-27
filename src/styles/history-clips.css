@@ -1,40 +1,30 @@
-/* History's clipping book. The header is a packet of slips with a numbered stub;
-   the matching wire clips in the margin collect text without changing the records. */
+/* History's clipping book (ui-iter-18). Since ui-iter-23 the sheet is a chip at the end of
+   the search row, shown only once something can be clipped. When it holds passages it
+   lights, and the whole row sticks to the top so the sheet stays in reach across days. */
 .clip-ticket {
-  align-items: center;
-  background: linear-gradient(105deg, color-mix(in srgb, var(--accfg) 7%, var(--panel)), var(--panel) 68%);
-  border: 1px solid color-mix(in srgb, var(--ctl-line) 52%, var(--panel));
-  border-radius: 3px;
-  box-shadow: 0 3px 0 -1px var(--bg), 0 3px 0 var(--line), 0 5px 0 -1px var(--panel), 0 6px 0 -1px var(--line);
-  display: grid;
-  gap: var(--s-9);
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  margin: 0 0 var(--s-10);
-  padding: 0 0 0 var(--s-8);
-  text-align: left;
-  width: 100%;
+  align-items: center; background: transparent; border: 1px dashed var(--ctl-line); border-radius: var(--r-pill);
+  color: var(--mut); display: inline-flex; flex: none; font-size: var(--fs-secondary); font-weight: 600;
+  gap: var(--s-4); margin-left: auto; min-height: 36px; padding: 0 5px 0 var(--s-6);
 }
-/* Keep the sheet within reach when gathering from several days. */
-.clip-ticket[data-filled] { border-color: var(--sel-edge); position: sticky; top: 4px; z-index: 3; }
-.history .cloth:has(.clip-ticket[data-filled]) :is(.history-tools, .history-timeline) :focus { scroll-margin-top: 8em; }
 .clip-ticket:hover { border-color: var(--sel-edge); }
+.clip-ticket__title { color: var(--fg); }
+.clip-ticket__count {
+  background: var(--field); border-radius: var(--r-pill); color: var(--fg);
+  font: 600 var(--fs-label)/1 var(--mono); font-variant-numeric: tabular-nums; padding: 5px 7px;
+}
+.clip-ticket[data-filled] { background: color-mix(in srgb, var(--accfg) 7%, var(--bg)); border: 1px solid var(--sel-edge); color: var(--accfg); }
+.clip-ticket[data-filled] .clip-ticket__count { background: var(--accfg); color: var(--bg); }
+.history-tools[data-clipping] {
+  background: var(--bg); box-shadow: 0 1px 0 var(--line); margin-inline: calc(var(--s-4) * -1);
+  padding: var(--s-4); position: sticky; top: 0; z-index: 3;
+}
+.history .cloth:has(.history-tools[data-clipping]) .history-timeline :focus { scroll-margin-top: 6em; }
+/* The empty sheet still shows the packet of slips. */
 .clip-mark { display: block; width: 72px; }
 .clip-mark__back { fill: var(--navon); stroke: var(--ctl-line); }
 .clip-mark__middle { fill: var(--field); stroke: var(--ctl-line); }
 .clip-mark__face { fill: var(--bg); stroke: var(--ctl-line); }
-.clip-ticket__title { display: grid; gap: 2px; padding-block: var(--s-6); }
-.clip-ticket__title strong, .clip-proof h2 {
-  color: var(--fg); font: normal calc(var(--fs-hero) * 1.04)/1.1 var(--font-words); letter-spacing: -.035em;
-}
-.clip-ticket__title small { color: var(--mut); font-size: var(--fs-secondary); }
-.clip-ticket__stub {
-  align-items: center; align-self: stretch;
-  background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--info) 7%, transparent) 4px 5px), var(--panel);
-  border-left: 1px dashed var(--ctl-line); color: var(--info); display: flex; flex-direction: column;
-  justify-content: center; min-width: 7em; padding: var(--s-5) var(--s-8);
-}
-.clip-ticket__stub b { font: normal var(--fs-hero)/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.08em; }
-.clip-ticket__stub span { color: var(--fg); font-size: var(--fs-label); font-weight: 650; margin-top: 3px; }
+.clip-proof h2 { color: var(--fg); font: normal calc(var(--fs-hero) * 1.04)/1.1 var(--font-words); letter-spacing: -.035em; }
 
 /* The date opens a gathering of slips. The existing timeline and recovery knots stay intact. */
 .history-day__head { border-bottom: 1px solid var(--line); padding-block: var(--s-4); }
@@ -80,10 +70,6 @@
 }
 .clip-proof footer .btn { margin-left: auto; }
 @media (max-width: 780px) {
-  .clip-ticket { gap: var(--s-4); padding-left: var(--s-4); }
-  .clip-ticket .clip-mark { width: 48px; }
-  .clip-ticket__stub { min-width: 4.5em; padding-inline: var(--s-4); }
-  .clip-ticket__title strong { font-size: calc(var(--fs-sheet) * 1.4); }
   .history-row.recent-row {
     --tab-w: 38px; grid-template-areas: "time knot body clip" ". knot actions clip";
     grid-template-columns: var(--spool-time) 12px minmax(0, 1fr) var(--tab-w);

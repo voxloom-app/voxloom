@@ -17,8 +17,7 @@
 [data-appearance-resolved="light"] .stage .pick__copy:hover { border-color: var(--sel-edge); color: var(--accfg); }
 
 /* ---- History: the woven day ---- */
-[data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1, .history-stage__tally dd) { color: var(--fg); }
-[data-appearance-resolved="light"] .history-stage__tally dl > div + div { border-left-color: rgba(70, 56, 30, .16); }
+[data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1) { color: var(--fg); }
 [data-appearance-resolved="light"] .day-loom__warp { stroke: rgba(70, 56, 30, .2); }
 [data-appearance-resolved="light"] .day-loom__weft { opacity: 1; }
 [data-appearance-resolved="light"] .day-loom g + g .day-loom__weft { opacity: .62; }
@@ -27,10 +26,7 @@
 [data-appearance-resolved="light"] .day-loom__waiting { background: #ffffff; border-color: rgba(70, 56, 30, .14); }
 [data-appearance-resolved="light"] :is(.day-loom__knot, .voice-path__thread i) { background-color: var(--linen); }
 [data-appearance-resolved="light"] .day-loom__knot:is([data-newest], [data-active][data-newest]) { background-color: var(--tone); }
-[data-appearance-resolved="light"] :is(.history-stage__deck, .proof__note) { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
-[data-appearance-resolved="light"] .history-stage__jump .btn { background: #ffffff; border-color: rgba(70, 56, 30, .26); }
-[data-appearance-resolved="light"] .history-stage__jump .btn:hover { background: #ffffff; border-color: var(--ctl-line); }
-[data-appearance-resolved="light"] .history-stage__jump .btn[aria-pressed="true"] { background: var(--navon); border-color: var(--sel-edge); }
+[data-appearance-resolved="light"] .proof__note { background: rgba(255, 255, 255, .42); border-top-color: rgba(70, 56, 30, .12); }
 
 /* ---- Dictionary: the spelling proof. Restored words wear a highlighter's lime. ---- */
 [data-appearance-resolved="light"] .proof__heard { background: #ffffff; border-color: rgba(70, 56, 30, .2); box-shadow: inset 0 1px 2px rgba(70, 56, 30, .06); }

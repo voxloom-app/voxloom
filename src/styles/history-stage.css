@@ -1,21 +1,16 @@
 /* History (ui-iter-02): a woven day. The masthead is the Home voice stage's dark
-   material (.stage in stage.css supplies its tokens): it tallies the latest day,
-   ties each dictation as a knot on the day loom and calls out loose threads.
+   material (.stage in stage.css supplies its tokens) and ties each of the latest
+   day's dictations as a knot on the day loom. Since ui-iter-23 it says nothing
+   the rail or the filter already says: no tally, no loose-threads deck.
    The timeline below runs one status-knotted thread through each day. */
 .history-stage { margin-bottom: var(--s-10); padding: var(--s-10) var(--stage-pad) var(--s-9); }
-.history-stage__top { align-items: flex-end; display: flex; flex-wrap: wrap; gap: var(--s-8) var(--s-11); justify-content: space-between; }
-.history-stage__title { flex: 1 1 20em; min-width: 0; }
+.history-stage__title { min-width: 0; }
 .history-stage h1 { color: #f6f6f9; font-size: calc(var(--fs-page) * 1.15); font-weight: 850; letter-spacing: -.035em; margin: 0 0 6px; }
 .history-stage__lede { color: var(--mut); font-size: var(--fs-secondary); margin: 0; max-width: 58ch; }
 
-.history-stage__day { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .12em; margin: 0 0 8px; text-transform: uppercase; }
-.history-stage__tally dl { display: flex; margin: 0; }
-.history-stage__tally dl > div { display: flex; flex-direction: column-reverse; gap: 4px; padding: 0 var(--s-10); }
-.history-stage__tally dl > div:first-child { padding-left: 0; }
-.history-stage__tally dl > div + div { border-left: 1px solid rgba(255, 255, 255, .09); }
-.history-stage__tally dl > div:last-child { padding-right: 0; }
-.history-stage__tally dt { color: var(--mut); font-size: var(--fs-label); }
-.history-stage__tally dd { color: #f6f6f9; font-size: var(--fs-hero); font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.03em; line-height: 1; margin: 0; }
+/* The loom's day, on the line the "Now" label shares. */
+.history-stage__day { color: var(--accfg); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .12em; line-height: 1; margin: var(--s-11) 0 0; text-transform: uppercase; }
+.history-stage__day + .day-loom { margin-top: calc(var(--fs-micro) * -1); }
 
 /* The day loom: two weft threads twist through the day and knot at each dictation. */
 .day-loom { isolation: isolate; margin-top: var(--s-11); position: relative; }
@@ -43,7 +38,8 @@
   width: var(--knot);
 }
 .day-loom__knot[data-status="copied"] { --tone: var(--info); }
-.day-loom__knot[data-status="unverified"] { --tone: var(--warn); }
+/* Unverified is unknown, not broken: a quiet dotted ring (ui-iter-23). */
+.day-loom__knot[data-status="unverified"] { --tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); border: 2px dotted var(--tone); box-shadow: 0 0 0 3px var(--panel); }
 /* A failed dictation frays: a broken ring instead of a tied knot. */
 .day-loom__knot[data-status="failed"] { --tone: var(--err); border: 2px dashed var(--tone); box-shadow: 0 0 0 3px var(--panel); }
 .day-loom__knot[data-newest] { background: var(--tone); box-shadow: 0 0 0 3px var(--panel), 0 0 16px 2px color-mix(in srgb, var(--tone) 55%, transparent); }
@@ -79,29 +75,6 @@
 .day-loom__ticks li:first-child::before { left: 0; }
 .day-loom__ticks li:last-child:not(:first-child) { transform: translateX(-100%); }
 .day-loom__ticks li:last-child:not(:first-child)::before { left: auto; right: 0; }
-
-/* Loose threads: the stage's base deck, only while something didn't land cleanly. */
-.history-stage__deck {
-  align-items: center;
-  background: rgba(255, 255, 255, .025);
-  border-top: 1px solid rgba(255, 255, 255, .08);
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--s-5) var(--s-8);
-  margin: var(--s-10) calc(var(--stage-pad) * -1) calc(var(--s-9) * -1);
-  padding: var(--s-7) var(--stage-pad);
-}
-.history-stage__deck > .icon { color: var(--warn); flex: none; }
-.history-stage__deck p { color: var(--mut); flex: 1 1 18em; font-size: var(--fs-secondary); margin: 0; }
-.history-stage__deck strong { color: var(--fg); font-weight: 650; }
-.history-stage__jump { display: flex; flex-wrap: wrap; gap: var(--s-4); }
-.history-stage__jump .btn { background: rgba(255, 255, 255, .04); color: var(--fg); font-size: var(--fs-secondary); font-weight: 600; }
-.history-stage__jump .btn:hover { background: rgba(255, 255, 255, .09); }
-.history-stage__jump .btn[aria-pressed="true"] { background: var(--segon); border-color: var(--sel-edge); box-shadow: inset 0 0 0 1px var(--sel-edge); }
-
-@media (max-width: 780px) {
-  .history-stage__tally dl > div { padding: 0 var(--s-8); }
-}
 
 @media (prefers-reduced-motion: reduce) {
   /* The loom holds still; knots, threads and "now" stay put. */

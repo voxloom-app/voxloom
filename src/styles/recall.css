@@ -132,7 +132,7 @@
 .recall__opt:not(.recall__opt--page)::before { background: var(--recall-thread); bottom: 0; content: ""; left: 21.5px; position: absolute; top: 0; width: 1px; }
 .recall__knot { --tone: var(--ok); background: var(--tone); border-radius: 50%; box-shadow: 0 0 0 3px var(--recall-cloth); height: 10px; justify-self: center; position: relative; width: 10px; }
 .recall__opt[data-status="copied"] .recall__knot { --tone: var(--info); }
-.recall__opt[data-status="unverified"] .recall__knot { --tone: var(--warn); }
+.recall__opt[data-status="unverified"] .recall__knot { --tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); }
 .recall__opt[data-status="failed"] .recall__knot { --tone: var(--err); }
 .recall__words { color: var(--fg); font-family: var(--font-words); font-size: var(--fs-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recall__words mark { background: none; border-radius: 2px; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--accfg) 55%, transparent); color: var(--accfg); }

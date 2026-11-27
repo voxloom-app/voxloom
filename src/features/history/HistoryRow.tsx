@@ -26,9 +26,10 @@ type Props = {
 };
 
 /**
- * One History row: time · knot · text · badge + meta · amber note · Copy / Retry
+ * One History row: time · knot · text · badge + meta · note · Copy / Retry
  * (browser) / Delete. The knot is drawn in CSS on the day's thread; the text is
- * an h3 under its day heading.
+ * an h3 under its day heading. An Unverified row's caution is shown once on its
+ * day heading (ui-iter-23), so here it stays readable but visually hidden.
  */
 export function HistoryRow({ record, isNative, currentTime, canStart, clipNumber, onClip, onCopy, onRetry, onDelete }: Props) {
   const textId = `history-text-${record.id}`;
@@ -43,6 +44,7 @@ export function HistoryRow({ record, isNative, currentTime, canStart, clipNumber
     : record.status === 'unverified'
     ? 'Input not verified. Inspect before copying or retrying.'
     : record.status === 'failed' ? failedNote : null;
+  const saidOnce = record.status === 'unverified';
 
   const [originalOpen, setOriginalOpen] = useState(false);
   const hasText = Boolean(record.text.trim());
@@ -60,6 +62,7 @@ export function HistoryRow({ record, isNative, currentTime, canStart, clipNumber
           <Badge status={record.status} />
           <span>{record.durationSeconds}s · {record.model ?? 'Local STT'} · {styleLabel(record.style)}</span>
           {cleanup && <span className="history-row__cleanup">· {cleanup}</span>}
+          {record.mayHaveInserted?.copied && <span aria-hidden="true">· also copied</span>}
         </p>
         {original && (
           <details className="history-row__original" onToggle={(event) => setOriginalOpen(event.currentTarget.open)}>
@@ -67,7 +70,8 @@ export function HistoryRow({ record, isNative, currentTime, canStart, clipNumber
             <p>{original}</p>
           </details>
         )}
-        {note && (
+        {note && saidOnce && <p className="sr-only">{note}</p>}
+        {note && !saidOnce && (
           <p className="recovery-state">
             <Icon name="warn" size={13} /> {note}
           </p>

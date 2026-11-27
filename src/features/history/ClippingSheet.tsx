@@ -18,7 +18,7 @@ type Props = {
   onCopy: (text: string) => Promise<void>;
 };
 
-/** Three slips and one continuous wire clip, the mark repeated in the timeline margin. */
+/** Three slips and one continuous wire clip; the empty sheet shows it. */
 function ClipMark() {
   return (
     <svg aria-hidden="true" className="clip-mark" fill="none" viewBox="0 0 84 72">
@@ -38,15 +38,15 @@ export function ClippingSheet({ passages, onCopy }: Props) {
   const count = passages.length;
   return (
     <>
+      {/* A chip in the search row (ui-iter-23); it lights and sticks with the row once filled. */}
       <button
         aria-haspopup="dialog" aria-label={`Open clipping sheet, ${countLabel(count)}`}
-        className="clip-ticket" data-filled={count > 0 || undefined} onClick={(event) => setOpener(event.currentTarget)} type="button"
+        className="clip-ticket" data-filled={count > 0 || undefined} onClick={(event) => setOpener(event.currentTarget)}
+        title={count ? 'Review clipped passages' : 'Clip passages below to copy them together'} type="button"
       >
-        <ClipMark />
-        <span className="clip-ticket__title"><strong>Clipping sheet</strong>
-          <small>{count ? `${countLabel(count)} in spoken order. Review before copying.` : 'Clip passages below to copy them together.'}</small>
-        </span>
-        <span className="clip-ticket__stub"><b>{folio(count)}</b><span>Review →</span></span>
+        <Icon name="clip" size={15} />
+        <span className="clip-ticket__title">Clipping sheet</span>
+        <b className="clip-ticket__count">{folio(count)}</b>
       </button>
       {opener && (
         <Dialog label="Clipping sheet" onClose={() => setOpener(null)} opener={opener}>

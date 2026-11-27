@@ -13,7 +13,7 @@
 /* The knot on the weft beneath (loom-bar.css) takes the same outcome colour as the badge. */
 :is(.pick, .loom-bar) { --pick-tone: var(--ok); }
 :is(.pick, .loom-bar)[data-status="copied"] { --pick-tone: var(--info); }
-:is(.pick, .loom-bar)[data-status="unverified"] { --pick-tone: var(--warn); }
+:is(.pick, .loom-bar)[data-status="unverified"] { --pick-tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); }
 
 .pick__label { color: var(--mut); font-size: var(--fs-label); font-weight: 600; letter-spacing: .04em; margin: 0 0 var(--s-5); }
 

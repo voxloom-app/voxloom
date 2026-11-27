@@ -32,6 +32,8 @@
   --knot-y: calc(var(--row-y) + var(--line-h) / 2);
   --thread-x: calc(var(--row-x) + var(--spool-time) + var(--col-gap) + 5px);
   --thread: color-mix(in srgb, var(--accfg) 40%, var(--line));
+  /* Middle of the day heading's first line (padding and serif size: history-clips.css). */
+  --head-mid: calc(var(--s-4) + var(--fs-sheet) * .74 - 4px);
 }
 
 .history-day__head {
@@ -45,10 +47,14 @@
 /* The day's mark on the thread, which runs on down to the first knot. */
 .history-day__head::before,
 .history-day__head::after { content: ""; position: absolute; }
-.history-day__head::before { background: var(--accfg); border-radius: 2px; height: 10px; left: calc(var(--thread-x) - 4px); top: calc(50% - 4px - 5px); transform: rotate(45deg); width: 10px; z-index: 1; }
-.history-day__head::after { background: var(--thread); bottom: 0; left: var(--thread-x); top: calc(50% - 4px); width: 2px; }
+.history-day__head::before { background: var(--accfg); border-radius: 2px; height: 10px; left: calc(var(--thread-x) - 4px); top: calc(var(--head-mid) - 5px); transform: rotate(45deg); width: 10px; z-index: 1; }
+.history-day__head::after { background: var(--thread); bottom: 0; left: var(--thread-x); top: var(--head-mid); width: 2px; }
 .history-day__head h2 { font-size: var(--fs-section); font-weight: 750; letter-spacing: -.01em; margin: 0; }
-.history-day__head span { color: var(--mut); font-size: var(--fs-label); }
+.history-day__head > span { color: var(--mut); font-size: var(--fs-label); }
+/* An unverified caution, said once for the day instead of on every row (ui-iter-23). */
+.history-day__unsure { align-items: flex-start; color: var(--mut); display: flex; flex-basis: 100%; font-size: var(--fs-secondary); gap: 6px; margin: 2px 0 0; }
+.history-day__unsure > .icon { color: var(--warn); flex: none; margin-top: 2px; }
+.history-day__unsure strong { color: var(--fg); font-weight: 650; }
 
 .history-day .history-list { gap: 0; }
 
@@ -85,7 +91,8 @@
   z-index: 1;
 }
 .history-row.recent-row[data-status="copied"]::before { --tone: var(--info); }
-.history-row.recent-row[data-status="unverified"]::before { --tone: var(--warn); }
+/* Unverified is unknown, not broken (ui-iter-23): a quiet dotted ring, no panel; its day says why. */
+.history-row.recent-row[data-status="unverified"]::before { --tone: color-mix(in srgb, var(--warn) 45%, var(--mut)); border: 2px dotted var(--tone); box-shadow: none; }
 .history-row.recent-row[data-status="failed"]::before { --tone: var(--err); border: 2px dashed var(--tone); box-shadow: none; }
 .history-day:first-child .history-row.recent-row:first-child::before { background: var(--tone); box-shadow: 0 0 0 4px color-mix(in srgb, var(--tone) 22%, transparent); }
 
@@ -94,15 +101,14 @@
 .history-row.recent-row:last-child::after { bottom: auto; height: var(--knot-y); }
 .history-row.recent-row[data-status="failed"]::after { background: repeating-linear-gradient(180deg, var(--err) 0 4px, transparent 4px 9px); opacity: .75; }
 
-/* Rows lift onto a panel under the pointer or focus; loose threads always sit on one. */
+/* Rows lift onto a panel under the pointer or focus; only failed rows, which need a
+   retry or a copy, always sit on one. */
 .history-row.recent-row:hover,
 .history-row.recent-row:focus-within,
-.history-row.recent-row[data-status="failed"],
-.history-row.recent-row[data-status="unverified"] { background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 10px 24px -18px rgba(15, 23, 42, .45); }
+.history-row.recent-row[data-status="failed"] { background: var(--panel); box-shadow: 0 0 0 1px var(--line), 0 10px 24px -18px rgba(15, 23, 42, .45); }
 .history-row.recent-row[data-status="failed"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--err) 35%, var(--line)), 0 10px 24px -18px rgba(15, 23, 42, .45); }
-.history-row.recent-row[data-status="unverified"] { box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 35%, var(--line)), 0 10px 24px -18px rgba(15, 23, 42, .45); }
-.history-row.recent-row:is(:hover, :focus-within, [data-status="failed"], [data-status="unverified"])::before { background: var(--panel); }
-.history-day:first-child .history-row.recent-row:first-child:is(:hover, :focus-within, [data-status="failed"], [data-status="unverified"])::before { background: var(--tone); }
+.history-row.recent-row:is(:hover, :focus-within, [data-status="failed"])::before { background: var(--panel); }
+.history-day:first-child .history-row.recent-row:first-child:is(:hover, :focus-within, [data-status="failed"])::before { background: var(--tone); }
 
 .history-row__meta {
   align-items: center;
