@@ -43,7 +43,7 @@ describe('The last pick (ui-iter-09): your words take the stage', () => {
     expect(within(pick()).getByRole('blockquote')).toHaveTextContent(NEWEST);
     expect(pick().querySelector('.badge')).toHaveAttribute('data-status', 'inserted');
     expect(pick()).toHaveAttribute('data-status', 'inserted');
-    expect(pick().querySelector('.pick__meta')).toHaveTextContent(/· 9 words · 7s$/);
+    expect(within(pick()).getByRole('button', { name: 'Read in full' })).toHaveAttribute('aria-haspopup', 'dialog');
     expect(pick().querySelector('time')).toHaveAttribute('dateTime', new Date(NOW - 3 * 60_000).toISOString());
     // The heading still opens the page; the pick follows it, and the lede steps aside.
     const headings = screen.getAllByRole('heading').map((h) => h.textContent);
@@ -107,6 +107,50 @@ describe('The last pick (ui-iter-09): your words take the stage', () => {
     dispatch({ record: record({}), type: 'append-record' });
     expect(document.querySelector('.pick__words')).toHaveAttribute('data-fresh');
     expect(within(earlier()).getByText('Nothing earlier yet.')).toBeInTheDocument();
+  });
+});
+
+describe('Reading recent dictations without leaving Home', () => {
+  const reader = () => within(screen.getByRole('dialog', { name: 'Recent dictations' }));
+
+  it('opens the full, unverified passage, keeps the selection by ID, and copies only on request', async () => {
+    const user = userEvent.setup();
+    const { dispatch } = renderHome();
+    const text = `${'A longer dictation. '.repeat(40)}\n\nKeep the paragraph break.`;
+    dispatch({ record: record({ status: 'unverified', text }), type: 'append-record' });
+    await navigator.clipboard.writeText('Unchanged');
+    const opener = screen.getByRole('button', { name: 'Read in full' });
+    opener.focus();
+    await user.keyboard('{Enter}');
+    expect(reader().getByRole('blockquote').textContent).toBe(text);
+    expect(reader().getByText(/check the destination before copying/i)).toBeVisible();
+    dispatch({ record: record({ createdAt: NOW + 120_000, id: 'next' }), type: 'append-record' });
+    expect(reader().getByRole('blockquote').textContent).toBe(text);
+    await user.click(reader().getByRole('button', { name: 'Older' }));
+    expect(reader().getByRole('blockquote')).toHaveTextContent(NEWEST);
+    expect(reader().getByText('9 words · 7s')).toBeVisible();
+    expect(reader().queryByText(/check the destination/i)).toBeNull();
+    await user.click(reader().getByRole('button', { name: 'Newer' }));
+    expect(await navigator.clipboard.readText()).toBe('Unchanged');
+    await user.click(reader().getByRole('button', { name: 'Copy text' }));
+    expect(await navigator.clipboard.readText()).toBe(text);
+    expect(reader().getByText('Copied to clipboard')).toBeVisible();
+    await user.keyboard('{Escape}');
+    expect(opener).toHaveFocus();
+    expect(within(pick()).getByRole('blockquote')).not.toHaveTextContent(text);
+  });
+
+  it('opens directly at an earlier entry, skips failures, and drops text removed during reading', async () => {
+    const user = userEvent.setup();
+    const { dispatch } = renderHome();
+    await user.click(within(earlier()).getByRole('button', { name: /Open src\/auth/ }));
+    expect(reader().getByRole('blockquote')).toHaveTextContent('Open src/auth/session.ts');
+    expect(reader().getByRole('button', { name: 'Older' })).toBeDisabled();
+    await user.click(reader().getByRole('button', { name: 'Newer' }));
+    expect(reader().getByRole('blockquote')).toHaveTextContent('Do not remove');
+    dispatch({ type: 'scenario-empty' });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText(/Do not remove/)).toBeNull();
   });
 });
 

@@ -1,0 +1,42 @@
+/* Home is the index: the newest quote keeps its controls, and each earlier
+   passage is a two-line excerpt that opens to its full, selectable text. */
+.pick__read, .earlier__read { background: none; border: 0; border-radius: 3px; font: inherit; }
+.pick__read { align-items: center; color: var(--accfg); display: inline-flex; gap: 5px; min-height: 24px; padding-inline: 2px; }
+.earlier__read { display: block; letter-spacing: inherit; max-width: 100%; padding: 0; text-align: start; }
+.earlier__read span { display: -webkit-box; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+:is(.pick__read, .earlier__read):is(:hover, :focus-visible) { text-decoration: underline; text-underline-offset: .16em; }
+
+/* A full-size reading page, hung from the same rod as the other sheets. The
+   folio sits outside the text measure; only the passage scrolls at normal sizes. */
+.overlay:has(.reader) { --sheet-max: 820px; }
+.reader { --margin: clamp(46px, 8vw, 96px); --ink-rule: color-mix(in srgb, var(--mut) 45%, transparent); }
+.reader__head { align-items: baseline; border-bottom: 1px solid var(--ink-rule); display: flex; flex-wrap: wrap; gap: 2px 1rem; justify-content: space-between; margin-bottom: var(--s-8); padding: 0 30px var(--s-6) 0; }
+.reader .reader__head h2 { font: 650 var(--fs-body)/1.4 var(--font); margin: 0 0 3px; padding: 0; }
+.reader__head time, .reader__folio span, .reader__folio small { color: var(--mut); font: var(--fs-micro)/1.5 var(--mono); }
+.reader__folio small { margin-top: var(--s-8); max-width: 10ch; text-wrap: pretty; }
+.reader__spread { display: grid; grid-template-columns: var(--margin) minmax(0, 1fr); }
+.reader__folio { align-self: start; display: grid; justify-items: start; padding: var(--s-4) var(--s-4) 0 0; }
+.reader__folio b { color: var(--fg); font: normal calc(var(--fs-page) * 1.35)/1 var(--font-words); letter-spacing: -.055em; }
+.reader__folio span { border-top: 2px solid var(--brand-b); margin-top: var(--s-4); padding-top: var(--s-2); }
+.reader__page { border-left: 1px solid var(--ink-rule); min-width: 0; padding-left: clamp(14px, 2.4vw, 32px); }
+.reader__words {
+  color: var(--fg); font: calc(var(--fs-emph) * 1.23)/1.65 var(--font-words); margin: 0;
+  max-height: min(49dvh, 26em); min-height: min(19dvh, 7em); overflow: auto;
+  overflow-wrap: anywhere; overscroll-behavior: contain; padding: var(--s-4) var(--s-6) var(--s-6) 2px;
+  scrollbar-gutter: stable; user-select: text; white-space: pre-wrap;
+}
+.reader__words:not([data-measure="long"]) { font-size: calc(var(--fs-hero) * 1.06); letter-spacing: -.02em; line-height: 1.32; }
+.reader__words:focus-visible { border-radius: 1px; box-shadow: -3px 0 var(--accfg); outline: 2px solid transparent; }
+.reader__outcome { align-items: baseline; display: flex; flex-wrap: wrap; gap: 3px 8px; margin-top: var(--s-6); }
+.reader__outcome > span:not(.badge), .reader__notice { color: var(--mut); font-size: var(--fs-secondary); }
+.reader__foot { align-items: center; border-top: 1px solid var(--ink-rule); display: flex; flex-wrap: wrap; gap: var(--s-4) var(--s-6); margin-top: var(--s-8); padding-top: var(--s-6); }
+.reader__copy { border-color: var(--ctl-line); min-height: 32px; }
+.reader__turn { align-items: center; display: flex; gap: var(--s-6); margin-left: auto; }
+.reader__turn button { align-items: center; border: 0; color: var(--fg); display: inline-flex; font-size: var(--fs-secondary); gap: var(--s-4); min-height: 32px; padding: 2px 4px; }
+.reader__turn button:enabled:hover { text-decoration: underline; }
+.reader__turn button + button { border-left: 1px solid var(--ink-rule); border-radius: 0; padding-left: var(--s-6); }
+@media (max-width: 780px) {
+  .reader { --margin: 76px; }
+  .reader__folio b { font-size: var(--fs-page); }
+  .reader__words { max-height: 39dvh; }
+}

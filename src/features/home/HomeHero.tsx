@@ -18,7 +18,7 @@ export function HomeHero({ capture, pick = null }: {
   /** Dictating from the window: the Start capsule on the weft (ui-iter-21). */
   capture?: CaptureProps;
   /** The newest dictation with words (and whether it landed while Home was open), or null before the first one. */
-  pick?: StagePick | null;
+  pick?: (StagePick & { onRead: (id: string, opener: HTMLButtonElement) => void }) | null;
 }) {
   const { state } = useApp();
   const active = useShortcutActive();
@@ -33,7 +33,7 @@ export function HomeHero({ capture, pick = null }: {
       </div>
       {!active && <p className="home-hero__none">{NO_SHORTCUT_HINT}</p>}
       {pick
-        ? <LastDictation fresh={pick.fresh} record={pick.record} />
+        ? <LastDictation fresh={pick.fresh} onRead={pick.onRead} record={pick.record} />
         : <p className="home-hero__lede">Speak in any app. Release to type. Transcribed locally with Whisper.</p>}
       <LoomBar capture={capture} pick={pick} />
     </section>

@@ -11,6 +11,7 @@ type Props = {
   /** Whether the stage shows a last pick (so an empty list is "nothing earlier", not "nothing"). */
   hasWords: boolean;
   onCopy: (text: string) => void;
+  onRead: (id: string, opener: HTMLButtonElement) => void;
 };
 
 /** Failed runs never reach Home's list (pickWords.ts), so three outcomes are enough. */
@@ -22,7 +23,7 @@ const LABELS: Partial<Record<HistoryStatus, string>> = { copied: 'Copied', inser
  * (filled typed, ring copied, dotted unconfirmed); the key beneath says it once, with the
  * count, and every row still names its status for screen readers.
  */
-export function EarlierDictations({ earlier, hasWords, onCopy }: Props) {
+export function EarlierDictations({ earlier, hasWords, onCopy, onRead }: Props) {
   const { dispatch } = useApp();
   const key = knotKey(earlier);
   return (
@@ -37,7 +38,12 @@ export function EarlierDictations({ earlier, hasWords, onCopy }: Props) {
         {earlier.map((record) => (
           <div className="recent-row" data-status={record.status} key={record.id}>
             <span className="timestamp">{formatTime(record.createdAt)}</span>
-            <p>{record.text}</p>
+            <p>
+              <button aria-haspopup="dialog" className="earlier__read" onClick={(event) => onRead(record.id, event.currentTarget)}
+                title="Read full dictation" type="button">
+                <span>{record.text}</span>
+              </button>
+            </p>
             <span className="sr-only">{LABELS[record.status] ?? record.status}</span>
             <IconButton icon="copy" label="Copy dictation" onClick={() => onCopy(record.text)} />
           </div>

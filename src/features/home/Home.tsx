@@ -5,6 +5,7 @@ import { isTauriEnv } from '../../services/capture/captureService';
 import type { CleanupModelStore } from '../../services/cleanup/contracts';
 import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCapture';
 import { wovenRecords } from './pickWords';
+import { DictationReader } from './DictationReader';
 import { EarlierDictations } from './EarlierDictations';
 import { HomeColophon } from './HomeColophon';
 import { HomeHero } from './HomeHero';
@@ -23,7 +24,15 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
   const isNative = isTauriEnv();
   const phase = stagePhase(dogfood.phase, dogfood.captureState.kind === 'active', state.dictation);
   const woven = wovenRecords(state.records);
-  const last = woven[0] ?? null;
+  const recent = woven.slice(0, 6);
+  const last = recent[0] ?? null;
+  // Freeze only the page IDs. A new dictation doesn't displace the oldest page
+  // mid-read; deletion or retention changes always withdraw the actual words.
+  const [reader, setReader] = useState<{ id: string; ids: string[]; opener: HTMLButtonElement } | null>(null);
+  const read = (id: string, opener: HTMLButtonElement) => setReader({ id, ids: recent.map((r) => r.id), opener });
+  const pages = reader ? woven.filter((r) => reader.ids.includes(r.id)) : [];
+  const page = pages.findIndex((r) => r.id === reader?.id);
+  if (reader && page < 0) setReader(null);
   // The run's own transcript, for manual recovery when History didn't keep it
   // (retention Off). When it is already the last dictation, the stage shows it once.
   const transcript = dogfood.transcript?.text;
@@ -48,7 +57,7 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
       <div className="stage" data-phase={phase}>
         <HomeHero
           capture={{ dogfood, isNative, onCopy: (t) => { void copy(t); } }}
-          pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }}
+          pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, onRead: read, record: last }}
         />
         {recovery && (
           <section aria-labelledby="recovery-title" aria-live="polite" className="dogfood-transcript stage__recovery">
@@ -67,9 +76,13 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
           under the weft, on the same surface, with no sheet between your words. How they are
           made closes the page as its colophon. Every page lies open since ui-iter-31 (frame.css). */}
       <div className="home-page">
-        <EarlierDictations earlier={woven.slice(1, 6)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} />
+        <EarlierDictations earlier={recent.slice(1)} hasWords={last !== null} onCopy={(t) => { void copy(t); }} onRead={read} />
         <HomeColophon cleanupModelStore={cleanupModelStore} isNative={isNative} />
       </div>
+      {reader && page >= 0 && (
+        <DictationReader count={pages.length} index={page} onClose={() => setReader(null)}
+          onTurn={(index) => setReader({ ...reader, id: pages[index].id })} opener={reader.opener} record={pages[page]} />
+      )}
     </div>
   );
 }

@@ -1,10 +1,12 @@
 import { Badge } from '../../components/Badge';
+import { Icon } from '../../components/Icon';
 import type { DictationRecord } from '../../domain/types';
 import { formatTime } from '../history/HistoryRow';
-import { pickMeasure, wordCount } from './pickWords';
+import { pickMeasure } from './pickWords';
 
 type Props = {
   record: DictationRecord;
+  onRead: (id: string, opener: HTMLButtonElement) => void;
   /** True when this dictation landed while Home was open: the line weaves in once. */
   fresh: boolean;
 };
@@ -17,8 +19,7 @@ type Props = {
  * The heading is for screen readers only (ui-iter-25): the quote marks and the time
  * already say what these words are, so the stage shows no label above them.
  */
-export function LastDictation({ fresh, record }: Props) {
-  const words = wordCount(record.text);
+export function LastDictation({ fresh, onRead, record }: Props) {
   return (
     <section aria-labelledby="pick-title" className="pick" data-status={record.status}>
       <h2 className="pick__label sr-only" id="pick-title">Last dictation</h2>
@@ -27,10 +28,9 @@ export function LastDictation({ fresh, record }: Props) {
       </blockquote>
       <div className="pick__meta">
         <Badge status={record.status} />
-        <span>
-          <time dateTime={new Date(record.createdAt).toISOString()}>{formatTime(record.createdAt)}</time>
-          {` · ${words} ${words === 1 ? 'word' : 'words'} · ${record.durationSeconds}s`}
-        </span>
+        <time dateTime={new Date(record.createdAt).toISOString()}>{formatTime(record.createdAt)}</time>
+        <button aria-haspopup="dialog" className="pick__read" type="button"
+          onClick={(event) => onRead(record.id, event.currentTarget)}><Icon name="book" size={14} />Read in full</button>
       </div>
     </section>
   );

@@ -14,6 +14,14 @@ export function unverifiedDay(now: number, count = 38): DictationRecord[] {
   }));
 }
 
+// Multi-paragraph sample for checking excerpt, scrolling and full-text copy in the browser.
+const LONG_NOTE = [
+  'For the next print run, keep the map on one sheet. Someone standing at the trailhead should be able to find the footbridge without unfolding a second page.',
+  'On the west side, the path turns just before the orchard. Mark the turn itself, not the nearest gate. In the afternoon the shadow from the gate makes that junction surprisingly easy to miss.',
+  'Leave enough room in the lower margin for the bus timetable. The weekday and weekend services start from different stops, so give each its own line and spell out the stop names.',
+  'Finally, take the sample outside. If the smallest labels are still legible at dusk, the map is ready to print.',
+].join('\n\n');
+
 interface ScenarioPanelProps {
   onReset: () => void;
 }
@@ -35,6 +43,13 @@ export function ScenarioPanel({ onReset }: ScenarioPanelProps) {
       <button onClick={() => unverifiedDay(now()).forEach((record) => dispatch({ record, type: 'append-record' }))}>
         38 unconfirmed runs
       </button>
+      <button onClick={() => {
+        const at = now();
+        dispatch({ type: 'append-record', record: {
+          createdAt: at, durationSeconds: 62, id: `synthetic-note-${crypto.randomUUID()}`, model: null,
+          recoveryExpiresAt: null, status: 'unverified', style: 'formal', text: LONG_NOTE,
+        } });
+      }}>Long dictation</button>
       <button onClick={dictation.start}>
         Listening · silent
       </button>
