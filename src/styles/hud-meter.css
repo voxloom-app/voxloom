@@ -37,19 +37,35 @@
 .hud-capsule .wave i:nth-child(-n+10) { opacity: .8; }
 .hud-capsule .wave i:nth-child(-n+5) { opacity: .58; }
 
-/* The meter disappears when the mic closes. Only the unfinished line
-   on the text glyph moves; the label stays still and readable. */
-.hud-writing-line {
-  animation: hud-write 2.4s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: left;
+/* Keep the bars mounted outside text layout. Their centers are 6px apart in
+   all phases, so each sample can turn into a stroke and fold onto the page. */
+.overlay-document .wave {
+  gap: 2px;
+  height: 18px;
+  left: 32px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
 }
-@keyframes hud-write {
-  0%, 100% { transform: scaleX(.25); }
-  50%, 80% { transform: scaleX(1); }
+.hud-capsule .wave[data-form="ink"] i {
+  animation: hud-ink 2.8s ease-in-out infinite;
+  background: #436e76;
+  opacity: 1;
+  transition: transform 340ms cubic-bezier(.2,.75,.2,1);
 }
+/* Each stroke presses into the paper in turn. Independent translate keeps
+   the sample's own position, rotation and length intact through the fold. */
+@keyframes hud-ink {
+  0%, 27%, 100% { background-color: #436e76; translate: 0 0; }
+  13% { background-color: #102f37; translate: 0 -1.5px; }
+}
+.hud-capsule .wave[data-form="knot"] i {
+  background: var(--hud-tone);
+  opacity: 0;
+  transition: transform 230ms ease-in, opacity 100ms 130ms;
+}
+.hud-signal { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hud-capsule .wave i, .hud-signal { transition: none; }
-  .hud-writing-line { animation: none; }
+  .hud-capsule .wave[data-form] i, .hud-signal { animation: none; transition: none; }
 }

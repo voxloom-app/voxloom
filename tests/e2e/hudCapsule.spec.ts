@@ -6,6 +6,7 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     const modifier = platform === 'MacIntel' ? 'Command' : 'Control';
     await page.addInitScript(value => Object.defineProperty(navigator, 'platform', { value }), platform);
     await openOverlay(page);
+    await page.addStyleTag({ content: ':root, html, body { --font: Verdana, sans-serif !important; }' });
     const status = page.getByRole('status');
     const capsule = page.locator('.hud-capsule');
     const signal = page.locator('.hud-signal');
@@ -29,14 +30,19 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     expect((await bars.first().boundingBox())!.height).toBeCloseTo(3);
     await levels(page, [0], 0); // stale generation
     expect((await bars.last().boundingBox())!.height).toBe(18);
+    await bars.last().evaluate(node => node.setAttribute('data-live-edge', 'true'));
     await emit(page, 'overlay:waveform', { waveform: 'processing' });
     await expect(status).toHaveText('Transcribing');
-    expect(await capsule.boundingBox()).toEqual(box);
-    await levels(page, [1, 0]); // late levels don't wake the mic back up
+    await expect.poll(async () => (await capsule.boundingBox())?.width).toBe(168);
+    const ink = capsule.locator('[data-form="ink"] i');
+    await expect(ink.last()).toHaveAttribute('data-live-edge', 'true');
+    const imprint = await ink.last().getAttribute('style');
+    await levels(page, [1, 0]); // late levels neither rewrite the slip nor wake the mic
+    await expect(ink.last()).toHaveAttribute('style', imprint!);
     await expect(bars).toHaveCount(0);
-    await expect(capsule).toHaveText('Transcribing');
+    await expect(capsule.locator('.hud-caption')).toHaveText('Transcribing');
     await expect(interactive).toHaveCount(0);
-    await expect(signal.locator('svg:has(.hud-writing-line)')).toBeVisible();
+    await expect(signal.locator('[data-icon="edit"]')).toBeVisible();
     await page.setViewportSize({ width: 248, height: 40 });
     for (const [waveform, result, spoken] of [
       ['result-copied', 'copied', `Copied. Press ${modifier} V to paste`],
@@ -46,7 +52,9 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     ]) {
       await emit(page, 'overlay:waveform', { waveform, result });
       await expect(status).toHaveText(spoken);
-      await expect(page.locator('.hud-writing-line, .wave')).toHaveCount(0);
+      await expect(bars).toHaveCount(0);
+      await expect(capsule.locator('[data-form="knot"] i').last()).toHaveAttribute('data-live-edge', 'true');
+      await expect(capsule.locator('[data-form="knot"] i').last()).toHaveCSS('opacity', '0');
       await expect(interactive).toHaveCount(0);
       for (const loc of [capsule, signal, status]) await expect(loc).toHaveAttribute('data-original', 'true');
       const tag = await capsule.boundingBox();
@@ -63,6 +71,6 @@ for (const platform of ['MacIntel', 'Linux x86_64']) {
     await page.setViewportSize({ width: 190, height: 76 });
     await emit(page, 'overlay:waveform', { waveform: 'silent' });
     await expect(status).toHaveText('');
-    expect((await bars.last().boundingBox())!.height).toBeCloseTo(3);
+    await expect.poll(async () => (await bars.last().boundingBox())!.height).toBeCloseTo(3);
   });
 }

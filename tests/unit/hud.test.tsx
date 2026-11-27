@@ -30,8 +30,9 @@ describe('HUD view', () => {
     expect(visible(container)).toBe('');
     expect(screen.getByRole('status')).toHaveTextContent('');
     rerender(<OverlayWaveformView levels={levels} waveform="processing" />);
-    expect(visible(container)).toBe('Transcribing');
-    expect(container.querySelector('.hud-label')).toHaveAttribute('aria-hidden', 'true');
+    expect(visible(container)).toBe('Transcribing0:00');
+    expect(container.querySelector('.hud-caption')).toHaveAttribute('aria-hidden', 'true');
+    expect(container.querySelector('.hud-clock')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('keeps one permanent live region that announces Transcribing and results', () => {

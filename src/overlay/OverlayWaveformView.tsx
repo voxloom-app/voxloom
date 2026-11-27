@@ -2,6 +2,7 @@ import { HudSignal } from '../components/HudSignal';
 import { isMacPlatform } from '../components/KeyCombo';
 import { Waveform } from '../components/Waveform';
 import type { OverlayResult, OverlayWaveform } from '../services/shortcut/overlayVisibility';
+import { WaitClock } from './WaitClock';
 
 interface Props {
   levels: readonly number[];
@@ -40,8 +41,12 @@ export function OverlayWaveformView({ levels, waveform, result = null, mac = isM
     <div aria-atomic="true" className="sr-only" role="status">{spoken}</div>
     <div className={`hud-capsule${outcome ? ` hud-result hud-result--${kind}` : ''}`} data-waveform={waveform}>
       <HudSignal signal={listening ? 'listening' : processing ? 'processing' : tone} />
-      {listening ? <Waveform levels={levels} />
-        : <span aria-hidden="true" className="hud-label" key={waveform}>{processing ? 'Transcribing' : resultText(result, mac)}</span>}
+      <Waveform form={listening ? 'meter' : processing ? 'ink' : 'knot'} levels={levels} />
+      {processing && <>
+        <span aria-hidden="true" className="hud-caption">Transcribing</span>
+        <WaitClock />
+      </>}
+      {outcome && <span aria-hidden="true" className="hud-label" key={waveform}>{resultText(result, mac)}</span>}
     </div>
   </>;
 }

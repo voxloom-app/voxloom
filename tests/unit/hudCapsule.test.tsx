@@ -5,7 +5,7 @@ import { WAVEFORM_SAMPLES } from '../../src/components/Waveform';
 import { OverlayWaveformView } from '../../src/overlay/OverlayWaveformView';
 
 describe('HUD signal well', () => {
-  it('keeps a mic visible in silence and exchanges it for lines of text when recording stops', () => {
+  it('keeps a mic visible in silence and exchanges it for a pen when recording stops', () => {
     const { container, rerender } = render(<OverlayWaveformView levels={[]} waveform="silent" />);
     const signal = container.querySelector('.hud-signal');
     expect(signal?.querySelector('[data-icon="mic"]')).not.toBeNull();
@@ -13,9 +13,9 @@ describe('HUD signal well', () => {
     rerender(<OverlayWaveformView levels={[]} waveform="processing" />);
     expect(container.querySelector('.hud-signal')).toBe(signal);
     expect(signal?.querySelector('[data-icon="mic"]')).toBeNull();
-    expect(signal?.querySelector('.hud-writing-line')).not.toBeNull();
+    expect(signal?.querySelector('[data-icon="edit"]')).not.toBeNull();
     expect(screen.queryByRole('img')).toBeNull();
-    expect(container.querySelector('.hud-label')).toHaveTextContent('Transcribing');
+    expect(container.querySelector('.hud-caption')).toHaveTextContent('Transcribing');
   });
 
   it.each([

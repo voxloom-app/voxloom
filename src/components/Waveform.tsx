@@ -13,11 +13,28 @@ export function toDisplayLevel(level: number): number {
   return (sensitive + rms) / 2;
 }
 
-/** Levels are display-normalised by the overlay; the preview uses a fixed phrase. */
-export function Waveform({ levels }: { levels: readonly number[] }) {
-  return <span aria-label="Microphone level" className="wave" role="img">
-    {levels.map((level, i) => (
-      <i key={i} style={{ transform: `scaleY(${(3 + 15 * level) / 18})` }} />
-    ))}
+type Form = 'meter' | 'ink' | 'knot';
+
+/** Same marks throughout: live bars, two lines of ink, then a single point
+ * inside the result well. Ink lengths describe level, never recognized words. */
+export function Waveform({ levels, form = 'meter' }: { levels: readonly number[]; form?: Form }) {
+  const meter = form === 'meter';
+  let lineWidth = 0;
+  return <span aria-label={meter ? 'Microphone level' : undefined} aria-hidden={meter ? undefined : true}
+    className="wave" data-form={form} role={meter ? 'img' : undefined}>
+    {levels.map((level, i) => {
+      // Listening centers are 6px apart (4px bar + 2px gap).
+      let transform = `scaleY(${(3 + 15 * level) / 18})`;
+      if (form === 'ink') {
+        if (i === 9) lineWidth = 0;
+        const length = 3 + 5 * level;
+        const x = lineWidth + length / 2 - (6 * i + 2);
+        transform = `translate(${x}px, ${i < 9 ? 4 : 10}px) rotate(90deg) scale(.63, ${length / 18})`;
+        lineWidth += length + 2;
+      } else if (form === 'knot') {
+        transform = `translateX(${-20 - i * 6}px) scale(.45, .1)`;
+      }
+      return <i key={i} style={{ transform, animationDelay: form === 'ink' ? `${i * 65}ms` : undefined }} />;
+    })}
   </span>;
 }
