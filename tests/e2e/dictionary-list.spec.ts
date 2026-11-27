@@ -48,7 +48,7 @@ async function expectUsableRange(page: Page, testInfo: TestInfo, state: string) 
       dictionary: box(element),
       footer: box(footer),
       list: { ...box(list), clientHeight: list.clientHeight, scrollHeight: list.scrollHeight, scrollTop: list.scrollTop },
-      controls: [...element.querySelectorAll('.dictionary-stage button, .specimen-plate__word, .proof__heard, .search, .history-tools .fine')].map(box),
+      controls: [...element.querySelectorAll('.dictionary-stage button, .specimen-plate__word, .proof__heard, .search, .word-index .fine')].map(box),
       rows: [...list.children].map((row) => ({
         name: box(row.querySelector('strong')!),
         actions: box(row.querySelector('.term-row__actions')!),
@@ -250,7 +250,12 @@ test('row actions are persistent pointer targets and direct keyboard stops', asy
   const inspect = page.getByRole('button', { name: 'Inspect JSON', exact: true });
   await expect(inspect).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('region', { name: 'Saved spelling specimen' }).getByRole('heading', { name: 'JSON' })).toBeVisible();
+  const specimen = page.getByRole('region', { name: 'Saved spelling specimen' });
+  await expect(specimen.getByRole('heading', { name: 'JSON' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(specimen.getByRole('button', { name: /^Return to word index/ })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(inspect).toBeFocused();
   await page.keyboard.press('Tab');
   await expect(edit).toBeFocused();
   await page.keyboard.press('Enter');
@@ -338,7 +343,34 @@ test('auditions a spelling from the index without overwriting the sentence proof
   await expect(page.getByRole('list', { name: 'Dictionary words, alphabetical' }).getByRole('listitem')).toHaveCount(4);
 });
 
-// ui-iter-05: the stage's spelling proof runs the real deterministic match.
+for (const [width, colorScheme] of [[640, 'light'], [1120, 'dark']] as const) {
+  test(`lookup by heard form keeps both leaves in reach at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ height: 620, width });
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await openDictionary(page);
+    const index = (await page.locator('.word-index').boundingBox())!;
+    const leaf = (await page.locator('.word-leaf').boundingBox())!;
+    if (width === 640) expect(index.y + index.height).toBeLessThanOrEqual(leaf.y + 1);
+    else expect(index.x + index.width).toBeLessThanOrEqual(leaf.x + 1);
+    expect(leaf.y + leaf.height).toBeLessThanOrEqual(620);
+    const search = page.getByRole('searchbox');
+    await search.fill('tan-stack');
+    await expect(search).toBeFocused();
+    await expect(page.getByText('1 of 4 words')).toBeVisible();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'TanStack Query' })).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Test tan stack query', exact: true })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#dictionary-proof-typed mark')).toHaveText('TanStack Query');
+    await expect(search).toHaveValue('tan-stack');
+    const accessibility = await new AxeBuilder({ page }).analyze();
+    expect(accessibility.violations.filter(({ impact }) => impact === 'critical' || impact === 'serious')).toEqual([]);
+  });
+}
+
+// The spelling proof runs the real deterministic match.
 test('spelling proof restores what you type, live, and saves nothing', async ({ page }) => {
   await page.setViewportSize({ height: 760, width: 1120 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -362,10 +394,13 @@ test('spelling proof restores what you type, live, and saves nothing', async ({ 
   await expect(proof).toHaveValue('ship it with vox loom');
   await expect(typed.locator('mark')).toHaveText(['Voxloom']);
   await expect(page.getByText('5 words', { exact: true })).toBeVisible();
-  const row = page.getByRole('listitem').filter({ has: page.getByText('Voxloom', { exact: true }) });
-  await expect(row.locator('.term-row__form')).toHaveText(['voxloom']);
+  await page.getByRole('button', { name: 'Inspect Voxloom', exact: true }).click();
+  const specimen = page.getByRole('region', { name: 'Saved spelling specimen' });
+  await expect(specimen.getByRole('button', { name: 'Test voxloom' })).toBeVisible();
   // Typing in the proof never changed the saved list.
   await expect(page.getByRole('list', { name: 'Dictionary words, alphabetical' }).getByRole('listitem')).toHaveCount(5);
+  await page.getByRole('radio', { name: 'Sentence proof' }).click();
+  await expect(proof).toHaveValue('ship it with vox loom');
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations.filter(({ impact }) => impact === 'critical' || impact === 'serious')).toEqual([]);
 });

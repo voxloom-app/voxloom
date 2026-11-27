@@ -172,22 +172,24 @@ describe('Dictionary spelling stage', () => {
     expect(screen.getByText('1 restored')).toBeInTheDocument();
   });
 
-  it('hangs each spelling\'s restored forms on its row as plain, unfocusable text', () => {
+  it('keeps the index compact and puts all verified examples on the selected leaf', async () => {
+    const user = userEvent.setup();
     renderWithApp(<Dictionary />);
     const list = screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
     const rows = within(list).getAllByRole('listitem');
     const tanstack = rows.find((row) => row.querySelector('strong')?.textContent === 'TanStack Query')!;
-    expect(tanstack).toHaveTextContent('TanStack Query, restored from tan stack query, tanstack query, tan-stack query');
-    expect([...tanstack.querySelectorAll('.term-row__form')].map((form) => form.textContent?.replace(/^, /, '')))
-      .toEqual(['tan stack query', 'tanstack query', 'tan-stack query']);
-    // The spelling inspects the specimen; the variant annotations aren't tab stops.
+    expect(tanstack).not.toHaveTextContent('tan stack query');
+    await user.click(within(tanstack).getByRole('button', { name: 'Inspect TanStack Query' }));
+    const leaf = within(screen.getByRole('region', { name: 'Saved spelling specimen' }));
+    const forms = leaf.getAllByRole('button', { name: /^Test / });
+    expect(forms.map((form) => form.getAttribute('aria-label')))
+      .toEqual(['Test tan stack query', 'Test tanstack query', 'Test tan-stack query']);
     expect(within(tanstack).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
       .toEqual(['Inspect TanStack Query', 'Edit TanStack Query', 'Delete TanStack Query']);
-    expect(tanstack.querySelector('.term-row__forms [tabindex], .term-row__forms button')).toBeNull();
-    expect(screen.getByText('Restored from')).toBeInTheDocument();
+    expect(within(list).queryByRole('button', { name: /^Test / })).toBeNull();
   });
 
-  it('keeps the proof and rows at AA over the stage, its glows and the new surfaces', () => {
+  it('keeps the lookup, specimen and sentence proof at AA across both leaves', () => {
     const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
     const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
     const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
@@ -196,33 +198,22 @@ describe('Dictionary spelling stage', () => {
       return (x + 0.05) / (y + 0.05);
     };
     const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
-    const stage = readFileSync('src/styles/stage.css', 'utf8');
-    const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(stage)![1];
+    const tokens = readFileSync('src/styles/tokens.css', 'utf8');
+    const themeTokens = tokens.split('[data-appearance-resolved="light"] {');
     const css = readFileSync('src/styles/dictionary-stage.css', 'utf8');
-    // Pin the surfaces this test measures, so a restyle has to revisit it. The
-    // Dictionary stage has no dictation phase, so its glows rest at .5 and .55.
-    expect(stage).toContain('color-mix(in srgb, var(--brand-a) 18%, transparent), transparent 70%); opacity: .5; }');
-    expect(stage).toContain('color-mix(in srgb, var(--brand-b) 16%, transparent), transparent 70%); opacity: .55; }');
-    expect(css).not.toContain('data-phase');
-    expect(css).toContain('background: rgba(255, 255, 255, .04);');
-    expect(css).toContain('.proof__heard:focus { background: rgba(255, 255, 255, .06);');
+    const indexCss = readFileSync('src/styles/dictionary.css', 'utf8');
+    expect(indexCss).toContain('var(--linen, var(--panel)) 55%, var(--bg)');
+    expect(indexCss).toContain('var(--accfg) 8%, var(--bg)');
+    expect(css).toContain('background: var(--field);');
     expect(css).toContain('background: color-mix(in srgb, var(--brand-a) 9%, transparent);');
-    expect(css).toContain('background: rgba(255, 255, 255, .025);');
-    const top = '#17171f';
-    const lime = '#b6ff3c';
-    for (const base of [top, mix(lime, top, 0.18 * 0.5), mix('#3cf0ff', top, 0.16 * 0.55)]) {
-      const surfaces = {
-        deck: mix('#ffffff', base, 0.025),
-        heard: mix('#ffffff', base, 0.04),
-        focused: mix('#ffffff', base, 0.06),
-        knot: mix(lime, base, 0.09),
-      };
-      for (const [name, surface] of Object.entries(surfaces)) {
-        expect(ratio(token('mut'), surface), `labels, tags and placeholder on ${name} ${surface}`).toBeGreaterThanOrEqual(4.5);
-        expect(ratio(token('fg'), surface), `heard text on ${name} ${surface}`).toBeGreaterThanOrEqual(4.5);
-        expect(ratio('#f6f6f9', surface), `typed line on ${name} ${surface}`).toBeGreaterThanOrEqual(4.5);
-        expect(ratio(lime, surface), `restored knot and count on ${name} ${surface}`).toBeGreaterThanOrEqual(4.5);
+    for (const [i, paper, indexTint] of [[0, '#121219', '#1a1a23'], [1, '#ffffff', '#f4f1ea']] as const) {
+      const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(themeTokens[i])![1];
+      for (const surface of [paper, mix(indexTint, paper, .55), mix(token('accfg'), paper, .08), token('field')]) {
+        for (const ink of ['mut', 'fg', 'accfg']) {
+          expect(ratio(token(ink), surface), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        }
       }
+      expect(ratio(token('accfg'), mix('#b6ff3c', paper, i ? .42 : .09))).toBeGreaterThanOrEqual(4.5);
     }
   });
 

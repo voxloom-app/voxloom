@@ -37,9 +37,8 @@ describe('Dictionary compact list', () => {
     renderWithApp(<Dictionary />);
     const list = screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(initialWords.length);
-    expect(screen.getByText('Canonical spelling')).toBeInTheDocument();
-    expect(screen.getByText('A–Z')).toBeInTheDocument();
-    expect(screen.getByText('Alphabetical order')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Word index' })).toBeInTheDocument();
+    expect(screen.getByText('A–Z')).toHaveAttribute('title', 'Alphabetical order');
     expect(screen.getByText('JSON — TypeScript')).toBeInTheDocument();
     expect(within(list).getAllByRole('listitem')[0]).not.toHaveAttribute('tabindex');
     await user.type(screen.getByRole('searchbox'), 'post');

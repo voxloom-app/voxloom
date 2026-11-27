@@ -1,4 +1,8 @@
+import type { Ref } from 'react';
+
 interface Props {
+  headingRef: Ref<HTMLHeadingElement>;
+  onReturn: () => void;
   forms: readonly string[];
   index: number;
   total: number;
@@ -8,7 +12,7 @@ interface Props {
 
 /** A proof plate for a single saved spelling. Ink the capitals separately so
  * the details that don't come through in speech are easy to spot. */
-export function WordSpecimen({ forms, index, total, word, onTest }: Props) {
+export function WordSpecimen({ forms, headingRef, index, total, word, onReturn, onTest }: Props) {
   const number = (value: number) => String(value).padStart(2, '0');
   // Valid entries are unbounded. Don't make thousands of spans for a long one.
   const type = word.length > 80 ? word : word.split(/(\p{Lu}+)/u).map((run, i) =>
@@ -18,10 +22,12 @@ export function WordSpecimen({ forms, index, total, word, onTest }: Props) {
       <div className="specimen-plate">
         <div className="specimen-plate__legend">
           <span>Saved spelling</span>
-          <span><span className="sr-only">Entry </span>{number(index)} / {number(total)}</span>
+          <button aria-label={`Return to word index, entry ${index} of ${total}`} onClick={onReturn} type="button">
+            <span aria-hidden="true">↩ </span>Index · {number(index)} / {number(total)}
+          </button>
         </div>
         <div className="specimen-plate__measure" data-length={word.length > 20 ? 'long' : word.length > 11 ? 'medium' : 'short'}>
-          <h2 aria-label={word} className="specimen-plate__word" dir="auto" tabIndex={0}>{type}</h2>
+          <h2 aria-label={word} className="specimen-plate__word" dir="auto" ref={headingRef} tabIndex={0}>{type}</h2>
         </div>
         <div aria-hidden="true" className="specimen-plate__rule" />
       </div>

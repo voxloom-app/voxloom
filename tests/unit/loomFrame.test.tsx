@@ -44,13 +44,14 @@ describe('The loom frame (ui-iter-08): each page is a beam on the frame and a sh
     expect(history.querySelector('.stage .history-timeline')).toBeNull();
   });
 
-  it('Dictionary: the proof is the beam; the word list lies on the cloth and the dialog stays outside it', async () => {
+  it('Dictionary: index and specimen share the cloth; the dialog stays outside it', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
     const dictionary = document.querySelector('.dictionary')!;
     expect(layers(dictionary)).toEqual(['stage', 'cloth']);
     const cloth = dictionary.querySelector(':scope > .cloth') as HTMLElement;
     expect(within(cloth).getByRole('list', { name: 'Dictionary words, alphabetical' })).toBeInTheDocument();
+    expect(within(cloth).getByRole('region', { name: 'Saved spelling specimen' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add term' }));
     expect(cloth.querySelector('[role="dialog"]')).toBeNull();
     expect(screen.getByRole('dialog')).toBeInTheDocument();

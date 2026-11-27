@@ -8,6 +8,21 @@ const specimen = () => within(screen.getByRole('region', { name: 'Saved spelling
 const inspect = (word: string) => screen.getByRole('button', { name: `Inspect ${word}` });
 
 describe('Dictionary specimen', () => {
+  it('looks up a verified heard form without repeating the variants in every index row', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<Dictionary />);
+    const search = screen.getByRole('searchbox', { name: 'Search dictionary' });
+    await user.type(search, 'TYPE SCR');
+    const list = screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(list).getByRole('button', { name: 'Inspect TypeScript' })).toBeInTheDocument();
+    expect(list).not.toHaveTextContent(/type script/i);
+    expect(specimen().getByRole('button', { name: 'Test type script' })).toBeInTheDocument();
+    expect(search).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(4);
+  });
+
   it('opens on the newest spelling and inspects any row without editing the word', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
@@ -15,7 +30,9 @@ describe('Dictionary specimen', () => {
     expect(inspect('TypeScript')).toHaveAttribute('aria-pressed', 'true');
     await user.click(inspect('JSON'));
     expect(specimen().getByRole('heading', { name: 'JSON' })).toBeInTheDocument();
-    expect(specimen().getAllByRole('button')).toHaveLength(1);
+    expect(specimen().getAllByRole('button', { name: /^Test / })).toHaveLength(1);
+    expect(specimen().getByRole('heading', { name: 'JSON' })).toHaveFocus();
+    await user.click(specimen().getByRole('button', { name: /^Return to word index/ }));
     expect(inspect('JSON')).toHaveFocus();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
@@ -56,7 +73,7 @@ describe('Dictionary specimen', () => {
     await user.type(screen.getByRole('textbox', { name: 'Word' }), 'async');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(specimen().getByRole('heading', { name: 'async' })).toBeInTheDocument();
-    expect(specimen().queryAllByRole('button')).toHaveLength(0);
+    expect(specimen().queryAllByRole('button', { name: /^Test / })).toHaveLength(0);
     expect(specimen().getByText('No example variants.')).toBeInTheDocument();
   });
 });

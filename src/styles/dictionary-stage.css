@@ -1,8 +1,5 @@
-/* Dictionary (ui-iter-05): a spelling loom. The masthead is the Home voice stage's dark
-   material (.stage in stage.css supplies its tokens). Its proof runs a sentence through
-   the real spelling match: what was heard on an editable tape (lime knot), what Voxloom
-   types beneath it (cyan knot), one thread between, and every restored stretch knotted
-   with what was heard hanging under it. The list rows hang their forms in dictionary.css. */
+/* The Dictionary masthead and the sentence proof on its reading leaf. The two
+   knots join the editable Heard line to the spellings the matcher produces. */
 .dictionary-stage { flex-shrink: 0; margin-bottom: var(--s-9); padding: var(--s-10) var(--stage-pad) 0; }
 .dictionary-stage__top { align-items: flex-start; display: flex; gap: var(--s-8) var(--s-11); justify-content: space-between; }
 .dictionary-stage__title { min-width: 0; }
@@ -61,8 +58,8 @@
 }
 
 .proof__heard {
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .13);
+  background: var(--field);
+  border: 1px solid var(--ctl-line);
   border-radius: 10px;
   color: var(--fg);
   font-family: var(--mono);
@@ -74,12 +71,11 @@
   width: 100%;
 }
 .proof__heard::placeholder { color: var(--mut); opacity: 1; }
-.proof__heard:hover { border-color: rgba(255, 255, 255, .22); }
-.proof__heard:focus { background: rgba(255, 255, 255, .06); border-color: color-mix(in srgb, var(--brand-a) 45%, transparent); }
+.proof__heard:hover, .proof__heard:focus { border-color: var(--accfg); }
 
 /* What Voxloom writes is set in the words face; what it heard stays in mono (ui-iter-09). */
 .proof__typed {
-  color: #f6f6f9;
+  color: var(--fg);
   font-family: var(--font-words);
   font-size: calc(var(--typed-fs) * 1.08);
   font-weight: 400;
@@ -117,19 +113,18 @@
   from { box-shadow: inset 0 -2px 0 transparent, 0 0 0 5px color-mix(in srgb, var(--brand-a) 30%, transparent); }
 }
 
-/* The stage's base deck: what this sentence restored, and where the same match runs. */
+/* The colophon stays with the proof, including in short windows. */
 .proof__note {
   align-items: baseline;
-  background: rgba(255, 255, 255, .025);
-  border-top: 1px solid rgba(255, 255, 255, .08);
+  border-top: 1px solid var(--line);
   color: var(--mut);
   display: flex;
   flex-wrap: wrap;
   font-size: var(--fs-secondary);
   gap: 2px var(--s-6);
   grid-column: 1 / -1;
-  margin: var(--s-4) calc(var(--stage-pad) * -1) 0;
-  padding: var(--s-6) var(--stage-pad);
+  margin: var(--s-4) 0 0;
+  padding-block: var(--s-6);
 }
 .proof__count { color: var(--accfg); font-weight: 700; }
 .proof[data-restored="0"] .proof__count { color: var(--fg); }
@@ -139,12 +134,11 @@
   .dictionary-stage__lede { display: none; }
 }
 
-/* Short windows keep the list usable: the proof stays, the lede and deck copy step back. */
+/* The index and the proof share the available height in short windows. */
 @media (max-height: 700px) {
   .dictionary-stage { padding-top: var(--s-8); }
   .dictionary-stage__lede { display: none; }
   .proof { margin-top: var(--s-8); }
-  .proof__note > span { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
