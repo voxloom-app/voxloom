@@ -43,10 +43,11 @@ describe('Light Frost + mint palette and V3 Layered Home actions', () => {
     expect(css('ui-controls.css')).toMatch(/\.seg__item\.on \{[^}]*color: var\(--seg-on-fg, var\(--fg\)\);/);
   });
 
-  it('dictates from the stage\'s weft, not a Home deck or the rail (ui-iter-21)', () => {
+  it('dictates from the rail\'s foot, not a Home deck or a stage capsule (ui-iter-33)', () => {
     expect(readFileSync(join(root, 'features/home/Home.tsx'), 'utf8')).not.toContain('home-card--dictate');
-    expect(readFileSync(join(root, 'features/home/LoomBar.tsx'), 'utf8')).toContain('className="dictate__button"');
-    expect(readFileSync(join(root, 'app/shell/Sidebar.tsx'), 'utf8')).not.toMatch(/dictate__button|DictateCapsule|LoomBar/);
+    // ui-iter-33: no capsule anywhere; the rail's foot holds one quiet Start.
+    expect(readFileSync(join(root, 'features/home/HomeHero.tsx'), 'utf8')).not.toMatch(/dictate__button|DictateCapsule|LoomBar|Start dictating/);
+    expect(readFileSync(join(root, 'app/shell/RailRun.tsx'), 'utf8')).toContain('className="rail-start__button"');
     expect(css('stage.css')).not.toContain('.home-card--dictate');
   });
 

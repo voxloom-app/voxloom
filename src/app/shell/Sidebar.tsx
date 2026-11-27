@@ -5,7 +5,7 @@ import { isMacPlatform, KeyCombo } from '../../components/KeyCombo';
 import { Knot } from '../../components/Knot';
 import { ScenarioPanel } from '../../dev/ScenarioPanel';
 import type { Screen } from '../../domain/types';
-import { type CaptureProps, runHasNews } from '../../features/home/captureRun';
+import { type CaptureProps, runState } from '../../features/home/captureRun';
 import type { StagePhase } from '../../features/home/stagePhase';
 import { navScreens } from './screens';
 import { RailRun } from './RailRun';
@@ -21,7 +21,7 @@ type Props = {
   phase?: StagePhase;
   onNavigate: (screen: Screen) => void;
   onReset: () => void;
-  /** The shared run, so a dictation can be finished from pages without the Start capsule. */
+  /** The shared run: the rail's foot starts, stops and cancels it from any page (ui-iter-33). */
   capture?: CaptureProps;
   /** Recall, under the brand (ui-iter-27: the window has no toolbar). */
   search?: ReactNode;
@@ -33,15 +33,16 @@ type Props = {
  * The warp rail (ui-iter-03): the window's frame, in the Home stage's dark material in
  * both themes. It stays put while pages scroll. Since ui-iter-21 it is quiet: the brand
  * and its live status, the pages, and Today on its beam, with a tick on the rod for each
- * dictation by time of day. Start dictating lives on Home's stage beside Copy. Away from
- * Home the rail's foot says which keys to hold or, during a run, offers Stop and Cancel
- * and then what the run did. Since ui-iter-27 it is the window's only chrome: Recall sits
- * under the brand and Settings… closes the rail, so no toolbar crosses the pages.
+ * dictation by time of day. Since ui-iter-27 it is the window's only chrome: Recall sits
+ * under the brand and Settings… closes the rail, so no toolbar crosses the pages. Since
+ * ui-iter-33 its foot holds the run on every page: a quiet Start dictating at rest, Stop and
+ * Cancel while it listens, then what it did. Away from Home, with nothing to report, it also
+ * says which keys to hold; Home's stage shows them already.
  */
 export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset, search, tools }: Props) {
   const active = useShortcutActive();
   const away = screen !== 'home';
-  const news = away && capture !== undefined && runHasNews(capture.dogfood);
+  const quiet = !capture || (runState(capture.dogfood) === 'idle' && !capture.dogfood.message);
   return (
     <aside className="sidebar" data-phase={phase}>
       <div className="brand">
@@ -77,8 +78,13 @@ export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onN
             <span className="run-tag__words">{NO_SHORTCUT}</span>
           </p>
         )}
-        {news && <RailRun dogfood={capture.dogfood} onCopy={capture.onCopy} />}
-        {active && away && !news && <p className="rail-key">Hold <KeyCombo combo={shortcut} /> in any app to dictate</p>}
+        {active && away && quiet && (
+          <p className="rail-key">
+            <span className="rail-key__hold">Hold <KeyCombo combo={shortcut} /></span>
+            {' '}<span>in any app to dictate</span>
+          </p>
+        )}
+        {capture && <RailRun {...capture} />}
       </div>
       {import.meta.env.DEV && (
         <details className="dev-panel">

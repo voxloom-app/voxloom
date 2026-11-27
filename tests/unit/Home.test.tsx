@@ -59,28 +59,30 @@ describe('Home', () => {
     expect(toast).toHaveBeenCalledWith('Copy failed');
   });
 
-  it('puts Start dictating back on the stage, beside the last pick\'s Copy (ui-iter-21)', async () => {
+  it('leaves starting to your keys: the stage lays them on its loom, with a quiet Copy and no Start (ui-iter-33)', async () => {
     const user = userEvent.setup();
-    const dogfood = stubDogfood();
+    const toast = vi.fn();
     vi.mocked(isTauriEnv).mockReturnValue(true);
     onTestFinished(() => { vi.mocked(isTauriEnv).mockReturnValue(false); });
-    renderWithApp(<Home dogfood={dogfood} onToast={vi.fn()} />);
+    renderWithApp(<Home dogfood={stubDogfood()} onToast={toast} />);
     expect(screen.queryByRole('heading', { name: 'Dictate' })).not.toBeInTheDocument();
-    const weft = document.querySelector('.home-hero .loom-bar') as HTMLElement;
-    const start = within(weft).getByRole('button', { name: 'Start dictating' });
-    expect(within(weft).getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
-    expect(start.compareDocumentPosition(within(weft).getByRole('button', { name: 'Copy last dictation' })))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    await user.click(start);
-    expect(dogfood.start).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    const loom = document.querySelector('.home-hero .loom-bar') as HTMLElement;
+    expect(within(loom).getByRole('heading', { level: 1 })).toHaveTextContent(/^Hold .* to dictate$/);
+    // Copy is the last word on the pick's line, by mouse or keyboard.
+    const copy = within(document.querySelector('.pick__meta') as HTMLElement).getByRole('button', { name: 'Copy last dictation' });
+    expect(copy).toHaveTextContent('Copy');
+    copy.focus();
+    await user.keyboard('{Enter}');
+    expect(toast).toHaveBeenCalledWith('Copied to clipboard');
   });
 
-  it('swaps Start for Stop and Cancel on the stage while you speak', () => {
+  it('keeps Stop and Cancel off the stage while you speak; the rail\'s foot holds them', () => {
     renderWithApp(<Home dogfood={stubDogfood({ phase: 'recording' })} onToast={vi.fn()} />);
-    const weft = document.querySelector('.home-hero .loom-bar') as HTMLElement;
-    expect(within(weft).queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
-    expect(within(weft).getByRole('button', { name: 'Stop' })).toBeInTheDocument();
-    expect(within(weft).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    const stage = document.querySelector('.stage') as HTMLElement;
+    expect(stage).toHaveAttribute('data-phase', 'listening');
+    expect(within(stage).queryByRole('button', { name: /Start dictating|Stop|Cancel/ })).not.toBeInTheDocument();
+    expect(within(stage).getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
   });
 
   it('offers the run\'s transcript for manual recovery when History did not keep it', async () => {

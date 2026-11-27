@@ -1,0 +1,116 @@
+/* The rail's foot (ui-iter-33): dictating from the window, on every page. The shortcut is
+   the way in from any app, so Home's stage no longer carries a Start capsule; the foot keeps
+   a quiet Start for pointer, switch-control and new users, swaps it for Stop and Cancel
+   while Voxloom listens, says when it writes, and wears the last run's tag (run-tag.css).
+   Off Home, at rest, it also names the keys to hold. Tokens carry both themes. */
+.rail-foot { display: grid; gap: var(--s-5); }
+.rail-foot:empty { display: none; }
+.rail-foot .run-tag::before { display: none; } /* the foot is not under a capsule: no string to hang from */
+
+/* With nothing to say off Home: the keys to hold, then where, on two short lines. */
+.rail-key {
+  color: var(--mut);
+  display: grid;
+  font-size: var(--fs-label);
+  gap: var(--s-2);
+  justify-items: center;
+  line-height: 1.35;
+  margin: 0;
+  text-align: center;
+}
+.rail-key__hold { align-items: center; display: flex; flex-wrap: wrap; gap: var(--s-3) 7px; justify-content: center; }
+.rail-key .key-combo__caps { flex-wrap: wrap; gap: 4px; justify-content: center; }
+/* Real caps with room inside: the glyph sits in the middle of the face, and the 2px edge
+   below is paid for in the margin, so the cap's middle lines up with "Hold" beside it. */
+.rail-key .kbd {
+  align-items: center;
+  background: linear-gradient(180deg, #2c2c38, #1b1b24);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-kbd);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 2px 0 #050508;
+  color: #f6f6f9;
+  display: inline-flex;
+  font-size: var(--fs-micro);
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  margin-bottom: 2px;
+  min-width: 22px;
+  padding: 0 7px;
+  transition: transform .12s ease, box-shadow .12s ease, color .12s ease;
+  white-space: nowrap;
+}
+/* Held while you speak: the caps sink and take the voice's lime. */
+.sidebar:is([data-phase="listening"], [data-phase="speaking"]) .rail-key .kbd {
+  border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
+  box-shadow: 0 0 10px -2px color-mix(in srgb, var(--brand-a) 60%, transparent);
+  color: var(--accfg);
+  transform: translateY(2px);
+}
+
+/* Start from the window: a quiet outline, never louder than the page it sits beside. */
+.rail-start { display: grid; gap: var(--s-3); justify-items: center; position: relative; }
+.rail-start__button {
+  align-items: center;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--mut);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--fs-label);
+  font-weight: 600;
+  gap: 7px;
+  min-height: 32px;
+  padding: 4px 14px 4px 11px;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.rail-start__button .icon { color: var(--accfg); }
+.rail-start__button:is(:hover, :focus-visible):not(:disabled) {
+  background: rgba(255, 255, 255, .05);
+  border-color: color-mix(in srgb, var(--brand-a) 55%, var(--line));
+  color: var(--fg);
+}
+.rail-start__button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+/* Only the desktop app can listen: the outline breaks and the mic goes grey; the words stay readable. */
+.rail-start__button:disabled { border-style: dashed; color: var(--mut); cursor: not-allowed; opacity: 1; }
+.rail-start__button:disabled .icon { color: var(--mut); }
+.rail-start__note { color: var(--mut); font-size: var(--fs-micro); line-height: 1.4; margin: 0; text-align: center; text-wrap: balance; }
+
+/* Why the words may be copied rather than inserted, said over the foot on hover and focus. */
+.rail-start__tip {
+  background: #0b0b10;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-tile);
+  bottom: calc(100% + var(--s-4));
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .8);
+  color: #c9c9d4;
+  font-size: var(--fs-label);
+  inset-inline: 0;
+  line-height: 1.4;
+  margin: 0;
+  opacity: 0;
+  padding: var(--s-4) var(--s-5);
+  pointer-events: none;
+  position: absolute;
+  text-align: left;
+  transition: opacity .15s ease;
+  visibility: hidden;
+  z-index: 3;
+}
+.rail-start:has(.rail-start__button:is(:hover, :focus-visible)) .rail-start__tip { opacity: 1; visibility: visible; }
+[data-appearance-resolved="light"] .rail-start__tip { box-shadow: 0 10px 24px -10px rgba(70, 56, 30, .6); }
+
+/* Finishing a run: Stop and Cancel side by side, or what Voxloom is doing now. */
+.rail-run { align-items: center; display: flex; gap: var(--s-3); justify-content: center; }
+.rail-run__stop { gap: 7px; min-height: 32px; padding: 4px 14px; }
+.rail-run__stop .rec-dot { height: 8px; width: 8px; }
+.rail-run__cancel { min-height: 32px; padding: 4px 10px; }
+.rail-run__busy { color: var(--mut); font-size: var(--fs-label); margin: 0; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* The caps don't sink and nothing fades: they only brighten. */
+  .sidebar[data-phase] .rail-key .kbd { transform: none; }
+  .rail-start__button,
+  .rail-start__tip { transition: none; }
+}

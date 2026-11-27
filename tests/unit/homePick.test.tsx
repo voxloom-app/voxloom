@@ -43,21 +43,22 @@ describe('The last pick (ui-iter-09): your words take the stage', () => {
     expect(within(pick()).getByRole('blockquote')).toHaveTextContent(NEWEST);
     expect(pick().querySelector('.badge')).toHaveAttribute('data-status', 'inserted');
     expect(pick()).toHaveAttribute('data-status', 'inserted');
-    expect(pick().querySelector('.pick__meta')).toHaveTextContent(/· 9 words · 7s$/);
+    expect(pick().querySelector('.pick__meta time')!.parentElement).toHaveTextContent(/· 9 words · 7s$/);
     expect(pick().querySelector('time')).toHaveAttribute('dateTime', new Date(NOW - 3 * 60_000).toISOString());
     // The heading still opens the page; the pick follows it, and the lede steps aside.
     const headings = screen.getAllByRole('heading').map((h) => h.textContent);
     expect(headings.slice(0, 2)).toEqual([expect.stringMatching(/^Hold .* to dictate$/), 'Last dictation']);
     expect(document.querySelector('.home-hero__lede')).toBeNull();
     expect(document.querySelector('.home-hero')).toHaveAttribute('data-words');
-    // ui-iter-21: the weft runs under the words, from Start (in) through the knot to Copy (out);
-    // the knot is decoration only and takes the pick's status.
-    const weft = document.querySelector('.home-hero .loom-bar')!;
-    expect(weft).toHaveAttribute('data-status', 'inserted');
-    expect(weft.querySelector('.pick__weft')).toHaveAttribute('aria-hidden', 'true');
-    expect(pick().compareDocumentPosition(weft)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(within(weft as HTMLElement).getByRole('button', { name: 'Start dictating' })).toBeInTheDocument();
-    expect(within(weft as HTMLElement).getByRole('button', { name: 'Copy last dictation' })).toBeInTheDocument();
+    // ui-iter-33: the loom gathers into the keys above the words, and Copy is the last word of
+    // the pick's own line; the badge alone says what happened, and the stage has no Start.
+    const loom = document.querySelector('.home-hero .loom-bar')!;
+    expect(loom.compareDocumentPosition(pick())).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(loom).not.toHaveAttribute('data-status');
+    expect(document.querySelector('.pick__weft')).toBeNull();
+    const meta = pick().querySelector('.pick__meta')!;
+    expect(meta.lastElementChild).toBe(within(pick()).getByRole('button', { name: 'Copy last dictation' }));
+    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
   });
 
   it('does not repeat the last pick on the cloth', () => {
@@ -88,10 +89,8 @@ describe('The last pick (ui-iter-09): your words take the stage', () => {
   it('weaves in only a dictation that lands while Home is open', () => {
     const { dispatch, unmount } = renderHome();
     expect(document.querySelector('.pick__words')).not.toHaveAttribute('data-fresh');
-    expect(document.querySelector('.pick__weft')).not.toHaveAttribute('data-fresh');
     dispatch({ record: record({}), type: 'append-record' });
     expect(document.querySelector('.pick__words')).toHaveAttribute('data-fresh');
-    expect(document.querySelector('.pick__weft')).toHaveAttribute('data-fresh');
     unmount();
     // Coming back to Home shows the same words at rest, without replaying the weave.
     renderHome();
@@ -138,10 +137,21 @@ describe('last pick and words-face styles', () => {
     expect(css('index.css')).toMatch(/@import "\.\/stage\.css";\n@import "\.\/home-pick\.css";/);
   });
 
-  it('drops the weave, the travelling light and the mask under reduced motion', () => {
+  it('drops the weave, the mask and Copy\'s fade under reduced motion', () => {
     expect(reduced).toContain('.stage .pick__words[data-fresh] p { animation: none; -webkit-mask: none; mask: none; }');
-    expect(reduced).toMatch(/\.pick__weft\[data-fresh\]::before,\s*\.pick__weft\[data-fresh\] i \{ animation: none; \}/);
-    expect(reduced).toContain('.stage[data-phase] .pick__weft::after { animation: none; opacity: 0; }');
+    expect(reduced).toContain('.stage .pick__copy { transition: none; }');
+    expect(pickCss).not.toContain('pick__weft');
+  });
+
+  it('sets Copy as a quiet word that lights when pointed at or focused (ui-iter-33)', () => {
+    const copy = /\.stage \.pick__copy \{([^}]*)\}/.exec(pickCss)![1];
+    expect(copy).toContain('background: none;');
+    expect(copy).toContain('border: 0;');
+    expect(copy).toContain('color: var(--mut);');
+    expect(copy).toContain('min-height: 28px;');
+    expect(pickCss).toMatch(/\.stage \.pick__copy:is\(:hover, :focus-visible\) \{[^}]*color: var\(--fg\);/);
+    // No rule removes the shared focus ring.
+    expect(pickCss).not.toMatch(/pick__copy[^{]*\{[^}]*outline: (0|none)/);
   });
 
   it('sets your words in a local system serif, with no bundled font files', () => {

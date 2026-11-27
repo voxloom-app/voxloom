@@ -26,8 +26,3 @@ export function runTone(dogfood: UseDogfoodCaptureResult): ToastTone {
 export function hasDiagnostic(dogfood: UseDogfoodCaptureResult): boolean {
   return dogfood.phase === 'error' && Boolean(dogfood.message?.startsWith('Escape cancellation unavailable [cancel-'));
 }
-
-/** True when the run has something to show: controls while it runs, or what it did. */
-export function runHasNews(dogfood: UseDogfoodCaptureResult): boolean {
-  return runState(dogfood) !== 'idle' || Boolean(dogfood.message);
-}

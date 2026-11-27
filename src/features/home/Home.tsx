@@ -11,7 +11,7 @@ import { HomeHero } from './HomeHero';
 import { stagePhase } from './stagePhase';
 
 interface HomeProps {
-  /** Shared App-level dogfood capture (also driven by global gesture). */
+  /** Shared App-level dogfood capture (also driven by global gesture): it lights the stage. */
   dogfood: UseDogfoodCaptureResult;
   /** Test seam: cleanup model status for the hero caption. */
   cleanupModelStore?: CleanupModelStore;
@@ -42,14 +42,11 @@ export function Home({ cleanupModelStore, dogfood, onToast }: HomeProps) {
 
   return (
     <div className="home">
-      {/* The voice stage: one dark instrument in both themes, alive while you dictate.
-          Dictating from the window starts on its weft, beside Copy (ui-iter-21). The mic
-          readout is gone (ui-iter-25): the Start capsule and the rail already say it. */}
+      {/* The voice stage: one dark instrument in both themes, alive while you dictate with
+          the shortcut from any app. Its loom gathers into your keys (ui-iter-33); starting,
+          stopping and cancelling from the window live at the rail's foot (RailRun). */}
       <div className="stage" data-phase={phase}>
-        <HomeHero
-          capture={{ dogfood, isNative, onCopy: (t) => { void copy(t); } }}
-          pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }}
-        />
+        <HomeHero pick={last && { fresh: last.id !== openedOn, onCopy: (t) => { void copy(t); }, record: last }} />
         {recovery && (
           <section aria-labelledby="recovery-title" aria-live="polite" className="dogfood-transcript stage__recovery">
             <div>

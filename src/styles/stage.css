@@ -1,7 +1,7 @@
 /* Home voice stage (ui-iter-01): the hero and the last dictation make one dark instrument,
    the same material as the app tile and the HUD, in both themes. VoiceLoom threads gather
-   into Start (voice in, left) and fan out of Copy (text out, right) on the stage's weft
-   (ui-iter-25, loom-bar.css); data-phase drives them, and at rest they hold still. */
+   into your shortcut's keys (voice in, left) and leave them (text out, right) on the stage's
+   loom (ui-iter-33, loom-bar.css); data-phase drives them, and at rest they hold still. */
 .stage {
   /* Dark instrument tokens. The legacy aliases resolve where they are declared, so they are
      re-declared here too; otherwise children would inherit the light theme's values. */
@@ -73,13 +73,13 @@
 .stage[data-phase="processing"]::after { opacity: 1; }
 .stage[data-phase="processing"]::before { opacity: .3; }
 
-/* Title band. No mic readout above it since ui-iter-25: Start and the rail say the state. */
+/* Title band. No mic readout above it since ui-iter-25: the keys and the rail say the state. */
 .stage .home-hero__title { padding: 30px 0 26px; }
 .stage .home-hero__lede { margin-top: 0; }
 .stage .home-hero h1 { color: #f6f6f9; }
 .banner + .home { margin-top: var(--s-6); }
 
-/* The loom's threads (placed on the weft in loom-bar.css). At rest they hold still; a light
+/* The loom's threads (placed around the keys in loom-bar.css). At rest they hold still; a light
    travels them only while you speak (in) or Voxloom writes (out). */
 .loom path { fill: none; stroke-linecap: round; transition: opacity .4s ease; vector-effect: non-scaling-stroke; }
 .loom__warp { opacity: .26; stroke-width: 1.25; }
@@ -129,10 +129,10 @@
   transform: translateY(3px);
 }
 
-/* The stage ends on the weft and its tag; the earlier dictations hang beneath (ui-iter-29). */
+/* The stage ends on your last words; the earlier dictations hang beneath (ui-iter-29). */
 .home > .stage { padding-bottom: var(--s-4); }
 /* Manual recovery: the run's own transcript, only when History didn't keep it. Dictating
-   from the window starts on the stage's weft (ui-iter-21, loom-bar.css). */
+   from the window starts at the rail's foot on every page (ui-iter-33, rail-foot.css). */
 .stage .stage__recovery {
   align-items: center;
   background: rgba(255, 255, 255, .035);

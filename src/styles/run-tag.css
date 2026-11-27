@@ -1,7 +1,7 @@
 /* What a run did, on one tag tied off with the HUD's knots (ui-iter-17): solid for done,
-   half for a caveat, frayed for failed or cancelled. Since ui-iter-21 it hangs under the
-   Start capsule on Home's stage (loom-bar.css) and from the rail's foot on other pages,
-   where it also carries the missing-shortcut warning. Tokens carry both themes. */
+   half for a caveat, frayed for failed or cancelled. Since ui-iter-33 it sits at the rail's
+   foot on every page, Home included (rail-foot.css), where it also carries the missing-
+   shortcut warning. Tokens carry both themes. */
 .run-tag {
   --tone: var(--ok);
   align-items: flex-start;
