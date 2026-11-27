@@ -92,7 +92,7 @@ describe('the setup stage and loom line', () => {
     const line = document.querySelector('.guided-hero > .loom-line')!;
     expect(line).toHaveAttribute('aria-hidden', 'true');
     expect([...line.querySelectorAll('.kbd')].map((cap) => cap.textContent)).toEqual(comboKeys(SHORTCUT));
-    expect(line.querySelector('.shuttle-glyph')).not.toBeNull();
+    expect(line.querySelector('.hud-preview')).not.toBeNull();
     expect(line.querySelector('button, a, input, textarea, [tabindex]')).toBeNull();
     // The heading keeps its focus target and name; the line adds nothing to read.
     expect(screen.getByRole('heading', { level: 2 })).toHaveAttribute('id', 'guided-heading');
@@ -112,7 +112,7 @@ describe('the setup stage and loom line', () => {
     const line = document.querySelector('.guided-hero > .loom-line')!;
     expect(line).toHaveAttribute('aria-hidden', 'true');
     expect(line.querySelector('.kbd')).toBeNull();
-    expect(line.querySelector('.shuttle-glyph')).not.toBeNull();
+    expect(line.querySelector('.hud-preview')).not.toBeNull();
     const rail = within(screen.getByRole('complementary', { name: 'Setup progress' }));
     expect(rail.getAllByRole('listitem').map((item) => item.dataset.state)).toEqual(['done', 'done', 'done']);
   });

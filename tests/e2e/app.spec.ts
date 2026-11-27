@@ -213,7 +213,7 @@ test('dialogs, reduced motion, narrow and coarse layouts work', async (
   const overlayPage = await page.context().newPage();
   await overlayPage.emulateMedia({ reducedMotion: 'reduce' });
   await overlayPage.goto('/overlay.html');
-  for (const selector of ['.wave .wave__strand', '.hud-shuttle__rim']) {
+  for (const selector of ['.wave i', '.hud-signal']) {
     const transitionDuration = await overlayPage.locator(selector).first()
       .evaluate((element) => getComputedStyle(element).transitionDuration);
     expect(Number.parseFloat(transitionDuration), selector).toBeLessThanOrEqual(0.00001);

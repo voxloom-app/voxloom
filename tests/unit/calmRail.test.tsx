@@ -118,10 +118,10 @@ describe('the calm rail (ui-iter-21)', () => {
 describe('the stage capsule styles (ui-iter-21)', () => {
   const barCss = css('loom-bar.css');
 
-  it('loads the weft after the pick and the run tag after the HUD shuttle', () => {
+  it('loads the weft after the pick and the run tag after the HUD meter', () => {
     const index = css('index.css');
     expect(index).toMatch(/@import "\.\/home-pick\.css";\n@import "\.\/loom-bar\.css";/);
-    expect(index).toMatch(/@import "\.\/hud-shuttle\.css";\n@import "\.\/run-tag\.css";/);
+    expect(index).toMatch(/@import "\.\/hud-meter\.css";\n@import "\.\/run-tag\.css";/);
     expect(index).not.toMatch(/rail-cloth|rail-tag/);
   });
 

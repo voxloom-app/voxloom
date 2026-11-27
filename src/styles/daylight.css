@@ -17,7 +17,7 @@
     repeating-linear-gradient(90deg, var(--weave) 0 1px, transparent 1px 3px),
     linear-gradient(180deg, var(--linen), var(--linen-low) 100vh) var(--linen-low);
 }
-[data-appearance-resolved="light"] :is(.btn.primary, .app-tile, .guided-mark, .shuttle-glyph) {
+[data-appearance-resolved="light"] :is(.btn.primary, .app-tile, .guided-mark, .hud-preview) {
   --brand-a: #b6ff3c;
   --brand-b: #3cf0ff;
 }

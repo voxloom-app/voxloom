@@ -53,8 +53,7 @@
 .frow__control input:not([type]) { max-width: 190px; }
 
 /* A still of the HUD shuttle (ui-iter-06); the same drawing on light and dark panels. */
-.shuttle-glyph { display: block; filter: drop-shadow(0 4px 8px rgba(15, 23, 42, .25)); height: 26px; width: 158px; }
-.shuttle-glyph__weft { stroke-width: 1.5px; }
+.hud-preview { flex: none; }
 
 .callout {
   align-items: flex-start;

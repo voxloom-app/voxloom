@@ -1,4 +1,4 @@
-/* Feature rules: appearance picker, onboarding. The recording overlay lives in hud-shuttle.css. */
+/* Feature rules: appearance picker, onboarding. The recording overlay lives in hud.css and hud-meter.css. */
 .appearance-option {
   align-items: center;
   border: 1px solid var(--border);

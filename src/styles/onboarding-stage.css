@@ -77,11 +77,9 @@
 @keyframes loom-line { from { transform: scaleX(0); } }
 .loom-line { align-items: center; display: flex; flex: none; gap: 24px; margin-left: auto; position: relative; z-index: 1; }
 .loom-line__keys { display: inline-flex; gap: 7px; }
-.loom-line__shuttle { animation: loom-halo 1.8s ease-in-out .8s both; border-radius: 50%; display: block; }
-.loom-line .shuttle-glyph { filter: none; height: auto; width: var(--shuttle-w); }
-.loom-line .shuttle-glyph .wave__back,
-.loom-line .shuttle-glyph .wave__front { animation: loom-swell .3s ease-in-out 1.05s 4 alternate both; transform-box: fill-box; transform-origin: 50% 50%; }
-@keyframes loom-swell { to { transform: scaleY(1.55); } }
+.loom-line__shuttle { animation: loom-halo 1.8s ease-in-out .8s both; border-radius: 50%; display: grid; place-items: center; width: var(--shuttle-w); }
+.loom-line .hud-preview .wave { animation: loom-swell .3s ease-in-out 1.05s 4 alternate both; }
+@keyframes loom-swell { to { transform: scaleY(1.2); } }
 @keyframes loom-halo { 30%, 70% { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--brand-a) 50%, transparent)); } }
 
 /* Big key caps in setup are the stage's physical caps (Home, the rail). */

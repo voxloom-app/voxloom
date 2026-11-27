@@ -1,0 +1,55 @@
+/* Only the measured bars move while listening. The microphone stays lit
+   even at a true zero; no ambient animation masquerades as input. */
+.hud-signal {
+  align-items: center;
+  background: var(--hud-tone);
+  border-radius: 50%;
+  color: #152020;
+  display: inline-flex;
+  flex: none;
+  height: 20px;
+  justify-content: center;
+  transition: background-color 140ms ease-out;
+  width: 20px;
+}
+
+.hud-signal .icon { stroke-width: 2; }
+.hud-knot { fill: none; stroke: currentColor; stroke-width: 1.5px; }
+.hud-knot .knot__core { fill: currentColor; stroke: none; }
+.hud-knot .knot__fray { stroke-dasharray: 2.6 2.6; }
+
+.hud-capsule .wave {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+}
+
+/* Interpolate the 20Hz input on the compositor, without a frame loop or
+   per-frame layout. Older samples recede; the live edge is always bright. */
+.hud-capsule .wave i {
+  background: var(--brand-a);
+  border-radius: 4px;
+  height: 18px;
+  transition: transform 65ms linear;
+  width: 4px;
+}
+.hud-capsule .wave i:nth-child(-n+10) { opacity: .8; }
+.hud-capsule .wave i:nth-child(-n+5) { opacity: .58; }
+
+/* The meter disappears when the mic closes. Only the unfinished line
+   on the text glyph moves; the label stays still and readable. */
+.hud-writing-line {
+  animation: hud-write 2.4s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: left;
+}
+@keyframes hud-write {
+  0%, 100% { transform: scaleX(.25); }
+  50%, 80% { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-capsule .wave i, .hud-signal { transition: none; }
+  .hud-writing-line { animation: none; }
+}

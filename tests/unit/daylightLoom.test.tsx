@@ -55,7 +55,8 @@ describe('The loom by daylight (ui-iter-10): Light gets its own material; dark k
       const all = rules(source).flatMap(([list]) => selectors(list));
       expect(all.length).toBeGreaterThan(20);
       for (const sel of all) expect(sel.startsWith(`${LIGHT} `), sel).toBe(true);
-      expect(source).not.toMatch(/\.hud|\.overlay/);
+      // The in-app preview stays vivid; the floating window is never themed.
+      expect(source).not.toMatch(/\.hud(?!-preview\b)|\.overlay/);
     }
     // Pseudo-elements are invalid inside :is() and would silently drop the whole selector.
     expect(`${daylight}\n${pages}`).not.toMatch(/:is\([^)]*::/);
@@ -75,7 +76,7 @@ describe('The loom by daylight (ui-iter-10): Light gets its own material; dark k
   it('threads are dyed for linen, while the lit things keep the vivid brand', () => {
     expect(token('--brand-a', threads)).toBe('#548a00');
     expect(token('--brand-b', threads)).toBe('#008a9e');
-    const lit = rules(daylight).find(([sel]) => sel.includes('.btn.primary, .app-tile, .guided-mark, .shuttle-glyph'))!;
+    const lit = rules(daylight).find(([sel]) => sel.includes('.btn.primary, .app-tile, .guided-mark, .hud-preview'))!;
     expect(lit[0].startsWith(LIGHT)).toBe(true);
     expect(token('--brand-a', lit[1])).toBe('#b6ff3c');
     expect(token('--brand-b', lit[1])).toBe('#3cf0ff');

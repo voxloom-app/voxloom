@@ -1,7 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { listen } from '@tauri-apps/api/event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WEAVE } from '../../src/components/Waveform';
 import { OverlayApp } from '../../src/overlay/OverlayApp';
 
 type Handler = (payload: unknown) => void;
@@ -11,17 +10,9 @@ function send(event: string, payload: unknown) {
   act(() => handlers.get(event)?.(payload));
 }
 
-/** The braid as drawn: every strand path inside the microphone meter. */
 function meter(): string[] {
-  return [...screen.getByRole('img', { name: 'Microphone level' }).querySelectorAll('.wave__strand')]
-    .map((path) => path.getAttribute('d') ?? '');
-}
-
-/** Largest swing from the centre line on the voice side, where the newest level enters. */
-function voiceSideSwing(): number {
-  const voiceSide = WEAVE.x0 + (WEAVE.x1 - WEAVE.x0) / 4;
-  return Math.max(...meter().flatMap((d) => d.slice(1).split(/[LM]/).map((pair) => pair.split(' ').map(Number))
-    .filter(([x]) => x <= voiceSide).map(([, y]) => Math.abs(y - WEAVE.mid))));
+  return [...screen.getByRole('img', { name: 'Microphone level' }).querySelectorAll('i')]
+    .map(bar => bar.style.transform);
 }
 
 beforeEach(() => {
@@ -39,7 +30,7 @@ describe('OverlayApp', () => {
       render(<OverlayApp />);
       await waitFor(() => expect(handlers.has('capture:event')).toBe(true));
       send('overlay:waveform', { waveform: 'silent' });
-      expect(voiceSideSwing()).toBeLessThanOrEqual(WEAVE.restAmp);
+      const silent = meter();
 
       send('capture:event', {
         generation: 1, kind: 'capture-started', request_id: 'first',
@@ -48,8 +39,9 @@ describe('OverlayApp', () => {
         generation: 1, kind: 'capture-level', level: 0.1,
         request_id: 'first',
       });
-      expect(voiceSideSwing()).toBeGreaterThan(WEAVE.restAmp);
       const live = meter();
+      expect(live.slice(0, -1)).toEqual(silent.slice(0, -1));
+      expect(live.at(-1)).not.toBe(silent.at(-1));
 
       send('capture:event', {
         generation: 0, kind: 'capture-level', level: 1,
@@ -58,11 +50,11 @@ describe('OverlayApp', () => {
       expect(meter()).toEqual(live);
 
       send('overlay:waveform', { waveform: 'silent' });
-      expect(voiceSideSwing()).toBeLessThanOrEqual(WEAVE.restAmp);
+      expect(meter()).toEqual(silent);
       send('capture:event', {
         generation: 2, kind: 'capture-level', level: 1,
         request_id: 'second',
       });
-      expect(voiceSideSwing()).toBeGreaterThan(5);
+      expect(meter().at(-1)).toBe('scaleY(1)');
     });
 });

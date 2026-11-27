@@ -1,6 +1,6 @@
 import { useApp } from '../../app/AppContext';
 import { SegmentedControl } from '../../components/SegmentedControl';
-import { ShuttleGlyph } from '../../components/ShuttleGlyph';
+import { HudPreview } from '../../components/HudPreview';
 import type { Appearance, TextSize } from '../../domain/types';
 
 const appearances: { label: string; value: Appearance }[] = [
@@ -57,7 +57,7 @@ export function AppearanceTab() {
           <span>Recording indicator</span>
           <small className="frow__help">Fixed bottom-center while listening or transcribing.</small>
         </span>
-        <ShuttleGlyph />
+        <HudPreview />
       </div>
     </div>
     </>
