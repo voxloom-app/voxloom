@@ -115,7 +115,7 @@ describe('Home writing style while cleanup is off (BUS-229)', () => {
     await user.click(button('Turn on local cleanup')!);
     await act(async () => { pending[0].reject(new Error('offline')); });
     await waitFor(() => expect(note()).toHaveTextContent(
-      'Couldn’t download the cleanup model. You can also add it in Settings → Capture.',
+      'Couldn’t download the cleanup model. You can also add it in Settings → Cleanup.',
     ));
     expect(picker()).toHaveAttribute('aria-disabled', 'true');
     await user.click(button('Try again')!);

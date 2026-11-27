@@ -4,7 +4,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { failureRowCopy, useSttModels } from '../../services/stt/useSttModels';
 import { ModelCard } from './ModelCard';
 
-/** Models tab (M1–M7, UI PR 7): model cards, progress, Retry download, list-error Try again. */
+/** Settings → Speech pane, formerly the Models tab (M1–M7, UI PR 7): model cards, progress, Retry download, list-error Try again. */
 export function ModelsTab() {
   const { settings, state } = useApp();
   const stt = useSttModels({

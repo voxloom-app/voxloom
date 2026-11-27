@@ -1,6 +1,6 @@
 /**
  * BUS-35: the backend emits `stt:models-changed` after its one-time startup
- * check of each model file on disk, so Settings → Models re-lists and a
+ * check of each model file on disk, so Settings → Speech re-lists and a
  * damaged or unreadable file shows as failed with Retry right away.
  */
 import { isTauri } from '@tauri-apps/api/core';

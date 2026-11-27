@@ -34,7 +34,7 @@ export function homeStyleState(input: {
   if (download.downloading) return 'downloading';
   const missing = view.kind === 'status' && !chosenCleanupModel(view.status, savedModelId).available;
   // Home can only download the default model (its note names Qwen3 0.6B):
-  // a missing optional 4B is fixed in Settings → Capture.
+  // a missing optional 4B is fixed in Settings → Cleanup.
   const homeCanFix = missing && homeDownloadId(view, savedModelId) !== null;
   if (download.note && download.note !== CLEANUP_DOWNLOAD_CANCELLED && homeCanFix) return 'failed';
   // While cleanup is on, only a status that says the model is gone disables
@@ -69,7 +69,7 @@ export function homeStyleNote(state: HomeStyleState, ratio: number): string | nu
     case 'downloading':
       return `Downloading the cleanup model… ${downloadPercent(ratio)}%`;
     case 'failed':
-      return 'Couldn’t download the cleanup model. You can also add it in Settings → Capture.';
+      return 'Couldn’t download the cleanup model. You can also add it in Settings → Cleanup.';
     case 'on-missing':
       return 'The cleanup model is missing, so styles aren’t applied.';
     default:

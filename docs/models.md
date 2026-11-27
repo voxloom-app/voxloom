@@ -4,7 +4,7 @@
 
 ## Choose a speech model
 
-Settings → Models offers Whisper Tiny/Base, Whisper Large v3 Turbo (English),
+Settings → Speech offers Whisper Tiny/Base, Whisper Large v3 Turbo (English),
 and optional Parakeet Core ML models. New users start with Whisper Base English
 (`whisper-base.en`, 147,964,211 bytes, shown as 148 MB); existing explicit
 choices are preserved. Guided setup discloses and downloads the selected pack
@@ -20,7 +20,7 @@ automatic download. Speech recognition stays local. See the
 The Whisper catalog (`src-tauri/src/stt/catalog.rs`) pins each file to a fixed
 Hugging Face revision, exact size and SHA-256. The shared native `model_fetch`
 path verifies downloads before an atomic rename. A mismatch deletes the
-partial file and reports `download-corrupted`; the Models tab offers Retry.
+partial file and reports `download-corrupted`; Settings → Speech offers Retry.
 Sizes and hashes, not transcript contents, go to the native log.
 
 Downloads use a shared HTTPS-only client that refuses redirects to HTTP, with
@@ -98,11 +98,11 @@ word order, so a rewrite is not refused. Casual may drop um, uh and ah; Very
 Casual asks the model to keep fillers and only fix capitalization and
 punctuation; the strict in-order check still allows it to drop hesitation
 sounds such as um and uh. With cleanup off, Home shows the style picker disabled
-with a note and a way to turn cleanup on; Settings → Capture keeps it live.
+with a note and a way to turn cleanup on; Settings → Cleanup keeps it live.
 `tests/unit/cleanup/styleEval.test.ts` runs the style corpus through the real
 model when `VOXLOOM_TEST_CLEANUP_MODEL` and `VOXLOOM_TEST_CLEANUP_WORKER` are set.
 
-Settings → Cleanup model offers Download (397 MB). The pinned model is
+Settings → Cleanup → Cleanup model offers Download (397 MB). The pinned model is
 Qwen3 0.6B Q4_K_M, a 396,705,472-byte GGUF from `unsloth/Qwen3-0.6B-GGUF`.
 Its revision, size and hash are in
 `src-tauri/src/cleanup/model_store/pin.rs`. The same HTTPS-only `model_fetch`
