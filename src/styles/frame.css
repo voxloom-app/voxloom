@@ -68,7 +68,6 @@
 }
 :is(.main, .settings-window-root) .settings-window { background: none; border: 0; border-radius: 0; box-shadow: none; max-width: none; overflow: visible; }
 :is(.main, .settings-window-root) .settings-window__bar.stage { background: transparent; padding-inline: var(--gutter); }
-:is(.main, .settings-window-root) .settings-window__bar .voice-path { margin-inline: calc(var(--gutter) * -1); }
 
 /* The open page (ui-iter-31). Home has lain open under its beam since ui-iter-29; now every
    page does. History's timeline, the Dictionary's two leaves, each Settings pane and the boot

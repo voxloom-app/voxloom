@@ -166,7 +166,8 @@ test('the 760×660 Settings window keeps two-column rows and a two-column recove
   await page.goto('/settings.html');
   const cols = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
   expect(await cols('.settings-rows .frow')).toBe(2);
-  await expect(page.getByRole('button', { name: /Next stop: Microphone/ })).toBeInViewport({ ratio: 1 });
+  // The sentence stays short enough that the pane's last row is in reach without scrolling.
+  await expect(page.getByRole('switch', { name: /Start at login/ })).toBeInViewport({ ratio: 1 });
   await page.getByRole('tab', { name: /^Transcripts/ }).click();
   expect(await cols('.settings-rows .frow')).toBe(2);
   expect(await cols('.recovery-grid')).toBe(2);

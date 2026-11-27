@@ -1,9 +1,9 @@
-/* The voice path (ui-iter-04): the Settings header becomes the stage material (stage.css)
-   in both themes, so Settings shares the rail's, Home's and History's instrument. One
-   brand thread runs left to right through a knot per stop a dictation passes; each stop
-   shows its saved value. Since ui-iter-13 the stops are the Settings tabs (settings-panes.css):
-   the open stop is tied (a filled knot), and Appearance hangs loose at the end, off the path.
-   Voice comes in on the lime side, text leaves on the cyan side, as on the Home loom. */
+/* The voice path (ui-iter-04): the Settings header is the stage material (stage.css) in
+   both themes, so Settings shares the rail's, Home's and History's instrument. Since
+   ui-iter-13 the path is the Settings tablist (settings-panes.css). Since ui-iter-41 it is
+   said as one plain sentence: the joining words stay quiet, and each saved setting is a
+   bright, underlined part you pick to open its pane. The underlines run lime to cyan in
+   the order a dictation passes them, voice in to text out, as on the Home loom. */
 .settings-window__bar.stage {
   align-items: stretch;
   /* settings.css paints the old toolbar later in the cascade; restate the stage material. */
@@ -22,145 +22,77 @@
 .settings-window__bar.stage h1 { color: var(--fg); font-size: var(--fs-section); font-weight: 700; }
 .settings-window__head p { color: var(--mut); font-size: var(--fs-label); margin: 0; }
 
-.voice-path { container-type: inline-size; margin: var(--s-8) calc(var(--s-11) * -1) 0; }
-.voice-path__stops {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(0, .9fr);
-  list-style: none;
-  margin: 0;
-  padding: 0 var(--s-9);
+/* The sentence reads like the transcripts: the words serif, set to a reading measure. */
+.path-sentence {
+  color: var(--mut);
+  font-family: var(--font-words);
+  font-size: calc(var(--fs-sheet) * 1.2);
+  line-height: 1.8;
+  margin: var(--s-6) 0 var(--s-8);
+  max-width: 44em;
+  text-wrap: pretty;
 }
+/* Appearance follows on its own line, smaller: it changes nothing a dictation does. */
+.path-sentence__look { font-size: var(--fs-emph); margin-top: var(--s-2); }
 
-.voice-path__stop {
-  --pad: var(--s-3);
-  align-items: center;
-  background: none;
-  border: 0;
-  border-radius: 12px;
+/* Each setting: bright words on a dotted underline in its stop's slice of the thread.
+   Inline, so a long part wraps with the sentence; each line keeps its own plate. */
+.path-sentence__stop {
+  --knot: color-mix(in srgb, var(--brand-a) calc(100% - var(--i) * 20%), var(--brand-b));
+  --plate: color-mix(in srgb, var(--knot) 15%, transparent);
+  background: linear-gradient(var(--knot), var(--knot)) 50% 100% / 0 2px no-repeat;
+  border-radius: 5px 5px 2px 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
   color: var(--fg);
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  font: inherit;
-  gap: var(--s-2);
-  height: 100%;
-  padding: var(--s-3) var(--pad) var(--s-5);
-  text-align: center;
-  width: 100%;
+  margin: 0 -.1em;
+  padding: .1em .16em .12em;
+  text-decoration: underline dotted color-mix(in srgb, var(--knot) 75%, transparent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: .3em;
+  transition: background-size .25s cubic-bezier(.2, .7, .2, 1), background-color .15s ease, text-decoration-color .15s ease;
 }
-.voice-path__stop:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.path-sentence__stop[data-stop="appearance"] { --knot: var(--fg); --plate: rgba(255, 255, 255, .1); }
+.path-sentence__stop:hover { background-color: rgba(255, 255, 255, .045); text-decoration-color: var(--knot); }
+.path-sentence__stop:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.voice-path__label { color: var(--mut); font-size: var(--fs-micro); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.voice-path__value { font-size: var(--fs-secondary); font-weight: 650; line-height: 1.3; overflow-wrap: anywhere; }
-.voice-path__value[data-inactive] { color: var(--mut); }
-.voice-path__detail { color: var(--mut); font-size: var(--fs-label); line-height: 1.3; }
-
-/* Each stop owns one slice of a single lime → cyan gradient, so the thread reads as one. */
-.voice-path__thread {
-  align-self: stretch;
-  display: grid;
-  height: 18px;
-  margin: var(--s-1) calc(var(--pad) * -1);
-  overflow: hidden;
-  place-items: center;
-  position: relative;
-}
-.voice-path__thread::before,
-.voice-path__thread::after {
-  content: "";
-  height: 2px;
-  inset: 8px 0 auto;
-  position: absolute;
-}
-.voice-path__thread::before {
-  background: linear-gradient(90deg, var(--brand-a), var(--brand-b)) calc(var(--i) * 20%) 0 / 600% 100%;
-  opacity: .55;
-}
-li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
-li[data-stop="transcripts"] > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(270deg, transparent, #000 45%); mask-image: linear-gradient(270deg, transparent, #000 45%); }
-
-/* A pulse of light carries a dictation stop to stop, then the path rests (12 s loop). */
-.voice-path__thread::after {
-  animation: path-carry 12s linear infinite;
-  animation-delay: calc(var(--i) * 1.2s);
-  background: linear-gradient(90deg, transparent 30%, color-mix(in srgb, var(--brand-a) 50%, var(--brand-b)) 50%, transparent 70%);
-  opacity: 0;
-  transform: translateX(-100%);
-}
-@keyframes path-carry {
-  0% { opacity: 0; transform: translateX(-100%); }
-  1% { opacity: 1; }
-  10% { opacity: 1; transform: translateX(100%); }
-  10.01%, 100% { opacity: 0; transform: translateX(100%); }
+/* The open setting is tied: a plate, and its dotted thread drawn solid along the foot. */
+.path-sentence__stop[data-current] {
+  background-color: var(--plate);
+  background-size: 100% 2px;
+  color: #f6f6f9;
+  text-decoration-color: transparent;
 }
 
-.voice-path__thread i {
-  background: var(--panel);
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 2px var(--ctl-line);
-  height: 12px;
-  position: relative;
-  transition: transform .15s ease, box-shadow .15s ease;
-  width: 12px;
-  z-index: 1;
-}
-
-/* The open stop is tied: a filled knot in that stop's colour, with a soft glow. */
-.voice-path li[data-current] .voice-path__thread i {
-  background: var(--knot);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--knot) 22%, transparent), 0 0 12px color-mix(in srgb, var(--knot) 38%, transparent);
-}
-.voice-path li[data-current] .voice-path__label { color: var(--fg); }
-.voice-path__stop:hover .voice-path__thread i,
-.voice-path__stop:focus-visible .voice-path__thread i { transform: scale(1.3); }
-.voice-path__stop:hover { background: rgba(255, 255, 255, .04); }
-
-/* The shortcut stop shows small key caps, the rail's material. */
-.voice-path__value .key-combo__caps { display: inline-flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
-.voice-path__value .kbd {
+/* The shortcut shows small key caps, the rail's material, sitting on the line. */
+.path-sentence__stop .key-combo__caps { display: inline-flex; gap: 3px; vertical-align: .12em; }
+.path-sentence__stop .kbd {
   background: linear-gradient(180deg, #32323f, #1b1b24);
   border: 1px solid rgba(255, 255, 255, .13);
   border-bottom-color: rgba(255, 255, 255, .04);
   border-radius: 6px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 2px 0 #050508;
   color: #f6f6f9;
-  font-size: var(--fs-micro);
-  line-height: 1.5;
-  min-width: 20px;
-  padding: 0 5px;
+  font-family: var(--font);
+  font-size: var(--fs-label);
+  line-height: 1.6;
+  min-width: 22px;
+  padding: 0 6px;
 }
-.voice-path__value[data-inactive] .kbd { color: var(--mut); }
+.path-sentence__stop[data-inactive] .kbd { color: var(--mut); }
+.path-sentence__note { color: var(--mut); font-family: var(--font); font-size: var(--fs-label); margin-left: .4em; }
 
 /* Keyboard focus in a pane's rows wears a lime selvedge. */
 .settings-rows .frow:has(:focus-visible) { box-shadow: inset 3px 0 0 var(--sel-edge); margin-inline: calc(var(--s-6) * -1); padding-inline: var(--s-6); }
 
-/* Below the desktop minimum: the thread runs down the left instead. */
-@container (max-width: 399px) {
-  .voice-path__stops { grid-auto-flow: row; grid-template-columns: 1fr; padding: 0 var(--s-6); }
-  .voice-path__stop {
-    align-items: center;
-    column-gap: var(--s-6);
-    display: grid;
-    grid-template-columns: 18px 9em minmax(0, 1fr);
-    padding: var(--s-3) var(--s-4);
-    text-align: left;
-  }
-  .voice-path__thread { grid-column: 1; grid-row: 1 / span 2; height: auto; margin: calc(var(--s-3) * -1) 0; }
-  .voice-path__thread::before,
-  .voice-path__thread::after { height: auto; inset: 0 8px; width: 2px; }
-  .voice-path__thread::before { background: linear-gradient(180deg, var(--brand-a), var(--brand-b)) 0 calc(var(--i) * 20%) / 100% 600%; }
-  li:first-child > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(180deg, transparent, #000 45%); mask-image: linear-gradient(180deg, transparent, #000 45%); }
-  li[data-stop="transcripts"] > .voice-path__stop .voice-path__thread::before { -webkit-mask-image: linear-gradient(0deg, transparent, #000 45%); mask-image: linear-gradient(0deg, transparent, #000 45%); }
-  .voice-path__thread::after { animation: none; display: none; }
-  .voice-path__label { grid-column: 2; grid-row: 1; }
-  .voice-path__value { grid-column: 3; grid-row: 1; }
-  .voice-path__detail { grid-column: 3; grid-row: 2; }
-  .voice-path__value .key-combo__caps { justify-content: flex-start; }
+/* Narrow windows: the same sentence, a size down, so it keeps to a few lines. */
+@media (max-width: 760px) {
+  .path-sentence { font-size: var(--fs-sheet); line-height: 1.7; margin-bottom: var(--s-7); }
+  .path-sentence__look { font-size: var(--fs-body); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* No travelling light along the path. */
-  .voice-path__thread::after { animation: none; display: none; }
-  .voice-path__thread i { transition: none; }
+  /* The open setting's thread is simply there. */
+  .path-sentence__stop { transition: none; }
 }

@@ -1,7 +1,8 @@
 /**
  * Settings panes (ui-iter-13): one per stop a dictation passes on the voice
  * path, in that order, plus Appearance, which sits off the path because
- * nothing in it changes a dictation. The path in the header is their tablist.
+ * nothing in it changes a dictation. The path in the header is their tablist,
+ * said as one sentence since ui-iter-41.
  */
 export type SettingsTab = 'shortcut' | 'microphone' | 'speech' | 'cleanup' | 'output' | 'transcripts' | 'appearance';
 
@@ -26,8 +27,5 @@ export const settingsPanes: readonly SettingsPane[] = [
   { value: 'transcripts', title: 'Transcripts & privacy',
     intro: 'What stays on this Mac after a dictation, and how to recover when something goes wrong.' },
   { value: 'appearance', title: 'Appearance',
-    intro: 'How Voxloom looks. This is off the path: nothing here changes a dictation.' },
+    intro: 'How Voxloom looks. Nothing here changes what you dictate.' },
 ];
-
-/** The stops on the path; Appearance is the one pane off it. */
-export const PATH_LENGTH = 6;

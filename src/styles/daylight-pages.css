@@ -26,14 +26,11 @@
 /* ---- Dictionary: the word check's fixes wear a highlighter's lime. ---- */
 [data-appearance-resolved="light"] .word-check__fix { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
 
-/* ---- Settings: the voice path ---- */
-[data-appearance-resolved="light"] .voice-path__thread i { background-color: var(--linen); }
-[data-appearance-resolved="light"] .voice-path__stop:hover { background: rgba(255, 255, 255, .5); }
-[data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__thread i { background-color: var(--knot); }
-[data-appearance-resolved="light"] .voice-path__thread::before { opacity: .8; }
-[data-appearance-resolved="light"] .voice-path li[data-current] > .voice-path__stop { --plate-line: rgba(70, 56, 30, .18); background: rgba(255, 255, 255, .62); }
-[data-appearance-resolved="light"] .voice-path li[data-current] > .voice-path__stop:hover { background: rgba(255, 255, 255, .8); }
-[data-appearance-resolved="light"] .voice-path li[data-current] .voice-path__value { color: var(--fg); }
+/* ---- Settings: the path said as a sentence ---- */
+[data-appearance-resolved="light"] .path-sentence__stop { --plate: color-mix(in srgb, var(--knot) 13%, #ffffff); }
+[data-appearance-resolved="light"] .path-sentence__stop[data-stop="appearance"] { --plate: rgba(255, 255, 255, .75); }
+[data-appearance-resolved="light"] .path-sentence__stop:hover { background-color: rgba(255, 255, 255, .55); }
+[data-appearance-resolved="light"] .path-sentence__stop[data-current] { background-color: var(--plate); color: var(--fg); }
 
 /* ---- Setup: the welcome, the thread and the steps ---- */
 [data-appearance-resolved="light"] .guided-main.stage { --sheet: transparent; --bg: var(--linen); }

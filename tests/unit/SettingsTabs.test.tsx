@@ -14,12 +14,11 @@ describe('Settings panes are the voice path (UI PR 6a, ui-iter-13)', () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
     const tabs = within(screen.getByRole('tablist', { name: 'Settings sections' })).getAllByRole('tab');
-    expect(tabs.map((t) => t.querySelector('.voice-path__label')?.textContent))
+    expect(tabs.map((t) => t.getAttribute('aria-label')?.split(':')[0]))
       .toEqual(['Shortcut', 'Microphone', 'Speech', 'Cleanup', 'Output', 'Transcripts', 'Appearance']);
     expect(tabs.map((t) => t.tabIndex)).toEqual([0, -1, -1, -1, -1, -1, -1]);
     const panel = screen.getByRole('tabpanel', { name: /^Shortcut/ });
     expect(within(panel).getByRole('heading', { level: 2, name: 'Shortcut' })).toBeInTheDocument();
-    expect(panel).toHaveTextContent('Stop 1 of 6');
     tabs[0].focus();
     await user.keyboard('{ArrowRight}');
     expect(tab(/^Microphone/)).toHaveAttribute('aria-selected', 'true');
@@ -28,7 +27,7 @@ describe('Settings panes are the voice path (UI PR 6a, ui-iter-13)', () => {
     expect(tab(/^Speech/)).toHaveAttribute('aria-selected', 'true');
     await user.keyboard('{End}');
     const appearance = screen.getByRole('tabpanel', { name: /^Appearance/ });
-    expect(appearance).toHaveTextContent('Off the path');
+    expect(appearance).toHaveTextContent('Nothing here changes what you dictate');
     expect(within(appearance).getByRole('heading', { level: 2, name: 'Appearance' })).toBeInTheDocument();
     await user.keyboard('{ArrowRight}');
     expect(tab(/^Shortcut/)).toHaveAttribute('aria-selected', 'true');
@@ -40,22 +39,14 @@ describe('Settings panes are the voice path (UI PR 6a, ui-iter-13)', () => {
     expect(tab(/^Shortcut/)).toHaveAttribute('aria-controls', 'settings-panel-shortcut');
   });
 
-  it('walks the path from a pane’s foot, keeping focus in the pane', async () => {
+  it('says what each setting does in one sentence, with no stop counter or Previous/Next walk', async () => {
     const user = userEvent.setup();
     renderWithApp(<Settings onSetup={vi.fn()} />);
-    expect(screen.queryByRole('button', { name: /^Previous stop/ })).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Next stop: Microphone' }));
-    expect(tab(/^Microphone/)).toHaveAttribute('aria-selected', 'true');
-    expect(document.activeElement).toBe(screen.getByRole('tabpanel', { name: /^Microphone/ }));
-    await user.click(screen.getByRole('button', { name: 'Previous stop: Shortcut' }));
-    expect(tab(/^Shortcut/)).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText(/Pick an underlined part to change it/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /stop:/ })).toBeNull();
+    expect(screen.queryByText(/Stop \d of 6/)).toBeNull();
     await user.click(tab(/^Output/));
-    await user.click(screen.getByRole('button', { name: 'Next stop: Transcripts & privacy' }));
-    expect(screen.getByRole('heading', { level: 2, name: 'Transcripts & privacy' })).toBeInTheDocument();
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('Stop 6 of 6');
-    expect(screen.queryByRole('button', { name: /^Next stop/ })).toBeNull();
-    // Appearance is off the path: nothing to walk to.
-    await user.click(tab(/^Appearance/));
+    expect(screen.getByRole('tabpanel', { name: /^Output/ })).toHaveTextContent('never presses Return or Send');
     expect(screen.queryByRole('button', { name: /stop:/ })).toBeNull();
   });
 
