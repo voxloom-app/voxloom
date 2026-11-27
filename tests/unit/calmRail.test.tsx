@@ -45,9 +45,7 @@ describe('the calm rail (ui-iter-21)', () => {
     renderWithApp(<App />, NOON);
     await user.click(screen.getByRole('button', { name: 'Set up later' }));
     expect(rail().querySelector('.rail-warp, .rail-cloth, .rail-shuttle, .rail-capture')).toBeNull();
-    // ui-iter-33: the foot holds one quiet Start, the window's only one, on Home too.
-    expect(within(rail().querySelector('.rail-foot') as HTMLElement).getByRole('button', { name: 'Start dictating' })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Start dictating' })).toHaveLength(1);
+    expect(within(rail() as HTMLElement).queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
   });
 
   it('summarises today in the card name, ticks each dictation on the beam and opens History', async () => {
@@ -117,47 +115,35 @@ describe('the calm rail (ui-iter-21)', () => {
   });
 });
 
-describe('the rail foot styles (ui-iter-33; the stage capsule until then)', () => {
-  const footCss = css('rail-foot.css');
-  const railTokens = css('rail.css');
-  const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(railTokens)![1];
+describe('the stage capsule styles (ui-iter-21)', () => {
+  const barCss = css('loom-bar.css');
 
-  it('loads the loom after the pick, and the foot after the run tag it wears', () => {
+  it('loads the weft after the pick and the run tag after the HUD meter', () => {
     const index = css('index.css');
     expect(index).toMatch(/@import "\.\/home-pick\.css";\n@import "\.\/loom-bar\.css";/);
-    expect(index).toMatch(/@import "\.\/hud-meter\.css";\n@import "\.\/run-tag\.css";\n@import "\.\/rail-foot\.css";/);
+    expect(index).toMatch(/@import "\.\/hud-meter\.css";\n@import "\.\/run-tag\.css";/);
     expect(index).not.toMatch(/rail-cloth|rail-tag/);
-    expect(css('loom-bar.css')).not.toMatch(/\.dictate|rail-start/);
   });
 
-  it('holds the caps still and stops fading under reduced motion', () => {
-    const reduced = footCss.slice(footCss.indexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toContain('.sidebar[data-phase] .rail-key .kbd { transform: none; }');
-    expect(reduced).toMatch(/\.rail-start__button,\s*\.rail-start__tip \{ transition: none; \}/);
+  it('holds the capsule still at rest and under reduced motion', () => {
+    expect(barCss.match(/\.dictate__level i \{[^}]*\}/)![0]).not.toContain('animation');
+    const reduced = barCss.slice(barCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toMatch(/\.dictate__level i,\s*\.dictate\[data-state="busy"\] \.dictate__button::after \{ animation: none !important; \}/);
     const loomCss = css('rail-loom.css');
     const railReduced = loomCss.slice(loomCss.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(railReduced).toContain('.sidebar[data-phase] .brand__dot { animation: none; }');
-    expect(loomCss).not.toMatch(/\.rail-(key|run|foot|start)/);
+    expect(railReduced).toContain('.sidebar[data-phase] .rail-key .kbd { transform: none; }');
   });
 
-  it('gives each key cap room and centres its glyph beside "Hold"', () => {
-    const cap = /\.rail-key \.kbd \{([^}]*)\}/.exec(footCss)![1];
-    for (const rule of ['align-items: center;', 'display: inline-flex;', 'justify-content: center;', 'height: 22px;', 'min-width: 22px;', 'padding: 0 7px;', 'white-space: nowrap;', 'margin-bottom: 2px;']) {
-      expect(cap, rule).toContain(rule);
-    }
-    expect(footCss).toMatch(/\.rail-key__hold \{ align-items: center; display: flex; flex-wrap: wrap; gap: var\(--s-3\) 7px;/);
-  });
-
-  it('keeps Start, its note and its tip at AA, with a visible focus ring', () => {
-    for (const ground of ['#17171f', '#0a0a0e']) {
-      expect(ratio(token('mut'), ground), `muted on ${ground}`).toBeGreaterThanOrEqual(4.5);
-    }
-    expect(footCss).toMatch(/\.rail-start__button \{[^}]*color: var\(--mut\);/);
-    expect(footCss).toMatch(/\.rail-start__button:disabled \{[^}]*color: var\(--mut\);[^}]*opacity: 1;/);
-    expect(footCss).toMatch(/\.rail-start__note \{ color: var\(--mut\);/);
-    const tip = /\.rail-start__tip \{[^}]*background: (#[0-9a-f]{6});[^}]*color: (#[0-9a-f]{6});/.exec(footCss)!;
+  it('keeps the capsule\'s words and its tip at AA on their glass, with a visible focus ring', () => {
+    const [, top, bottom] = /\.dictate__button \{[^}]*linear-gradient\(180deg, (#[0-9a-f]{6}), (#[0-9a-f]{6})\) padding-box/.exec(barCss)!;
+    expect(barCss).toMatch(/\.dictate__button \{[^}]*color: #f6f6f9;/);
+    for (const glass of [top, bottom]) expect(ratio('#f6f6f9', glass), `label on ${glass}`).toBeGreaterThanOrEqual(4.5);
+    const off = /button\.dictate__button:disabled \{[^}]*linear-gradient\(180deg, (#[0-9a-f]{6}), (#[0-9a-f]{6})\) padding-box[^}]*color: (#[0-9a-f]{6});[^}]*opacity: 1;/.exec(barCss)!;
+    for (const glass of [off[1], off[2]]) expect(ratio(off[3], glass), `disabled label on ${glass}`).toBeGreaterThanOrEqual(4.5);
+    const tip = /\.home-hero \.dictate__tip \{[^}]*background: (#[0-9a-f]{6});[^}]*color: (#[0-9a-f]{6});/.exec(barCss)!;
     expect(ratio(tip[2], tip[1]), 'tip').toBeGreaterThanOrEqual(4.5);
-    expect(footCss).toContain('.rail-start__button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }');
+    expect(barCss).toMatch(/button\.dictate__button:focus-visible \{ outline: 2px solid var\(--focus\); outline-offset: 3px; \}/);
   });
 });
 

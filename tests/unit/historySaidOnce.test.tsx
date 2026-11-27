@@ -112,8 +112,7 @@ describe('History says it once (ui-iter-23)', () => {
     // Hour marks measure time, never delivery outcomes.
     expect(css('history.css')).not.toMatch(/\.history-hour[^{]*\[data-status/);
     expect(css('home.css')).toContain(`.home .recent-row[data-status="unverified"]::before { border: 2px dotted ${quiet};`);
-    // ui-iter-33: the last pick has no knot of its own; its badge alone says Unverified.
-    expect(css('home-pick.css')).not.toMatch(/--pick-tone|\[data-status/);
+    expect(css('home-pick.css')).toContain(`[data-status="unverified"] { --pick-tone: ${quiet}; }`);
     expect(css('recall.css')).toContain(`.recall__opt[data-status="unverified"] .recall__knot { --tone: ${quiet}; background: none; border: 1.5px dotted var(--tone); }`);
   });
 });

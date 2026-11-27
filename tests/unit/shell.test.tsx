@@ -4,10 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app/App';
 import { Switch } from '../../src/components/Switch';
 import { screenForAltDigit } from '../../src/app/shell/screens';
-import { RailRun } from '../../src/app/shell/RailRun';
 import { RailTools } from '../../src/app/shell/RailTools';
 import { Sidebar } from '../../src/app/shell/Sidebar';
 import { Home } from '../../src/features/home/Home';
+import { LoomBar } from '../../src/features/home/LoomBar';
 import { isTauriEnv } from '../../src/services/capture/captureService';
 import type { UseDogfoodCaptureResult } from '../../src/services/stt/useDogfoodCapture';
 import { renderWithApp } from './testUtils';
@@ -49,6 +49,8 @@ describe('App shell (UI PR 3)', () => {
     expect([...dock.querySelectorAll('.kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
     expect(dock).toHaveTextContent('Control Shift Space');
     expect(dock).toHaveTextContent(/^Hold .* in any app to dictate$/);
+    // ui-iter-33: the keys and "Hold" share the first line, "in any app to dictate" the second.
+    expect(dock.querySelector('.rail-key__hold .key-combo')).not.toBeNull();
     expect(screen.queryByText(/Global hold\/latch snapshots/)).not.toBeInTheDocument();
   });
 
@@ -165,15 +167,15 @@ describe('Home (UI PR 3)', () => {
   });
 });
 
-describe('Dictating from the rail\'s foot (ui-iter-33; on the stage since ui-iter-21)', () => {
-  const foot = (over: Partial<UseDogfoodCaptureResult> = {}, isNative = true) => {
+describe('Start on the stage (ui-iter-21)', () => {
+  const bar = (over: Partial<UseDogfoodCaptureResult> = {}, isNative = true) => {
     const run = dogfood(over);
-    render(<RailRun dogfood={run} isNative={isNative} onCopy={vi.fn()} />);
+    render(<LoomBar capture={{ dogfood: run, isNative, onCopy: vi.fn() }} pick={null} />);
     return run;
   };
 
-  it('starts a run from the window and says where the words may go', async () => {
-    const run = foot();
+  it('starts a run from the stage and says where the words may go', async () => {
+    const run = bar();
     const start = screen.getByRole('button', { name: 'Start dictating' });
     expect(start).toBeEnabled();
     expect(start).toHaveAccessibleDescription('Starting here focuses Voxloom, so the words may be copied instead of inserted.');
@@ -183,75 +185,72 @@ describe('Dictating from the rail\'s foot (ui-iter-33; on the stage since ui-ite
   });
 
   it('is disabled with a note in the browser preview', () => {
-    foot({}, false);
+    bar({}, false);
     expect(screen.getByRole('button', { name: 'Start dictating' })).toBeDisabled();
     expect(screen.getByText('Dictating here needs the Voxloom desktop app.')).toBeInTheDocument();
   });
 
   it('shows Stop/Cancel while recording and Transcribing… while busy', async () => {
     const user = userEvent.setup();
-    const run = foot({ phase: 'recording' });
+    const run = bar({ phase: 'recording' });
     expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Stop' }));
     expect(run.stop).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(run.cancel).toHaveBeenCalledOnce();
     cleanup();
-    foot({ phase: 'transcribing' });
+    bar({ phase: 'transcribing' });
     expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('offers Stop for a latched or held run from the shortcut too', () => {
-    foot({ captureState: { device: 'Mic', generation: 1, kind: 'active', request_id: 'latch-1' } });
+    bar({ captureState: { device: 'Mic', generation: 1, kind: 'active', request_id: 'latch-1' } });
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
+    expect(document.querySelector('.dictate')).toHaveAttribute('data-state', 'recording');
   });
 
   it('shows Cleaning up… while local cleanup runs (BUS-16)', () => {
-    foot({ phase: 'cleaning' });
+    bar({ phase: 'cleaning' });
     expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
     expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
   });
 
-  it('says what the last run did above Start, which stays ready for the next one', () => {
-    foot({ message: 'Inserted into the focused app.', phase: 'success' });
-    const tag = screen.getByRole('status');
-    expect(tag).toHaveTextContent('Inserted into the focused app.');
-    expect(tag.compareDocumentPosition(screen.getByRole('button', { name: 'Start dictating' })))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  it('hangs a run\'s outcome beneath the capsule', () => {
+    bar({ message: 'Inserted into the focused app.', phase: 'success' });
+    expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
+    expect(screen.getByRole('status').closest('.loom-bar__hang')).not.toBeNull();
   });
 
   it('ties the outcome tag off with the HUD\'s knot for what happened (ui-iter-17)', () => {
     const tag = () => screen.getByRole('status');
     const knot = () => tag().querySelector('svg.run-tag__knot')!;
-    foot({ message: 'Inserted into the focused app.', phase: 'success' });
+    bar({ message: 'Inserted into the focused app.', phase: 'success' });
     expect(tag()).toHaveAttribute('data-tone', 'ok');
     expect(knot()).toHaveAttribute('aria-hidden', 'true');
     expect(knot().querySelector('.knot__core')).not.toBeNull();
     cleanup();
-    foot({ message: 'Copied — paste it where you need it.', phase: 'success' });
+    bar({ message: 'Copied — paste it where you need it.', phase: 'success' });
     expect(tag()).toHaveAttribute('data-tone', 'warn');
     cleanup();
     // A cancelled run frays, and the words are spoken exactly as written.
-    foot({ message: 'Capture cancelled — nothing transcribed.', phase: 'cancelled' });
+    bar({ message: 'Capture cancelled — nothing transcribed.', phase: 'cancelled' });
     expect(tag()).toHaveAttribute('data-tone', 'err');
     expect(knot().querySelector('.knot__fray')).not.toBeNull();
     expect(tag().textContent).toBe('Capture cancelled — nothing transcribed.');
   });
 
-  it('lives in the rail on every page, Home included; the stage carries no Start or Stop', async () => {
+  it('lives on Home\'s stage only; the rail carries no Start on any page', async () => {
     const user = await renderShell();
     const rail = () => document.querySelector('.sidebar') as HTMLElement;
-    const stage = document.querySelector('.stage') as HTMLElement;
-    expect(within(stage).queryByRole('button', { name: /Start dictating|Stop/ })).not.toBeInTheDocument();
-    expect(within(rail()).getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    const stage = document.querySelector('.home-hero') as HTMLElement;
+    expect(within(stage).getByRole('button', { name: 'Start dictating' })).toBeDisabled();
+    expect(within(rail()).queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
     for (const page of ['History', 'Dictionary']) {
       await user.click(within(screen.getByRole('navigation', { name: 'Voxloom screens' })).getByRole('button', { name: page }));
       expect(current()).toBe(page);
-      expect(screen.getAllByRole('button', { name: 'Start dictating' })).toHaveLength(1);
-      expect(within(rail()).getByRole('button', { name: 'Start dictating' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start dictating' })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole('heading', { name: 'Dictate' })).not.toBeInTheDocument();
   });
@@ -266,19 +265,6 @@ describe('Quiet rail foot (ui-iter-21)', () => {
     rail(dogfood({ message: 'Inserted into the focused app.', phase: 'success' }), 'history');
     expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
     expect(document.querySelector('.rail-key')).toBeNull();
-  });
-
-  it('names the keys above Start when nothing has happened yet, off Home only', () => {
-    const { unmount } = rail(dogfood(), 'history');
-    const foot = document.querySelector('.rail-foot') as HTMLElement;
-    const hint = foot.querySelector('.rail-key')!;
-    expect(hint.querySelector('.rail-key__hold .key-combo')).not.toBeNull();
-    expect(hint.compareDocumentPosition(within(foot).getByRole('button', { name: 'Start dictating' })))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    unmount();
-    rail(dogfood(), 'home');
-    expect(document.querySelector('.rail-key')).toBeNull();
-    expect(within(document.querySelector('.rail-foot') as HTMLElement).getByRole('button', { name: 'Start dictating' })).toBeEnabled();
   });
 
   it('lets you finish a run from another page with Stop and Cancel', async () => {
@@ -296,16 +282,12 @@ describe('Quiet rail foot (ui-iter-21)', () => {
     expect(screen.getByText('Transcribing…')).toHaveAttribute('role', 'status');
   });
 
-  it('holds the run on Home too, now that the stage shows only your keys (ui-iter-33)', async () => {
-    const user = userEvent.setup();
-    const run = dogfood({ message: 'Inserted into the focused app.', phase: 'recording' });
-    rail(run, 'home');
+  it('stays out of the way on Home, where the stage holds the run', () => {
+    rail(dogfood({ message: 'Inserted into the focused app.', phase: 'recording' }), 'home');
     const sidebar = document.querySelector('.sidebar') as HTMLElement;
-    const foot = sidebar.querySelector('.rail-foot') as HTMLElement;
-    await user.click(within(foot).getByRole('button', { name: 'Stop' }));
-    expect(run.stop).toHaveBeenCalledOnce();
-    expect(within(foot).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    expect(sidebar.querySelector('.rail-key, .rail-warp, .rail-cloth, .rail-shuttle')).toBeNull();
+    expect(within(sidebar).queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(within(sidebar).queryByRole('status')).not.toBeInTheDocument();
+    expect(sidebar.querySelector('.rail-warp, .rail-cloth, .rail-shuttle')).toBeNull();
   });
 });
 

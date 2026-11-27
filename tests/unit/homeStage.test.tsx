@@ -46,7 +46,7 @@ describe('Home voice stage', () => {
     expect(stage()).toHaveAttribute('data-phase', 'idle');
     expect(stage().querySelector('#home-title')).not.toBeNull();
     expect(stage().querySelector('#capture-title')).toBeNull();
-    // ui-iter-25: the readout row is gone; the keys and the rail say what the mic is doing.
+    // ui-iter-25: the readout row is gone; Start and the rail say what the mic is doing.
     expect(stage().querySelector('.stage__readout')).toBeNull();
     expect(screen.queryByText('Mic off')).toBeNull();
     // Model and output are named for screen readers and shown as values, on the page's colophon.
@@ -56,11 +56,11 @@ describe('Home voice stage', () => {
     expect(stage().querySelector('.recent-list')).toBeNull();
   });
 
-  it('draws one loom around your keys: hidden, unfocusable, seven threads in and seven out (ui-iter-33)', () => {
+  it('draws one loom, on the weft: hidden, unfocusable, seven threads into Start and out of Copy', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const looms = [...stage().querySelectorAll('svg.loom')];
     expect(looms).toHaveLength(2);
-    const bar = stage().querySelector('.home-hero__title.loom-bar')!;
+    const bar = stage().querySelector('.loom-bar')!;
     for (const loom of looms) {
       expect(loom).toHaveAttribute('aria-hidden', 'true');
       expect(loom).toHaveAttribute('focusable', 'false');
@@ -69,30 +69,26 @@ describe('Home voice stage', () => {
     expect(bar.querySelectorAll('.loom--in .loom__side--in .loom__pulse')).toHaveLength(7);
     expect(bar.querySelectorAll('.loom--out .loom__side--out .loom__pulse')).toHaveLength(7);
     expect(bar.querySelectorAll('.loom__warp')).toHaveLength(14);
-    // The threads run into "Hold <keys>" and out of "to dictate"; the heading itself holds none.
-    const title = screen.getByRole('heading', { level: 1 });
-    expect(title).toHaveTextContent(/^Hold .* to dictate$/);
-    expect(title.querySelector('svg')).toBeNull();
-    expect(looms[0].compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(title.compareDocumentPosition(looms[1])).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(stage().querySelector('.dictate, .pick__weft')).toBeNull();
+    // The shortcut heading no longer carries threads of its own.
+    expect(stage().querySelector('.home-hero__title svg')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Hold .* to dictate$/);
   });
 
-  it('lights up while capturing and transcribing; the rail\'s foot says Stop and Cleaning up… (ui-iter-33)', () => {
+  it('lights up while capturing and transcribing', () => {
     const { unmount } = renderWithApp(<Home dogfood={dogfood({ phase: 'recording' })} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'listening');
-    expect(screen.queryByRole('button', { name: 'Stop' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
     unmount();
     renderWithApp(<Home dogfood={dogfood({ phase: 'cleaning' })} onToast={vi.fn()} />);
     expect(stage()).toHaveAttribute('data-phase', 'processing');
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByText('Cleaning up…')).toHaveAttribute('role', 'status');
   });
 
   it('says how your words are made once, as the colophon after the earlier dictations (ui-iter-29)', () => {
     renderWithApp(<Home dogfood={dogfood()} onToast={vi.fn()} />);
     const page = document.querySelector('.home > .home-page')!;
     const colophon = page.querySelector('.home-colophon')!;
-    // Nothing stands between the stage and the earlier words: the colophon is the page's last part.
+    // Nothing stands between the weft and the earlier words: the colophon is the page's last part.
     expect(page.lastElementChild).toBe(colophon);
     expect(screen.getByRole('region', { name: 'Earlier dictations' }).compareDocumentPosition(colophon))
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
@@ -153,10 +149,9 @@ describe('voice stage styles', () => {
     expect(css('daylight-pages.css')).not.toMatch(/\.loom__pulse \{[^}]*opacity/);
   });
 
-  it('lays the threads beside the keys without changing the heading\'s height (ui-iter-33)', () => {
+  it('lays the threads on the weft without changing its height (ui-iter-25)', () => {
     const bar = css('loom-bar.css');
-    expect(bar).toMatch(/\.loom-bar \.loom \{[^}]*margin-block: calc\(var\(--loom-h\) \/ -2\);[^}]*z-index: -1;/);
-    expect(bar).toMatch(/\.loom-bar h1 \{ grid-area: 1 \/ 2;/);
+    expect(bar).toMatch(/\.loom-bar \.loom \{[^}]*margin-block: calc\(\(var\(--bar-h\) - var\(--loom-h\)\) \/ 2\);[^}]*z-index: -1;/);
     expect(bar).toMatch(/\.loom-bar \.loom--in \{ grid-column: 1;/);
     expect(bar).toMatch(/\.loom-bar \.loom--out \{ grid-column: 3;/);
   });
