@@ -21,7 +21,7 @@ export function toastTone(message: string): ToastTone {
 }
 
 /**
- * A tag that drops on a string from the toolbar beam, under Recall, and is tied off with
+ * A tag that drops on a string from the window's top edge, over the page, tied off with
  * the HUD's knots, so severity reads by shape as well as colour (ui-iter-19). It hangs
  * over the page's header, never over the rows you are working in. Announced politely;
  * timings live in useToastMessages.

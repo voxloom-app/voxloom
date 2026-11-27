@@ -1,4 +1,4 @@
-/// ui-iter-19: sheets hang from the toolbar's beam and toasts are knotted tags.
+/// ui-iter-19: sheets hang from the window's top edge (the toolbar's beam until ui-iter-27) and toasts are knotted tags.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -44,6 +44,11 @@ describe('hanging sheet', () => {
     expect(css('daylight.css')).toMatch(/--brand-a: #548a00;\s*--brand-b: #008a9e;/);
   });
 
+  it('drops from the window top in both windows: neither has a toolbar (ui-iter-27)', () => {
+    expect(hang).toMatch(/\.overlay \{[^}]*--beam-y: 0px;/);
+    expect(hang).not.toContain('#root:has(.settings-window-root) ~ .overlay');
+  });
+
   it('loads after the old sheet rules and before the responsive and daylight layers', () => {
     const index = css('index.css');
     const at = (file: string) => index.indexOf(`@import "./${file}";`);
@@ -66,8 +71,8 @@ describe('knotted toast tag', () => {
     expect(knot.querySelector(shape)).not.toBeNull();
   });
 
-  it('hangs on a string under the toolbar and only fades for reduced motion', () => {
-    expect(tag).toMatch(/\.toast \{[^}]*bottom: auto;[^}]*top: 52px;/);
+  it('hangs on a string from the window top and only fades for reduced motion', () => {
+    expect(tag).toMatch(/\.toast \{[^}]*bottom: auto;[^}]*top: var\(--s-6\);/);
     expect(tag).toMatch(/\.toast::before \{[^}]*bottom: 100%;/);
     expect(tag.slice(tag.indexOf('prefers-reduced-motion'))).toContain('.toast { transition: opacity .16s ease; }');
   });

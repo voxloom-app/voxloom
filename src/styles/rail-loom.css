@@ -108,6 +108,34 @@
   transform: translateY(2px);
 }
 
+/* The rail's last line (ui-iter-27): Settings… and the shortcuts "?", which used to sit at
+   the right of a toolbar that crossed every page. Quieter than the pages until pointed at. */
+.rail-tools { align-items: center; border-top: 1px solid var(--line); display: flex; gap: var(--s-3); padding-top: var(--s-5); }
+.rail-settings {
+  align-items: center;
+  border: 0;
+  border-radius: var(--r-tile);
+  color: var(--mut);
+  display: flex;
+  flex: 1;
+  gap: 9px;
+  min-width: 0;
+  padding: var(--s-3) var(--s-5);
+  text-align: left;
+}
+.rail-settings kbd { color: var(--mut); font-size: var(--fs-micro); margin-left: auto; visibility: hidden; }
+.rail-settings:is(:hover, :focus-visible) kbd { visibility: visible; }
+.rail-settings:is(:hover, :focus-visible) { background: rgba(255, 255, 255, .05); color: var(--fg); }
+.rail-settings[aria-current="page"] {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--brand-a) 14%, transparent), transparent);
+  box-shadow: inset 3px 0 0 var(--sel-edge);
+  color: var(--fg);
+  font-weight: 600;
+}
+.rail-settings[aria-current="page"] .icon { color: var(--accfg); }
+.rail-help { border: 1px solid var(--ctl-line); border-radius: 50%; color: var(--mut); flex: none; height: 24px; padding: 0; width: 24px; }
+.rail-help:is(:hover, :focus-visible) { color: var(--fg); }
+
 .dev-panel summary { color: var(--mut); cursor: pointer; font-size: var(--fs-label); padding: 0 var(--s-4); }
 .dev-panel .state-lab { border-top: 0; margin-top: var(--s-3); padding-top: 0; }
 

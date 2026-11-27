@@ -1,6 +1,6 @@
-/* The loom frame (ui-iter-08). The window is one instrument: the warp rail, the toolbar and
-   each page's stage join into a single dark frame in both themes, and everything you work
-   with (dictations, words, settings rows) lies on one sheet of cloth that the frame holds.
+/* The loom frame (ui-iter-08). The window is one instrument: the warp rail and each page's
+   stage join into a single dark frame in both themes (no toolbar since ui-iter-27), and
+   everything you work with (dictations, words, settings rows) lies on one sheet of cloth.
    The stage stops being a floating card: it is the frame's beam, its glows run to the rail
    and the window edge, and a reed of brand threads feeds the cloth below it. The native
    Settings window (.settings-window-root) is framed the same way. */
@@ -15,7 +15,6 @@
 .app { --gutter: max(var(--gutter-min), calc((100vw - var(--side-w) - var(--frame) * 2 - var(--content-max)) / 2 + var(--pad-x))); }
 
 /* Frame surfaces outside a stage use the stage's dark tokens (see stage.css). */
-.titlebar,
 :is(.main, .settings-window-root) > .banner,
 :is(.main, .settings-window-root) > section[aria-busy] > .page-head {
   color-scheme: dark;
@@ -40,9 +39,6 @@
   --text: var(--fg);
   color: var(--fg);
 }
-
-.titlebar { border-bottom: 0; padding: 0 var(--gutter); }
-.titlebar__title { color: #f6f6f9; letter-spacing: -.01em; }
 
 .main,
 .settings-window-root {
@@ -143,10 +139,12 @@
 :is(.main, .settings-window-root) > .banner--info { background: color-mix(in srgb, var(--info) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--info) 22%, transparent); }
 :is(.main, .settings-window-root) > .banner--error { background: color-mix(in srgb, var(--err) 11%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--err) 26%, transparent); }
 .main > .banner + .home { margin-top: 0; }
+/* With no toolbar above it, a notice starts level with the rail's brand. */
+.main > .banner { margin-top: var(--s-8); }
 
 /* An open reference book: both leaves stay in the window. The list and long
    proofs scroll independently, including when the leaves stack. */
-.main > .dictionary { flex: 1 1 auto; height: calc(100dvh - 40px - var(--frame)); min-height: 0; }
+.main > .dictionary { flex: 1 1 auto; height: calc(100dvh - var(--frame)); min-height: 0; }
 .main .dictionary > .dictionary-book {
   display: grid;
   flex: 1 1 0;

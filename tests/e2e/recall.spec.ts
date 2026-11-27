@@ -48,34 +48,40 @@ test('Shift+Enter lands on the dictation in History', async ({ page }) => {
 });
 
 for (const width of [1120, 640]) {
-  test(`the search field and reading sheet fit the toolbar at ${width}px`, async ({ page }) => {
+  test(`the search field sits in the rail and its drawer fits beside it at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ height: 620, width });
     await openShell(page);
+    // ui-iter-27: no toolbar. The page starts at the top of the window; Recall sits in the
+    // rail under the brand, and Settings and Help close the rail.
+    expect((await box(page, '.main')).y).toBe(0);
     const tab = await box(page, '.recall__tab');
-    const settings = await box(page, '.tb-settings');
     const rail = await box(page, '.sidebar');
-    expect(tab.x).toBeGreaterThanOrEqual(rail.x + rail.width);
-    expect(tab.x + tab.width).toBeLessThanOrEqual(settings.x);
-    if (await page.locator('.titlebar__title').isVisible()) {
-      const title = await box(page, '.titlebar__title');
-      expect(tab.x).toBeGreaterThanOrEqual(title.x + title.width);
-    }
+    const nav = await box(page, '.sidebar nav');
+    const tools = await box(page, '.rail-tools');
+    expect(tab.x).toBeGreaterThanOrEqual(rail.x);
+    expect(tab.x + tab.width).toBeLessThanOrEqual(rail.x + rail.width);
+    expect(tab.y + tab.height).toBeLessThanOrEqual(nav.y);
+    expect(tools.x + tools.width).toBeLessThanOrEqual(rail.x + rail.width);
+    expect(tools.y + tools.height).toBeLessThanOrEqual(620);
     await field(page).click();
-    // Measure once the sheet settles.
+    // Measure once the drawer settles.
     await page.locator('.recall__sheet').evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
     const sheet = await box(page, '.recall__sheet');
-    expect(sheet.x).toBeGreaterThanOrEqual(rail.x + rail.width);
+    expect(sheet.x).toBeGreaterThanOrEqual(rail.x + rail.width - 0.5);
     expect(sheet.x + sheet.width).toBeLessThanOrEqual(width);
+    expect(Math.abs(sheet.y - tab.y)).toBeLessThanOrEqual(1);
     expect(sheet.y + sheet.height).toBeLessThanOrEqual(620);
     const preview = await box(page, '.recall-leaf');
     const index = await box(page, '.recall__list');
     if (width === 640) expect(preview.y).toBeGreaterThanOrEqual(index.y + index.height - 1);
     else expect(preview.x).toBeGreaterThanOrEqual(index.x + index.width - 1);
     await expect(page.getByRole('button', { name: 'Copy passage' })).toBeInViewport();
-    // The sheet lies over the page: nothing below the toolbar takes the click.
-    const hit = await page.evaluate(([x, y]) => document.elementFromPoint(x, y)?.closest('.recall') !== null,
-      [sheet.x + sheet.width / 2, sheet.y + 40]);
-    expect(hit).toBe(true);
+    // The drawer lies over the page, and the field stays above the dim: both take the pointer.
+    const hits = await page.evaluate(([x, y, fx, fy]) => [
+      document.elementFromPoint(x, y)?.closest('.recall__sheet') !== null,
+      document.elementFromPoint(fx, fy)?.closest('.recall__tab') !== null,
+    ], [sheet.x + sheet.width / 2, sheet.y + 40, tab.x + tab.width / 2, tab.y + tab.height / 2]);
+    expect(hits).toEqual([true, true]);
   });
 }
 

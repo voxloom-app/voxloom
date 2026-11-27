@@ -76,7 +76,28 @@ const activeOption = () => document.getElementById(field().getAttribute('aria-ac
 const currentScreen = () => within(screen.getByRole('navigation', { name: 'Voxloom screens' }))
   .getAllByRole('button').find((b) => b.getAttribute('aria-current') === 'page')?.getAttribute('aria-label');
 
-describe('Recall in the toolbar (ui-iter-11)', () => {
+describe('Recall at the top of the rail (ui-iter-11, moved by ui-iter-27)', () => {
+  it('sits in the rail under the brand, before the pages, with Settings and Help closing the rail', async () => {
+    await openApp();
+    const rail = document.querySelector('.sidebar') as HTMLElement;
+    expect(rail).toContainElement(field());
+    const order = [...rail.children].map((child) => child.classList[0]);
+    expect(order.slice(0, 3)).toEqual(['brand', 'recall', undefined]);
+    expect(rail.children[2].tagName).toBe('NAV');
+    expect(order.at(-1)).toBe('rail-tools');
+    const tools = rail.lastElementChild as HTMLElement;
+    expect(within(tools).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['Settings', 'Open keyboard shortcuts']);
+  });
+
+  it('opens its drawer level with the field', async () => {
+    const user = await openApp();
+    const box = document.querySelector('.recall') as HTMLElement;
+    expect(box.style.getPropertyValue('--recall-top')).toBe('');
+    await user.click(field());
+    expect(box).toHaveAttribute('data-open');
+    expect(box.style.getPropertyValue('--recall-top')).toMatch(/^\d+px$/);
+  });
+
   it('⌘K opens it from anywhere with your latest dictations, then the pages', async () => {
     const user = await openApp();
     expect(field()).toHaveAttribute('aria-expanded', 'false');
@@ -215,6 +236,13 @@ describe('Recall styles (ui-iter-11)', () => {
     expect(css('index.css')).toMatch(/@import "\.\/rail-loom\.css";\n@import "\.\/recall\.css";\n@import "\.\/primary-layered\.css";/);
   });
 
+  it('slides its drawer out of the rail edge and lifts the rail over the dim while open (ui-iter-27)', () => {
+    expect(recall).not.toContain('.titlebar');
+    expect(recall).toMatch(/\.recall__sheet \{[^}]*left: var\(--side-w\);[^}]*position: fixed;[^}]*top: var\(--recall-top, 64px\);/);
+    expect(recall).toContain('.sidebar:has(.recall[data-open]) { z-index: 15; }');
+    expect(recall).toContain('@keyframes recall-drop { from { transform: translateX(-8px); } }');
+  });
+
   it('keeps the sheet in place under reduced motion', () => {
     const reduced = recall.slice(recall.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toMatch(/\.recall__scrim,\s*\.recall__sheet \{ animation: none; \}/);
@@ -229,7 +257,7 @@ describe('Recall styles (ui-iter-11)', () => {
     const mix = (a: string, b: string, t: number) => `#${rgb(a).map((v, i) => Math.round(v * t + rgb(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('')}`;
     const read = (source: string, name: string, after = 0) => new RegExp(`${name}:\\s*(#[0-9a-f]{6})`).exec(source.slice(after))![1];
     const daylight = css('daylight.css');
-    const lightTokens = daylight.indexOf('.titlebar, .main > .banner');
+    const lightTokens = daylight.indexOf('.sidebar, .guided-rail, .main > .banner');
     const nightCloth = read(recall, '--recall-cloth');
     const dayCloth = read(recall, '--recall-cloth', recall.indexOf('[data-appearance-resolved="light"] .recall__sheet'));
     const themes = {

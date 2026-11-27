@@ -1,12 +1,12 @@
 /* Interruptions hang from the loom (ui-iter-19). Dialogs stopped floating mid-window as
-   generic cards: each one is a sheet of cloth that drops from the toolbar's beam on two
-   threads, the way a macOS sheet drops from its title bar. A lit rod carries it (the rail's
-   Today beam, pegs and all), the cloth holds the content, and its warp hangs loose below as
-   a fringe of lime and cyan. Behind it the window pauses: a dim with the warp showing through.
+   generic cards: each one is a sheet of cloth that drops from the window's top edge on two
+   threads, the way a macOS sheet drops from its title bar (no toolbar since ui-iter-27). A
+   lit rod carries it (the rail's Today beam, pegs and all), the cloth holds the content, and
+   its warp hangs loose below as a fringe of lime and cyan. Behind it the window pauses: a dim with the warp showing through.
    Toasts hang from the same beam as tags (toast-tag.css). */
 
 .overlay {
-  --beam-y: 44px;       /* the toolbar's lower edge */
+  --beam-y: 0px;        /* the window's top edge: neither window has a toolbar */
   --drop: var(--s-11);  /* thread length from the beam to the rod */
   --sheet-max: 500px;
   --sheet-room: calc(100dvh - var(--beam-y) - var(--drop) - var(--s-11) * 2);
@@ -16,13 +16,11 @@
   overscroll-behavior: contain;
   padding: calc(var(--beam-y) + var(--drop)) var(--s-10) var(--s-11);
 }
-/* In the main window the sheet hangs under the toolbar's centre (where Recall sits), and only
-   reaches over the rail when the page column is too narrow for it. */
+/* In the main window the sheet hangs over the page column, and only reaches over the rail
+   when the page column is too narrow for it. */
 #root:has(.app:not([hidden])) ~ .overlay {
   padding-left: clamp(var(--s-10), 100vw - var(--sheet-max) - var(--s-10), var(--side-w));
 }
-/* The native Settings window has no toolbar: its sheets drop from the window's top edge. */
-#root:has(.settings-window-root) ~ .overlay { --beam-y: 0px; }
 
 /* The window pauses: one dim, and the warp showing through it under the beam. */
 .overlay::before,
@@ -56,7 +54,7 @@
   position: absolute;
   top: calc(var(--drop) * -1 - 1px);
 }
-/* The beam itself: a lit run along the toolbar's edge where the threads are tied. */
+/* The beam itself: a lit run along the window's edge where the threads are tied. */
 .overlay__hang::after {
   background: linear-gradient(90deg, transparent, var(--brand-a) 30%, var(--brand-b) 70%, transparent);
   content: "";

@@ -1,5 +1,5 @@
 /* The loom by daylight (ui-iter-10). Light appearance gets its own material instead of the
-   night loom: the frame (rail, toolbar, every page's beam and setup) is woven linen, text is
+   night loom: the frame (rail, every page's beam and setup) is woven linen, text is
    ink, and the threads are dyed deep enough to read on it (lime #548a00, cyan #008a9e, both
    3:1+ as graphics). The vivid brand stays where it is lit: primary buttons, the app tile,
    the shuttle, and the voice glows, which become sunlight through dyed thread. Dark keeps
@@ -24,7 +24,7 @@
 
 /* Daylight tokens for every frame surface (each re-declares the night set). Text holds AA
    over the frame's darkest stop, the sunlit glows, the selected nav and the segmented track. */
-[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .titlebar, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head) {
+[data-appearance-resolved="light"] :is(.stage, .sidebar, .guided-rail, .main > .banner, .settings-window-root > .banner, .main > section[aria-busy] > .page-head, .settings-window-root > section[aria-busy] > .page-head) {
   color-scheme: light;
   --panel: #efebe3;
   --field: #fbfaf7;
@@ -54,7 +54,6 @@
 [data-appearance-resolved="light"] .guided-main.stage {
   background: linear-gradient(90deg, transparent 8%, var(--brand-a) 35%, var(--brand-b) 65%, transparent 92%) top / 100% 1px no-repeat;
 }
-[data-appearance-resolved="light"] .titlebar__title,
 [data-appearance-resolved="light"] :is(.main, .settings-window-root) > section[aria-busy] > .page-head h1 { color: var(--fg); }
 
 /* The cloth: bleached paper laid on the linen, lifted by a soft shadow instead of a black edge. */
@@ -133,5 +132,5 @@
   box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 rgba(70, 56, 30, .16), 0 2px 6px -1px rgba(70, 56, 30, .3);
 }
 [data-appearance-resolved="light"] .stage .seg__item.on { box-shadow: inset 0 0 0 1px var(--sel-edge), 0 1px 2px rgba(70, 56, 30, .2); }
-[data-appearance-resolved="light"] .titlebar .tb-settings[aria-current="page"],
-[data-appearance-resolved="light"] .titlebar .tb-settings:is(:hover, :focus-visible) { background: rgba(255, 255, 255, .7); }
+[data-appearance-resolved="light"] .rail-settings:is(:hover, :focus-visible) { background: rgba(70, 56, 30, .06); }
+[data-appearance-resolved="light"] .rail-settings[aria-current="page"] { background: linear-gradient(90deg, color-mix(in srgb, #b6ff3c 34%, transparent), transparent); }

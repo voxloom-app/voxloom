@@ -206,8 +206,9 @@ describe('BUS-48 contrast tokens', () => {
     expect(css('base.css')).toMatch(/input,\nselect,\ntextarea \{[^}]*border: 1px solid var\(--ctl-line\)/);
     expect(css('components.css')).toMatch(/\.btn \{[^}]*border-color: var\(--ctl-line\)/);
     expect(css('ui-controls.css')).toMatch(/\.search \{[^}]*border: 1px solid var\(--ctl-line\)/);
-    expect(css('shell.css')).toMatch(/\.tb-settings\[aria-current="page"\] \{ box-shadow: inset 0 -2px 0 var\(--sel-edge\); \}/);
-    expect(css('shell.css')).toMatch(/\.tb-help \{[^}]*border: 1px solid var\(--ctl-line\)/);
+    // ui-iter-27: Settings… and "?" moved from the toolbar to the rail's foot.
+    expect(css('rail-loom.css')).toMatch(/\.rail-settings\[aria-current="page"\] \{[^}]*box-shadow: inset 3px 0 0 var\(--sel-edge\);/);
+    expect(css('rail-loom.css')).toMatch(/\.rail-help \{[^}]*border: 1px solid var\(--ctl-line\)/);
   });
 
   it('marks selected nav and segment with --sel-edge', () => {

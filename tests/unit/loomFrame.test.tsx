@@ -70,7 +70,8 @@ describe('The loom frame (ui-iter-08): each page is a beam on the frame and a sh
     renderWithApp(<App />);
     await user.click(screen.getByRole('button', { name: 'Set up later' }));
     const shell = document.getElementById('app-shell')!;
-    expect(layers(shell)).toEqual(['titlebar', 'sidebar', 'main']);
+    // ui-iter-27: no toolbar crosses the pages; the rail carries Recall, Settings and Help.
+    expect(layers(shell)).toEqual(['sidebar', 'main']);
     expect(shell.querySelector('.sidebar')).toHaveAttribute('data-phase', 'idle');
     expect(frame).toContain('.sidebar:is([data-phase="listening"], [data-phase="speaking"]) ~ .main :is(.cloth, .settings-panel)::before');
     expect(frame).toContain('.sidebar[data-phase="processing"] ~ .main :is(.cloth, .settings-panel)::before');
@@ -101,8 +102,9 @@ describe('frame.css', () => {
     const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
     const pick = (block: string, name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(block)![1];
 
-    // Frame text (toolbar, notices, boot title) over the frame's lightest and darkest stops and the notice tints.
-    const frameBlock = frame.slice(frame.indexOf('.titlebar,'), frame.indexOf('.titlebar {'));
+    // Frame text (notices, boot title) over the frame's lightest and darkest stops and the notice tints.
+    const frameStart = frame.indexOf('/* Frame surfaces outside a stage');
+    const frameBlock = frame.slice(frameStart, frame.indexOf('\n}\n', frameStart));
     expect(frameBlock).toContain('color-scheme: dark;');
     expect(frameBlock).toContain('--focus: var(--brand-a);');
     const top = '#17171f';
@@ -113,7 +115,7 @@ describe('frame.css', () => {
       }
       expect(ratio('#b6ff3c', surface), `focus ring on ${surface}`).toBeGreaterThanOrEqual(3);
     }
-    // The toolbar's bordered Help button sits on the frame itself (notice actions are borderless ghosts).
+    // A bordered control on the frame keeps its ring (notice actions are borderless ghosts).
     for (const surface of [top, '#0a0a0e']) {
       expect(ratio(pick(frameBlock, 'ctl-line'), surface), `help button ring on ${surface}`).toBeGreaterThanOrEqual(3);
     }

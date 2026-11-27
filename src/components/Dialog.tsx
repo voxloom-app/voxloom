@@ -62,7 +62,7 @@ export function Dialog({ children, initialFocus, label, onClose, onEscape, opene
       onKeyDown={(event) => trapTab(event, panel.current)}
       role="dialog"
     >
-      {/* The sheet hangs from the toolbar's beam on two threads: a lit rod on top,
+      {/* The sheet hangs from the window's top edge on two threads: a lit rod on top,
           the cloth unrolling from it, and the warp left loose as a fringe (ui-iter-19). */}
       <div className="overlay__hang" onMouseDown={(event) => event.stopPropagation()}>
         <span aria-hidden="true" className="overlay__rod" />

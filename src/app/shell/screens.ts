@@ -1,7 +1,7 @@
 import type { IconName } from '../../components/Icon';
 import type { Screen } from '../../domain/types';
 
-/** Sidebar screens (⌥1–3). Settings is opened from the title bar, ⌥4 or ⌘,. */
+/** Sidebar screens (⌥1–3). Settings is opened from the rail's foot, ⌥4 or ⌘,. */
 export const navScreens: { icon: IconName; label: string; value: Screen }[] = [
   { icon: 'house', label: 'Home', value: 'home' },
   { icon: 'clock', label: 'History', value: 'history' },

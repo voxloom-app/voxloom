@@ -61,6 +61,12 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
   const expanded = open && options.length > 0;
   const selected = options[current];
   const list = useRef<HTMLDivElement>(null);
+  // The drawer opens level with the field, wherever the rail's brand left it (ui-iter-27).
+  const tab = useRef<HTMLLabelElement>(null);
+  useLayoutEffect(() => {
+    const field = tab.current;
+    if (open && field) field.parentElement?.style.setProperty('--recall-top', `${Math.max(0, Math.round(field.getBoundingClientRect().top))}px`);
+  }, [open]);
   useLayoutEffect(() => {
     const pane = list.current;
     const row = pane?.querySelector('[aria-selected="true"]');
@@ -185,7 +191,7 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
       }}
     >
       {open && <div aria-hidden="true" className="recall__scrim" />}
-      <label className="recall__tab">
+      <label className="recall__tab" ref={tab}>
         <Icon name="search" size={16} />
         <input
           aria-activedescendant={expanded && current >= 0 ? optionId(current) : undefined}
@@ -210,7 +216,7 @@ export function Recall({ records, now, inputRef, onCopy, onShow, onNavigate }: P
           }}
           onFocus={onFocus}
           onKeyDown={onKeyDown}
-          placeholder={open ? 'Find words in a dictation…' : 'Recall a dictation'}
+          placeholder={open ? 'Find words…' : 'Recall a dictation'}
           ref={inputRef}
           role="combobox"
           spellCheck={false}

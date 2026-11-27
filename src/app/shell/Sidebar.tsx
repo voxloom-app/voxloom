@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { AppTile } from '../../components/AppTile';
 import { Icon } from '../../components/Icon';
 import { isMacPlatform, KeyCombo } from '../../components/KeyCombo';
@@ -22,6 +23,10 @@ type Props = {
   onReset: () => void;
   /** The shared run, so a dictation can be finished from pages without the Start capsule. */
   capture?: CaptureProps;
+  /** Recall, under the brand (ui-iter-27: the window has no toolbar). */
+  search?: ReactNode;
+  /** Settings… and the shortcuts "?", the rail's last line. */
+  tools?: ReactNode;
 };
 
 /**
@@ -30,9 +35,10 @@ type Props = {
  * and its live status, the pages, and Today on its beam, with a tick on the rod for each
  * dictation by time of day. Start dictating lives on Home's stage beside Copy. Away from
  * Home the rail's foot says which keys to hold or, during a run, offers Stop and Cancel
- * and then what the run did.
+ * and then what the run did. Since ui-iter-27 it is the window's only chrome: Recall sits
+ * under the brand and Settings… closes the rail, so no toolbar crosses the pages.
  */
-export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset }: Props) {
+export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset, search, tools }: Props) {
   const active = useShortcutActive();
   const away = screen !== 'home';
   const news = away && capture !== undefined && runHasNews(capture.dogfood);
@@ -45,6 +51,7 @@ export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onN
           <small className="brand__status"><i aria-hidden="true" className="brand__dot" />{status}</small>
         </div>
       </div>
+      {search}
       <nav aria-label="Voxloom screens">
         {navScreens.map(({ icon, label, value }, index) => (
           <button
@@ -79,6 +86,7 @@ export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onN
           <ScenarioPanel onReset={onReset} />
         </details>
       )}
+      {tools}
     </aside>
   );
 }

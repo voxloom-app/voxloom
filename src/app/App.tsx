@@ -16,9 +16,9 @@ import { useDogfoodCapture } from '../services/stt/useDogfoodCapture';
 import { ResetSessionDialog, ShortcutsDialog } from './AppDialogs';
 import { useApp } from './AppContext';
 import { BootHydratePlaceholder } from './shell/BootHydratePlaceholder';
+import { RailTools } from './shell/RailTools';
 import { Recall } from './shell/Recall';
 import { Sidebar } from './shell/Sidebar';
-import { TitleBar } from './shell/TitleBar';
 import { useAppKeys } from './useAppKeys';
 import { useDevSession } from './useDevSession';
 import { toGestureDogfoodBridge, useShortcutGestures } from './useShortcutGestures';
@@ -157,28 +157,32 @@ export function App() {
   // Home keeps its state and the opener gets focus back, but is not shown.
   return <>
     <div className="app" hidden={onboardingOpen} id="app-shell">
-      <TitleBar
-        onHelp={openHelp}
-        onSettings={() => navigate('settings')}
-        settingsOpen={!native && state.screen === 'settings'}
-      >
-        <Recall
-          inputRef={recallInput}
-          now={now}
-          onCopy={copyText}
-          onNavigate={navigate}
-          onShow={showRecalled}
-          records={state.records}
-        />
-      </TitleBar>
+      {/* No toolbar (ui-iter-27): the rail carries Recall and Settings, pages start at the top. */}
       <Sidebar
         capture={{ dogfood, isNative: native, onCopy: copyText }}
         onNavigate={navigate}
         onReset={dev.requestReset}
         phase={phase}
         screen={state.screen}
+        search={(
+          <Recall
+            inputRef={recallInput}
+            now={now}
+            onCopy={copyText}
+            onNavigate={navigate}
+            onShow={showRecalled}
+            records={state.records}
+          />
+        )}
         shortcut={state.settings.shortcut}
         status={status}
+        tools={(
+          <RailTools
+            onHelp={openHelp}
+            onSettings={() => navigate('settings')}
+            settingsOpen={!native && state.screen === 'settings'}
+          />
+        )}
       />
       <main className="main">
         {bootReady && state.screen === 'home' && !onboardingOpen && !state.onboarding.complete && <div className="banner banner--info"><span className="banner__text">Setup is incomplete. Connect access and try both ways to dictate.</span><button className="btn ghost" onClick={(event) => { modalOpener.current = event.currentTarget; setOnboardingOpen(true); }} type="button">Resume setup</button></div>}

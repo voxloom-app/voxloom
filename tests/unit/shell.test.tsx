@@ -4,8 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/app/App';
 import { Switch } from '../../src/components/Switch';
 import { screenForAltDigit } from '../../src/app/shell/screens';
+import { RailTools } from '../../src/app/shell/RailTools';
 import { Sidebar } from '../../src/app/shell/Sidebar';
-import { TitleBar } from '../../src/app/shell/TitleBar';
 import { Home } from '../../src/features/home/Home';
 import { LoomBar } from '../../src/features/home/LoomBar';
 import { isTauriEnv } from '../../src/services/capture/captureService';
@@ -121,9 +121,9 @@ describe('App shell (UI PR 3)', () => {
     expect(fireEvent.keyDown(document, { altKey: true, code: 'Digit7', key: '¶' })).toBe(true);
   });
 
-  it('opens Settings from the title bar, ⌥4 and ⌘,', async () => {
+  it('opens Settings from the rail, ⌥4 and ⌘,', async () => {
     const user = await renderShell();
-    const settings = screen.getByRole('button', { name: 'Settings' });
+    const settings = within(document.querySelector('.sidebar') as HTMLElement).getByRole('button', { name: 'Settings' });
     await user.click(settings);
     expect(settings).toHaveAttribute('aria-current', 'page');
     expect(current()).toBeUndefined();
@@ -284,22 +284,24 @@ describe('Quiet rail foot (ui-iter-21)', () => {
   });
 });
 
-describe('Title bar (designer: standard macOS title bar)', () => {
-  it('draws the app name only in the browser preview, never a fake inset', async () => {
+describe('No toolbar (ui-iter-27; designer: standard macOS title bar)', () => {
+  it('names the app once, in the rail, in the browser preview and natively', () => {
     const { unmount, container } = renderWithApp(<App />);
-    expect(container.querySelector('.titlebar__title')).toHaveTextContent('Voxloom');
+    expect(container.querySelector('#app-shell > header, .titlebar')).toBeNull();
+    expect(container.querySelector('.brand__name')).toHaveTextContent('Voxloom');
     unmount();
     vi.mocked(isTauriEnv).mockReturnValue(true);
     const native = renderWithApp(<App />);
-    expect(native.container.querySelector('.titlebar__title')).toBeNull();
+    expect(native.container.querySelector('#app-shell > header, .titlebar')).toBeNull();
+    expect(native.container.querySelectorAll('.brand__name')).toHaveLength(1);
   });
 });
 
 describe('off-Mac shell labels (QA #45)', () => {
-  it('title bar says Ctrl+, and the sidebar says Alt+1–3 and Ctrl+Shift+Space', () => {
+  it('the rail says Ctrl+,, Alt+1–3 and Ctrl+Shift+Space', () => {
     const spy = vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
     try {
-      render(<TitleBar onHelp={() => {}} onSettings={() => {}} settingsOpen={false} />);
+      render(<RailTools onHelp={() => {}} onSettings={() => {}} settingsOpen={false} />);
       expect(screen.getByRole('button', { name: 'Settings' })).toHaveTextContent('Settings… Ctrl+,');
       renderWithApp(
         <Sidebar onNavigate={() => {}} onReset={() => {}} screen="history" shortcut="Control+Shift+Space" status="Ready" />,

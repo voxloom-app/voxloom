@@ -8,7 +8,7 @@ type Options = {
   blocked: boolean;
   onHelp: (opener: HTMLElement) => void;
   onNavigate: (screen: Screen) => void;
-  /** Cmd/Ctrl+K anywhere, or "/" when not typing: focus Recall in the toolbar. */
+  /** Cmd/Ctrl+K anywhere, or "/" when not typing: focus Recall at the top of the rail. */
   onRecall?: () => void;
 };
 
