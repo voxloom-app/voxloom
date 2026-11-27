@@ -1,15 +1,15 @@
 import { replaceDictionaryTerms } from '../../services/dictionary/replace';
 
 /**
- * Dictionary as a spelling loom (ui-iter-05). Everything here is read back
- * through `replaceDictionaryTerms`, the deterministic match every dictation
- * runs, so the page never claims a catch the pipeline would not make.
+ * What the Dictionary page shows about each word: the forms a row "replaces"
+ * and the marked preview in the Add sheet's check. Everything here is read
+ * back through `replaceDictionaryTerms`, the deterministic match every
+ * dictation runs, so the page never claims a fix the pipeline would not make.
  */
 
 /** Longer entries get no examples: the row stays one line and the work small. */
 const MAX_TERM = 40;
 const MAX_FORMS = 3;
-const MAX_SAMPLE_TERMS = 3;
 const WORD_CHAR = /[\p{L}\p{M}\p{N}_]/u;
 
 const splitAt = (term: string, joiner: string) => term.replace(/(\p{Ll})(\p{Lu})/gu, `$1${joiner}$2`);
@@ -46,20 +46,6 @@ export function restoredForms(term: string, words: readonly string[]): string[] 
 /** Restored forms for every saved spelling, keyed by the spelling. */
 export function formsByWord(words: readonly string[]): Map<string, string[]> {
   return new Map(words.map((word) => [word, restoredForms(word, words)]));
-}
-
-/**
- * An editable example built from the newest entries' first restored forms,
- * so the proof opens on the user's own words. Empty when nothing would change.
- */
-export function sampleSentence(words: readonly string[], forms: ReadonlyMap<string, string[]>): string {
-  const heard = [...words].reverse()
-    .map((word) => forms.get(word)?.[0])
-    .filter((form): form is string => Boolean(form))
-    .slice(0, MAX_SAMPLE_TERMS);
-  if (!heard.length) return '';
-  const last = heard.pop()!;
-  return `Follow up on ${heard.length ? `${heard.join(', ')} and ${last}` : last}.`;
 }
 
 export type ProofSegment =

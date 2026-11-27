@@ -80,7 +80,7 @@ test('screens, settings, themes, and baselines stay synchronized', async (
   await page.goto('/');
   await skipOnboarding(page);
   await page.getByRole('button', { name: 'Dictionary' }).click();
-  await page.getByRole('button', { name: 'Add term' }).click();
+  await page.getByRole('button', { name: 'Add a word' }).click();
   await expectAccessible(page);
   await page.getByRole('textbox', { name: 'Word' }).fill(' Vite ');
   await page.getByRole('button', { name: 'Save' }).click();

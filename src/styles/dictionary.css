@@ -1,6 +1,6 @@
-/* The left leaf is a lookup index, not a second specimen. Thumb letters mark
-   the beginning of each run; only the facing page shows the heard forms. Both
-   leaves lie open on the page (ui-iter-31): only the binding divides them. */
+/* The word list is the page (ui-iter-35). Thumb letters mark the beginning of
+   each run; each row says what its word replaces. The facing page explains
+   what a saved word does. Both lie open on the page (ui-iter-31). */
 .word-index {
   display: flex;
   flex-direction: column;
@@ -33,19 +33,26 @@
   padding: 0 var(--s-2) 0 0;
 }
 .dictionary .term-row:last-child { border-bottom: 0; }
-.term-row__inspect {
+.term-row__word {
   align-content: center;
   align-items: baseline;
   align-self: stretch;
-  border: 0;
-  border-radius: 0;
   display: grid;
-  gap: var(--s-4);
-  grid-template-columns: 1.7em minmax(0, 1fr);
+  gap: 0 var(--s-4);
+  grid-template-columns: 1.7em minmax(0, max-content) minmax(0, 1fr);
   min-width: 0;
   padding: var(--s-3) 0 var(--s-3) var(--s-1);
-  text-align: start;
 }
+/* What the row replaces gives way to the word: it shortens, then disappears. */
+.term-row__replaces {
+  color: var(--mut);
+  font: var(--fs-micro)/1.5 var(--mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.term-row__verb { font-family: var(--font); font-style: italic; }
 .term-row__initial {
   align-self: start;
   border-inline-end: 1px solid var(--line);
@@ -57,9 +64,7 @@
 .dictionary .term-row__actions { gap: 0; opacity: 1; visibility: visible; }
 .dictionary .term-row__actions .ib { height: 32px; width: 32px; }
 .dictionary .term-row:is(:hover, :focus-within) { background: var(--panel); }
-.term-row__inspect:hover { color: var(--accfg); }
-.dictionary .term-row[data-selected] { background: color-mix(in srgb, var(--accfg) 8%, var(--bg)); box-shadow: inset 3px 0 var(--accfg); }
-.term-row__inspect:focus-visible { outline-offset: -3px; }
+.dictionary .term-row[data-saved] { background: color-mix(in srgb, var(--accfg) 8%, var(--bg)); box-shadow: inset 3px 0 var(--accfg); }
 .dictionary-list-foot {
   align-items: baseline;
   color: var(--mut);
@@ -73,28 +78,15 @@
 .dictionary-list-foot > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dictionary-list-foot abbr { text-decoration: none; white-space: nowrap; }
 
-/* A subtle shadow along the binding separates the two pages without boxing them. */
-.word-leaf {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--mut) 8%, transparent), transparent 13px);
-  border-inline-start: 1px solid var(--line);
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: var(--s-10) max(var(--s-10), calc(var(--gutter) - var(--frame))) var(--s-10) var(--s-10);
-  scrollbar-width: thin;
-}
-.word-leaf__blank { color: var(--mut); font-family: var(--font-words); font-size: var(--fs-sheet); font-style: italic; margin: var(--s-11) 0; }
 @media (max-width: 959px) {
-  .word-index, .word-leaf { padding: var(--s-6) var(--s-8); }
-  .word-leaf { background: none; border-block-start: 1px solid var(--line); border-inline: 0; }
+  .word-index { padding: var(--s-6) var(--s-8); }
   .word-index__head { align-items: center; grid-template-columns: auto minmax(0, 1fr) auto; margin-bottom: var(--s-4); }
   .word-index__head h2 { font-size: var(--fs-sheet); }
   .word-index__head .fine { grid-column: 3; }
   .dictionary .search { grid-column: 2; grid-row: 1; }
 }
 @media (pointer: coarse) {
-  .dictionary .term-row__actions .ib, .term-row__inspect { min-height: 44px; min-width: 44px; }
+  .dictionary .term-row__actions .ib { min-height: 44px; min-width: 44px; }
 }
 
 .editor-form input[aria-invalid="true"] {

@@ -160,7 +160,7 @@ describe('last pick and words-face styles', () => {
     expect(css('home.css')).toMatch(/\.home \.recent-row > p \{[^}]*font-family: var\(--font-words\);/);
     expect(css('history.css')).toMatch(/\.history-row \.history-row__text \{[^}]*font-family: var\(--font-words\);/);
     expect(css('dictionary.css')).toMatch(/\.dictionary \.term-row strong \{[^}]*font-family: var\(--font-words\);/);
-    expect(css('dictionary-stage.css')).toMatch(/\.proof__typed \{[^}]*font-family: var\(--font-words\);/);
+    expect(css('dictionary-stage.css')).toMatch(/\.word-check \.word-check__typed \{[^}]*font-family: var\(--font-words\);/);
     // What the engine heard stays in mono.
     expect(css('history.css')).toMatch(/\.history-row__original p \{[^}]*font-family: var\(--mono\);/);
   });

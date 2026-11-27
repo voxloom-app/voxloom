@@ -102,11 +102,11 @@ describe('App integration', () => {
         screen.getByRole('button', { name: 'Dictionary' }),
       );
       await user.click(
-        screen.getByRole('button', { name: 'Add term' }),
+        screen.getByRole('button', { name: 'Add a word' }),
       );
       await user.type(screen.getByLabelText('Word'), 'Vite');
       await user.click(screen.getByRole('button', { name: 'Save' }));
-      // The list, not the stage's spelling proof, which also shows the newest words.
+      // The list, not the guide's example, which also shows one of your words.
       expect(within(screen.getByRole('list', { name: 'Dictionary words, alphabetical' })).getByText('Vite')).toBeInTheDocument();
     });
 
@@ -132,7 +132,7 @@ describe('App integration', () => {
         screen.getByRole('button', { name: 'Dictionary' }),
       );
       await user.click(
-        screen.getByRole('button', { name: 'Add term' }),
+        screen.getByRole('button', { name: 'Add a word' }),
       );
       fireEvent.keyDown(document, shortcutKey);
       fireEvent.keyUp(document, shortcutKey);

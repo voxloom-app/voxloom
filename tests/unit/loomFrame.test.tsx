@@ -47,7 +47,7 @@ describe('The loom frame (ui-iter-08): each page is a beam on the frame, and the
     expect(history.querySelector('.stage .history-timeline')).toBeNull();
   });
 
-  it('Dictionary: index and specimen lie open as two leaves; the dialog stays outside the page', async () => {
+  it('Dictionary: the word list and its guide lie open side by side; the dialog stays outside the page', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
     const dictionary = document.querySelector('.dictionary')!;
@@ -56,8 +56,8 @@ describe('The loom frame (ui-iter-08): each page is a beam on the frame, and the
     const page = dictionary.querySelector(':scope > .page-body') as HTMLElement;
     expect(page).toHaveClass('dictionary-book');
     expect(within(page).getByRole('list', { name: 'Dictionary words, alphabetical' })).toBeInTheDocument();
-    expect(within(page).getByRole('region', { name: 'Saved spelling specimen' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    expect(within(page).getByText('What adding a word does').closest('details')).toHaveClass('dictionary-guide');
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     expect(page.querySelector('[role="dialog"]')).toBeNull();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });

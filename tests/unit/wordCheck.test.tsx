@@ -6,7 +6,7 @@ import { AppProvider } from '../../src/app/AppContext';
 import { initialWords } from '../../src/domain/fixtures';
 import { Dictionary } from '../../src/features/dictionary/Dictionary';
 import {
-  formsByWord, proofSegments, restoredForms, sampleSentence, type ProofSegment,
+  formsByWord, proofSegments, restoredForms, type ProofSegment,
 } from '../../src/features/dictionary/spellingForms';
 import { createDictionaryStore, createMemoryDictionaryIo } from '../../src/services/dictionary';
 import { replaceDictionaryTerms } from '../../src/services/dictionary/replace';
@@ -22,8 +22,9 @@ const vocabulary = [
 
 const joined = (segments: ProofSegment[]) => segments.map((s) => (s.kind === 'text' ? s.text : s.typed)).join('');
 const catches = (segments: ProofSegment[]) => segments.flatMap((s) => (s.kind === 'catch' ? [[s.typed, s.heard]] : []));
-const proof = () => screen.getByRole('textbox', { name: 'Heard: try a sentence' });
-const typedLine = () => document.getElementById('dictionary-proof-typed')!;
+const check = () => screen.getByRole('textbox', { name: /^What does Voxloom write instead\?/ });
+const preview = () => document.getElementById('dictionary-heard-preview')!;
+const marks = () => [...preview().querySelectorAll('mark')].map((mark) => mark.textContent);
 /** Text a screen reader gets: aria-hidden decoration removed. */
 const spoken = (element: HTMLElement) => {
   const copy = element.cloneNode(true) as HTMLElement;
@@ -31,7 +32,7 @@ const spoken = (element: HTMLElement) => {
   return copy.textContent;
 };
 
-describe('restored forms (ui-iter-05)', () => {
+describe('restored forms (ui-iter-05; shown as "replaces" on each row since ui-iter-35)', () => {
   it('lists split, lowercase and hyphenated forms the real matcher writes back as the spelling', () => {
     expect(restoredForms('TanStack Query', initialWords)).toEqual(['tan stack query', 'tanstack query', 'tan-stack query']);
     expect(restoredForms('TypeScript', initialWords)).toEqual(['type script', 'typescript', 'type-script']);
@@ -52,14 +53,6 @@ describe('restored forms (ui-iter-05)', () => {
       for (const form of list) expect(replaceDictionaryTerms(form, vocabulary), `${form} → ${word}`).toBe(word);
     }
     expect([...forms.values()].flat().length).toBeGreaterThanOrEqual(20);
-  });
-
-  it('builds the sample from the newest spellings, or leaves it empty', () => {
-    const forms = formsByWord(initialWords);
-    expect(sampleSentence(initialWords, forms)).toBe('Follow up on type script, tan stack query and postgres.');
-    expect(sampleSentence(['Postgres'], formsByWord(['Postgres']))).toBe('Follow up on postgres.');
-    expect(sampleSentence(['async'], formsByWord(['async']))).toBe('');
-    expect(sampleSentence([], new Map())).toBe('');
   });
 });
 
@@ -112,84 +105,98 @@ describe('proof segments', () => {
   });
 });
 
-describe('Dictionary spelling stage', () => {
-  it('opens the sentence proof on the saved spellings, knotting each restored stretch', async () => {
+describe('The Add sheet checks a mistake against the word being saved (ui-iter-35)', () => {
+  async function openAdd(word: string) {
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
+    if (word) await user.type(screen.getByRole('textbox', { name: 'Word' }), word);
+    return user;
+  }
+
+  it('previews the fix with the new word included, marking what it replaces, and labels it a preview', async () => {
     renderWithApp(<Dictionary />);
-    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
-    const stage = document.querySelector('.dictionary-stage')!;
-    expect(stage).toHaveClass('stage');
-    expect(within(stage as HTMLElement).getByRole('heading', { level: 1, name: 'Dictionary' })).toBeInTheDocument();
-    expect(within(stage as HTMLElement).getByRole('button', { name: 'Add term' })).toBeInTheDocument();
-    expect(proof()).toHaveValue('Follow up on type script, tan stack query and postgres.');
-    expect(proof()).toHaveAttribute('type', 'text');
+    const user = await openAdd('Voxloom');
+    expect(check()).toHaveAttribute('type', 'text');
+    expect(check()).toHaveAttribute('placeholder', 'For example: voxloom');
     expect(screen.getAllByRole('searchbox')).toHaveLength(1);
-    expect(spoken(typedLine())).toBe('Voxloom types: Follow up on TypeScript (heard as type script), TanStack Query (heard as tan stack query) and Postgres (heard as postgres).');
-    expect([...typedLine().querySelectorAll('mark')].map((mark) => mark.textContent)).toEqual(['TypeScript', 'TanStack Query', 'Postgres']);
-    // The visible "heard" tags are decoration; screen readers get the parenthesis.
-    for (const tag of typedLine().querySelectorAll('.proof__was')) expect(tag).toHaveAttribute('aria-hidden', 'true');
+    expect(preview()).toHaveTextContent('Type a mistake you’ve seen to check how Voxloom will write it.');
+    expect(screen.getByText('Only the word is saved. This preview isn’t.')).toBeInTheDocument();
+    await user.type(check(), 'ship it with vox loom');
+    expect(marks()).toEqual(['Voxloom']);
+    expect(spoken(preview())).toBe('Preview: ship it with Voxloom (replaces vox loom)Fixed: Voxloom will write it like this.');
+    for (const tag of preview().querySelectorAll('.word-check__was')) expect(tag).toHaveAttribute('aria-hidden', 'true');
     // jsdom's name computation drops inline spacing; browsers keep it.
-    expect(proof()).toHaveAccessibleDescription(/^Voxloom types:\s*Follow up on\s*TypeScript\s*\(heard as type script\)/);
-    expect(screen.getByText('3 restored')).toBeInTheDocument();
+    expect(check()).toHaveAccessibleDescription(/^Preview:\s*ship it with\s*Voxloom\s*\(replaces vox loom\)/);
+    expect(document.querySelector('.word-check')).toHaveAttribute('data-state', 'fixed');
   });
 
-  it('proofs what you type, live, without saving it or changing the dictionary', async () => {
+  it('says plainly when spelling alone will not change a mistake, or when it is already right', async () => {
+    renderWithApp(<Dictionary />);
+    const user = await openAdd('Voxloom');
+    await user.type(check(), 'box loom');
+    expect(marks()).toEqual([]);
+    expect(preview()).toHaveTextContent('Not changed by spelling alone. Whisper or cleanup may still catch it.');
+    expect(document.querySelector('.word-check')).toHaveAttribute('data-state', 'unchanged');
+    await user.clear(check());
+    await user.type(check(), 'Voxloom');
+    expect(preview()).toHaveTextContent('That’s already your spelling.');
+    // Words already saved are fixed too, so the preview matches a real dictation.
+    await user.clear(check());
+    await user.type(check(), 'we keep json in postgres');
+    expect(marks()).toEqual(['JSON', 'Postgres']);
+  });
+
+  it('checks an edit against the new spelling, not the one it replaces', async () => {
+    const user = userEvent.setup();
+    renderWithApp(<Dictionary />);
+    await user.click(screen.getByRole('button', { name: 'Edit Postgres' }));
+    const word = screen.getByRole('textbox', { name: 'Word' });
+    await user.clear(word);
+    await user.type(word, 'PostgreSQL');
+    await user.type(check(), 'postgres');
+    expect(marks()).toEqual([]);
+    await user.clear(check());
+    await user.type(check(), 'postgresql');
+    expect(marks()).toEqual(['PostgreSQL']);
+  });
+
+  it('keeps the Word field and its errors as they were, with a plain hint until an error replaces it', async () => {
+    renderWithApp(<Dictionary />);
+    const user = await openAdd('');
+    const word = screen.getByLabelText('Word');
+    expect(word).toHaveFocus();
+    expect(word).toHaveAccessibleDescription('A word or name, spelled exactly as you want it written.');
+    await user.type(check(), 'vox loom');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(word).toHaveAttribute('aria-invalid', 'true');
+    expect(word).toHaveAccessibleDescription('Enter a word.');
+    expect(screen.queryByText('A word or name, spelled exactly as you want it written.')).toBeNull();
+  });
+
+  it('saves only the word: the mistake you checked is never stored', async () => {
     const raw = '{"version":1,"words":["Postgres","TypeScript"]}\n';
     const io = createMemoryDictionaryIo(raw);
     const store = createDictionaryStore(io);
     const save = vi.spyOn(store, 'save');
     const user = userEvent.setup();
     render(<AppProvider dictionaryPersistence={{ enabled: true, store }}><Dictionary /></AppProvider>);
-    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
-    await waitFor(() => expect(proof()).toHaveValue('Follow up on type script and postgres.'));
-    await user.clear(proof());
-    expect(typedLine()).toHaveTextContent('Your spellings appear here.');
-    expect(document.querySelector('.proof__count')).toHaveTextContent('');
-    await user.type(proof(), 'we moved to postgres');
-    expect([...typedLine().querySelectorAll('mark')].map((mark) => mark.textContent)).toEqual(['Postgres']);
-    expect(screen.getByText('1 restored')).toBeInTheDocument();
-    await user.clear(proof());
-    await user.type(proof(), 'plain words only');
-    expect(screen.getByText('Nothing to restore')).toBeInTheDocument();
-    expect(typedLine().querySelector('mark')).toBeNull();
-    expect(save).not.toHaveBeenCalled();
-    expect(io.snapshot()).toBe(raw);
-  });
-
-  it('follows the dictionary: a spelling added below is restored in the proof at once', async () => {
-    const user = userEvent.setup();
-    renderWithApp(<Dictionary />);
-    await user.click(screen.getByRole('radio', { name: 'Sentence proof' }));
-    await user.clear(proof());
-    await user.type(proof(), 'try vox loom');
-    expect(screen.getByText('Nothing to restore')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit Postgres' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     await user.type(screen.getByRole('textbox', { name: 'Word' }), 'Voxloom');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(proof()).toHaveValue('try vox loom');
-    expect([...typedLine().querySelectorAll('mark')].map((mark) => mark.textContent)).toEqual(['Voxloom']);
-    expect(screen.getByRole('button', { name: 'Edit Voxloom' })).toBeInTheDocument();
-    expect(screen.getByText('1 restored')).toBeInTheDocument();
+    await user.type(check(), 'vox loom');
+    expect(save).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(io.snapshot()).toBe(raw);
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
+    expect(check()).toHaveValue('');
+    await user.type(screen.getByRole('textbox', { name: 'Word' }), 'Voxloom');
+    await user.type(check(), 'vox loom{Enter}');
+    await waitFor(() => expect(JSON.parse(io.snapshot()!).words).toEqual(['Postgres', 'TypeScript', 'Voxloom']));
+    expect(io.snapshot()).not.toContain('vox loom');
+    expect(within(screen.getByRole('list', { name: 'Dictionary words, alphabetical' })).getByText('Voxloom')).toBeInTheDocument();
   });
 
-  it('keeps the index compact and puts all verified examples on the selected leaf', async () => {
-    const user = userEvent.setup();
-    renderWithApp(<Dictionary />);
-    const list = screen.getByRole('list', { name: 'Dictionary words, alphabetical' });
-    const rows = within(list).getAllByRole('listitem');
-    const tanstack = rows.find((row) => row.querySelector('strong')?.textContent === 'TanStack Query')!;
-    expect(tanstack).not.toHaveTextContent('tan stack query');
-    await user.click(within(tanstack).getByRole('button', { name: 'Inspect TanStack Query' }));
-    const leaf = within(screen.getByRole('region', { name: 'Saved spelling specimen' }));
-    const forms = leaf.getAllByRole('button', { name: /^Test / });
-    expect(forms.map((form) => form.getAttribute('aria-label')))
-      .toEqual(['Test tan stack query', 'Test tanstack query', 'Test tan-stack query']);
-    expect(within(tanstack).getAllByRole('button').map((button) => button.getAttribute('aria-label')))
-      .toEqual(['Inspect TanStack Query', 'Edit TanStack Query', 'Delete TanStack Query']);
-    expect(within(list).queryByRole('button', { name: /^Test / })).toBeNull();
-  });
-
-  it('keeps the lookup, specimen and sentence proof at AA across both leaves', () => {
+  it('keeps the list, the guide and the check at AA in both themes', () => {
     const lin = (c: number) => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
     const hex = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
     const lum = (rgb: number[]) => 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
@@ -198,36 +205,41 @@ describe('Dictionary spelling stage', () => {
       return (x + 0.05) / (y + 0.05);
     };
     const mix = (a: string, b: string, t: number) => '#' + hex(a).map((v, i) => Math.round(v * t + hex(b)[i] * (1 - t)).toString(16).padStart(2, '0')).join('');
-    // Both leaves lie open on the page (ui-iter-31): the night page over the frame's stops, and
-    // the daylight page on linen with the daylight tokens.
+    // The list and guide lie open on the page (ui-iter-31): the night page over the frame's stops,
+    // and the daylight page on linen with the daylight tokens. The check sits on the sheet.
     const tokens = readFileSync('src/styles/tokens.css', 'utf8');
     const night = tokens.slice(0, tokens.indexOf('[data-appearance-resolved="light"] {'));
+    const lightRoot = tokens.slice(tokens.indexOf('[data-appearance-resolved="light"] {'));
     const daylight = readFileSync('src/styles/daylight.css', 'utf8');
     const day = daylight.slice(daylight.indexOf('.main .page-body, .settings-window > .settings-panel'));
     const css = readFileSync('src/styles/dictionary-stage.css', 'utf8');
     const indexCss = readFileSync('src/styles/dictionary.css', 'utf8');
     expect(indexCss).not.toMatch(/\.word-index \{[^}]*background/);
     expect(indexCss).toContain('var(--accfg) 8%, var(--bg)');
-    expect(css).toContain('background: var(--field);');
+    expect(indexCss).toMatch(/\.term-row__replaces \{[^}]*color: var\(--mut\);/);
     expect(css).toContain('background: color-mix(in srgb, var(--brand-a) 9%, transparent);');
+    expect(readFileSync('src/styles/daylight-pages.css', 'utf8'))
+      .toContain('.word-check__fix { background: color-mix(in srgb, #b6ff3c 42%, transparent);');
     const themes = [
-      { block: night, paper: '#121219', ground: ['#17171f', '#0a0a0e'], highlight: .09 },
-      { block: day, paper: '#f4f1ea', ground: ['#e9e4da'], highlight: .42 },
+      { block: night, sheetBlock: night, paper: '#121219', ground: ['#17171f', '#0a0a0e'], highlight: .09 },
+      { block: day, sheetBlock: lightRoot, paper: '#f4f1ea', ground: ['#e9e4da'], highlight: .42 },
     ];
-    for (const { block, paper, ground, highlight } of themes) {
-      const token = (name: string) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(block)![1];
-      for (const surface of [paper, ...ground, mix(token('accfg'), paper, .08), token('field')]) {
+    for (const { block, sheetBlock, paper, ground, highlight } of themes) {
+      const token = (name: string, from = block) => new RegExp(`--${name}: (#[0-9a-f]{6});`).exec(from)![1];
+      for (const surface of [paper, ...ground, mix(token('accfg'), paper, .08)]) {
         for (const ink of ['mut', 'fg', 'accfg']) {
           expect(ratio(token(ink), surface), `${ink} on ${surface}`).toBeGreaterThanOrEqual(4.5);
         }
       }
-      expect(ratio(token('accfg'), mix('#b6ff3c', paper, highlight))).toBeGreaterThanOrEqual(4.5);
+      const sheet = token('sheet', sheetBlock);
+      for (const ink of ['mut', 'fg', 'accfg']) expect(ratio(token(ink, sheetBlock), sheet), `${ink} on the sheet`).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(token('accfg', sheetBlock), mix('#b6ff3c', sheet, highlight))).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it('holds the knots still under reduced motion', () => {
+  it('holds the fix marks still under reduced motion', () => {
     const css = readFileSync('src/styles/dictionary-stage.css', 'utf8');
     const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
-    expect(reduced).toContain('.proof__knot { animation: none; }');
+    expect(reduced).toContain('.word-check__fix { animation: none; }');
   });
 });

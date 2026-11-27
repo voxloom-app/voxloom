@@ -24,9 +24,8 @@
 /* ---- Page titles on the linen ---- */
 [data-appearance-resolved="light"] :is(.history-stage h1, .dictionary-stage h1) { color: var(--fg); }
 
-/* ---- Dictionary: the spelling proof. Restored words wear a highlighter's lime. ---- */
-[data-appearance-resolved="light"] .proof__knot { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
-[data-appearance-resolved="light"] .proof__label--typed::before { background-color: var(--brand-b); }
+/* ---- Dictionary: the word check's fixes wear a highlighter's lime. ---- */
+[data-appearance-resolved="light"] .word-check__fix { background: color-mix(in srgb, #b6ff3c 42%, transparent); box-shadow: inset 0 -2px 0 var(--brand-a); }
 
 /* ---- Settings: the voice path ---- */
 [data-appearance-resolved="light"] .voice-path__thread i { background-color: var(--linen); }

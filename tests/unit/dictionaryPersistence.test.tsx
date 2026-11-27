@@ -54,7 +54,7 @@ describe('durable dictionary persistence', () => {
       expect(screen.queryByRole('main', { name: 'Set up Voxloom' })).not.toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    // The list, not the stage's spelling proof, which also shows the newest words.
+    // The list, not the guide's example, which also shows one of your words.
     expect(await within(await terms()).findByText('PersistedWord')).toBeInTheDocument();
   });
 
@@ -81,7 +81,7 @@ describe('durable dictionary persistence', () => {
       expect(screen.queryByRole('main', { name: 'Set up Voxloom' })).not.toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: 'Dictionary' }));
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     await user.type(screen.getByLabelText('Word'), 'Durable');
     await user.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => {

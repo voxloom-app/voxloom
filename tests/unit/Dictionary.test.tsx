@@ -10,7 +10,7 @@ describe('Dictionary', () => {
   it('supports Word CRUD, filtering, and accessible errors', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
-    await user.click(screen.getByRole('button', { name: 'Add term' }));
+    await user.click(screen.getByRole('button', { name: 'Add a word' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Enter a word');
     await user.type(screen.getByLabelText('Word'), ' typescript ');
@@ -19,7 +19,7 @@ describe('Dictionary', () => {
     await user.clear(screen.getByLabelText('Word'));
     await user.type(screen.getByLabelText('Word'), ' Vite ');
     await user.click(screen.getByRole('button', { name: 'Save' }));
-    // Scoped to the list: the stage's spelling proof also shows the newest words.
+    // Scoped to the list: the guide's example also shows one of your words.
     expect(within(terms()).getByText('Vite')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Edit Vite' }));
     await user.clear(screen.getByLabelText('Word'));
@@ -36,7 +36,7 @@ describe('Dictionary', () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
     for (const word of ['Zebra', 'Apple', 'mango']) {
-      await user.click(screen.getByRole('button', { name: 'Add term' }));
+      await user.click(screen.getByRole('button', { name: 'Add a word' }));
       await user.type(screen.getByLabelText('Word'), word);
       await user.click(screen.getByRole('button', { name: 'Save' }));
     }
@@ -48,7 +48,7 @@ describe('Dictionary', () => {
   it('restores focus and supports backdrop dismissal', async () => {
     const user = userEvent.setup();
     renderWithApp(<Dictionary />);
-    const add = screen.getByRole('button', { name: 'Add term' });
+    const add = screen.getByRole('button', { name: 'Add a word' });
     await user.click(add);
     await user.keyboard('{Escape}');
     expect(add).toHaveFocus();
