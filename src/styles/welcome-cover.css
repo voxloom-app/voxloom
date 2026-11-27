@@ -1,0 +1,58 @@
+/* Front cover: the progress spine starts when setup does. On the cover its
+   three chapters are the contents, not a second set of progress indicators. */
+.guided-setup[data-step="0"] { grid-template-columns: minmax(0, 1fr); }
+.guided-setup[data-step="0"] .guided-main { --cover-edge: max(22px, calc((100cqw - 52rem) / 2)); }
+.guided-setup[data-step="0"] :is(.guided-content, .guided-footer, .guided-disclosure) { padding-inline: var(--cover-edge); }
+.guided-setup[data-step="0"] .guided-content {
+  display: flex; flex-direction: column; gap: var(--s-10); padding-block: 26px 20px;
+}
+.welcome-imprint { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.welcome-imprint .guided-brand { margin: 0; }
+.welcome-imprint > span { color: var(--mut); font: 500 var(--fs-label)/1.4 var(--mono); text-align: end; }
+.welcome-title { margin-block: auto; text-align: center; }
+.guided-content .welcome-title h2 {
+  display: inline-block; margin: 0; padding: 0; font-size: calc(var(--fs-page) * 1.95); line-height: 1.08; letter-spacing: -.055em;
+}
+.welcome-title h2 em { display: inline-block; font-family: var(--font-words); font-weight: 450; letter-spacing: -.045em; margin-inline-start: .1em; }
+.welcome-title > p { margin: 10px auto 20px; font-size: var(--fs-body); color: var(--mut); }
+.welcome-sample {
+  display: inline-flex; max-width: 100%; flex-direction: column; align-items: center; gap: 12px;
+  background: transparent; border: 0; color: var(--fg); font: inherit; padding: 8px 12px; cursor: pointer;
+}
+.welcome-sample__proof { display: flex; align-items: center; max-width: 100%; }
+.welcome-sample__proof i { width: min(6vw, 60px); height: 1px; background: var(--brand); }
+.welcome-sample__proof > span:last-child {
+  border-inline-start: 2px solid var(--brand-b); padding: 3px 0 3px 12px;
+  font: 450 var(--fs-bigkey)/1.2 var(--font-words); text-align: start;
+}
+.welcome-sample__label { display: inline-flex; align-items: center; gap: 8px; color: var(--mut); font-size: var(--fs-label); font-weight: 600; }
+.welcome-sample__label b { color: var(--accfg); font: 600 var(--fs-emph)/1 var(--mono); }
+.welcome-sample:is(:hover, :focus-visible) .welcome-sample__label { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.welcome-title[data-preview] h2 { font-size: var(--fs-page); }
+.welcome-title[data-preview] > p { margin-block: 4px; }
+.welcome-foldout { margin: 6px auto 0; max-width: 42rem; text-align: start; }
+.guided-steps {
+  display: grid; gap: 20px; grid-template-columns: repeat(3, minmax(0, 1fr)); list-style: none; margin: 0; padding: 0;
+}
+.guided-steps li { display: flex; align-items: baseline; gap: 10px; border-top: 1px solid var(--ctl-line); padding-top: 12px; }
+.guided-steps-badge { flex: none; white-space: nowrap; color: var(--mut); font: 500 var(--fs-label)/1.6 var(--mono); }
+.guided-steps h3 { margin: 0 0 2px; font: 600 var(--fs-body)/1.3 var(--font); }
+.guided-steps p { margin: 0; font-size: var(--fs-label); color: var(--mut); }
+.guided-steps .key-combo { vertical-align: baseline; }
+.guided-steps .kbd { font-size: var(--fs-label); padding: 2px 6px; vertical-align: 1px; color: var(--fg); }
+.guided-setup[data-step="0"] .form-error { margin: 0; }
+@media (max-width: 760px) {
+  .guided-content .welcome-title h2 { font-size: calc(var(--fs-page) * 1.45); }
+  .guided-content .welcome-title[data-preview] h2 { font-size: var(--fs-hero); }
+}
+@media (max-width: 540px) {
+  .guided-steps { grid-template-columns: 1fr; gap: 8px; }
+  .guided-steps li { padding-top: 6px; }
+  .welcome-imprint > span { max-width: 15ch; }
+}
+@media (max-height: 680px) {
+  .guided-setup[data-step="0"] .guided-content { padding-block: 12px; gap: 10px; }
+  .welcome-imprint { padding-bottom: 8px; }
+  .welcome-title > p { margin-bottom: 8px; }
+  .welcome-title[data-preview] > p { margin: 0; }
+}

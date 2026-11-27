@@ -40,19 +40,9 @@
 [data-appearance-resolved="light"] .guided-main.stage { --sheet: transparent; --bg: var(--linen); }
 [data-appearance-resolved="light"] .guided-main.stage :is(.guided-disclosure, .guided-footer) { background: rgba(255, 255, 255, .42); }
 [data-appearance-resolved="light"] .guided-main.stage .guided-footer { border-top-color: rgba(70, 56, 30, .12); }
-[data-appearance-resolved="light"] :is(.setup-thread li > b, .guided-steps-badge) { background-color: var(--linen); }
+[data-appearance-resolved="light"] .setup-thread li > b { background-color: var(--linen); }
 [data-appearance-resolved="light"] .guided-modes span::before { background-color: var(--linen); }
 /* Step numbers are text: the dyed lime is a 3:1 thread, so the current one is set in deep lime ink. */
-[data-appearance-resolved="light"] :is(.setup-thread li[data-state="current"] > b, .guided-steps li:first-child .guided-steps-badge) { color: var(--accfg); }
+[data-appearance-resolved="light"] .setup-thread li[data-state="current"] > b { color: var(--accfg); }
 [data-appearance-resolved="light"] .guided-hero:has(> .loom-line) h2 { text-shadow: 0 0 8px var(--linen); }
 [data-appearance-resolved="light"] .guided-content h2:focus-visible::before { box-shadow: 0 0 10px color-mix(in srgb, #b6ff3c 80%, transparent); }
-/* The same one-shot press; onboarding.css's reduced-motion guard still stops it. */
-[data-appearance-resolved="light"] .loom-line .kbd { animation-name: loom-press-day; }
-@keyframes loom-press-day {
-  14%, 78% {
-    border-color: color-mix(in srgb, #548a00 70%, transparent);
-    box-shadow: inset 0 1px 0 #ffffff, 0 1px 0 #cbc3b3, 0 0 24px -2px color-mix(in srgb, #b6ff3c 85%, transparent);
-    color: #376b00;
-    transform: translateY(2px);
-  }
-}

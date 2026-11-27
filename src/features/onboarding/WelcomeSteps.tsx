@@ -14,7 +14,7 @@ export function WelcomeSteps({ shortcut }: { shortcut: string }) {
   // role="list" keeps list semantics in WebKit, which drops them with list-style: none.
   return <ol aria-label="Setup steps" className="guided-steps" role="list">
     {SETUP_STEP_TITLES.map((title, index) => <li key={title}>
-      <span aria-hidden="true" className="guided-steps-badge">{index + 1}</span>
+      <span aria-hidden="true" className="guided-steps-badge">0{index + 1}</span>
       <div><h3>{title}</h3><p>{descriptions[index]}</p></div>
     </li>)}
   </ol>;

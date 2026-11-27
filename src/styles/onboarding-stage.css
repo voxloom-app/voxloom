@@ -1,13 +1,12 @@
 /* Setup threads the loom (ui-iter-07). The content column wears the stage material
    (stage.css) in both themes, so first run is the same instrument as Home, the rail and
    the HUD. The rail's steps become one thread with a knot per step and small ties that
-   follow the live checks; the welcome draws a loom line from the rail, through your
-   shortcut, into the shuttle and out as text. Layout and copy rules stay in onboarding.css. */
+   follow the live checks. The finish step ties the indicator back to that thread. */
 .guided-main.stage {
   /* Tokens .stage does not carry: the footer and disclosure would read the light sheet. */
   --sheet: #14141c;
   --bg: #0b0b10;
-  /* The content column's own gutters, so the welcome's loom line can reach both edges. */
+  /* The content column's own gutters, so the finish line can reach both edges. */
   --gut-s: 36px;
   --gut-e: max(36px, calc(100cqw - 640px));
   border-radius: 0;
@@ -46,7 +45,7 @@
 .setup-thread__ties em[data-state="working"]::before { animation: thread-tie 1.2s linear infinite; border-color: var(--brand-b); border-style: dashed; }
 @keyframes thread-tie { to { transform: rotate(360deg); } }
 
-/* ---- The loom line: the welcome opens on it and the finish step closes on it ---- */
+/* ---- The loom line on the finish step ---- */
 .guided-hero:has(> .loom-line) {
   --loom-tail: 96px;
   --shuttle-w: 214px;
@@ -76,14 +75,12 @@
 }
 @keyframes loom-line { from { transform: scaleX(0); } }
 .loom-line { align-items: center; display: flex; flex: none; gap: 24px; margin-left: auto; position: relative; z-index: 1; }
-.loom-line__keys { display: inline-flex; gap: 7px; }
 .loom-line__shuttle { animation: loom-halo 1.8s ease-in-out .8s both; border-radius: 50%; display: grid; place-items: center; width: var(--shuttle-w); }
 .loom-line .hud-preview .wave { animation: loom-swell .3s ease-in-out 1.05s 4 alternate both; }
 @keyframes loom-swell { to { transform: scaleY(1.2); } }
 @keyframes loom-halo { 30%, 70% { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--brand-a) 50%, transparent)); } }
 
 /* Big key caps in setup are the stage's physical caps (Home, the rail). */
-.loom-line .kbd,
 .guided-shortcut .kbd,
 .guided-content > .key-combo .kbd,
 .shortcut-card__keys .kbd {
@@ -98,22 +95,6 @@
   padding: 0 12px;
   place-items: center;
 }
-.loom-line .kbd { animation: loom-press 1.9s ease .7s both; font-size: var(--fs-emph); height: 40px; min-width: 40px; }
-@keyframes loom-press {
-  14%, 78% {
-    border-color: color-mix(in srgb, var(--brand-a) 60%, transparent);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), 0 1px 0 #050508, 0 0 22px -4px color-mix(in srgb, var(--brand-a) 55%, transparent);
-    color: var(--brand-a);
-    transform: translateY(2px);
-  }
-}
-
-/* The three steps hang on one slack thread; the first knot is where Start setup begins. */
-.guided-steps { border-bottom: 0; }
-.guided-steps li { border-top: 0; position: relative; }
-.guided-steps li:not(:last-child)::after { background: repeating-linear-gradient(180deg, color-mix(in srgb, var(--brand-a) 40%, transparent) 0 4px, transparent 4px 8px); bottom: calc(var(--row-pad) * -1); content: ""; left: 13.25px; position: absolute; top: calc(var(--row-pad) + 28px); width: 1.5px; }
-.guided-steps-badge { background: #121219; position: relative; z-index: 1; }
-.guided-steps li:first-child .guided-steps-badge { border: 1.5px solid var(--brand-a); box-shadow: 0 0 12px color-mix(in srgb, var(--brand-a) 35%, transparent); color: var(--brand-a); }
 
 /* Step 3's two ways to dictate are two knots on one thread. */
 .guided-modes { align-items: center; gap: 36px; }
@@ -127,7 +108,6 @@
 @media (max-width: 760px) {
   .guided-main.stage { --gut-s: 22px; --gut-e: 22px; }
   .guided-hero:has(> .loom-line) { --loom-tail: 40px; --shuttle-w: 150px; gap: 12px 16px; }
-  .loom-line__keys { display: none; }
   .setup-thread li { column-gap: 8px; font-size: var(--fs-micro); }
 }
 /* Matches onboarding.css's short-window rule, so the welcome's rows and the finish step's
@@ -135,13 +115,7 @@
 @media (max-width: 760px), (max-height: 680px) {
   .guided-hero:has(> .loom-line) { margin-bottom: 12px; }
 }
-/* Short windows below 1200 wide: the loom line drops its keycaps (step 2 still shows the
-   shortcut) so the heading keeps its two lines with wider fallback fonts (Linux CI). */
-@media (max-height: 680px) and (max-width: 1199px) {
-  .loom-line__keys { display: none; }
-}
 @media (min-width: 900px) and (min-height: 700px) {
   .guided-hero:has(> .loom-line) { margin-bottom: 26px; padding-block: 10px; }
   .guided-hero:has(> .loom-line) h2 { font-size: calc(var(--fs-hero) * 1.45); }
-  .guided-steps li { --row-pad: 16px; }
 }

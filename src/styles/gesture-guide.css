@@ -1,11 +1,4 @@
-/* A timing score on a perforated strip of paper. Only the first setup page changes. */
-.guided-setup[data-step="0"] .guided-main {
-  --gut-e: max(var(--gut-s), calc(100cqw - 890px));
-}
-.guided-setup[data-step="0"] :is(.guided-content, .guided-footer, .guided-disclosure) { padding-inline-end: var(--gut-e); }
-.guided-setup[data-step="0"] .guided-hero { margin-bottom: 4px; padding-block: 0; }
-.guided-setup[data-step="0"] h2 em { display: block; font-family: var(--font-words); font-weight: 450; }
-.guided-setup[data-step="0"] .guided-intro { max-width: none; margin-bottom: var(--s-9); }
+/* A timing score on a perforated strip of paper, inside the welcome foldout. */
 
 .gesture-guide {
   --stock: var(--field);
@@ -80,30 +73,15 @@
 .gesture-guide__watch:hover { background: var(--segon); }
 .gesture-guide__watch span { color: var(--accfg); }
 
-/* Keep the three actual setup steps, but as a compact colophon rather than a second spine. */
-.guided-setup[data-step="0"] .guided-steps { display: grid; gap: var(--s-8); grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--s-10); max-width: none; }
-.guided-setup[data-step="0"] .guided-steps li { gap: 8px; padding: 0; }
-.guided-setup[data-step="0"] .guided-steps li::after { content: none; }
-.guided-setup[data-step="0"] .guided-steps-badge { height: 21px; width: 21px; }
-.guided-setup[data-step="0"] .guided-steps h3 { font-size: var(--fs-secondary); }
-.guided-setup[data-step="0"] .guided-steps p { font-size: var(--fs-label); }
-
 @container (max-width: 600px) {
-  .guided-setup[data-step="0"] .guided-steps { gap: 6px; grid-template-columns: minmax(0, 1fr); }
-  .guided-setup[data-step="0"] .guided-steps li > div { align-items: baseline; display: grid; grid-template-columns: 7.2em minmax(0, 1fr); gap: 6px; }
   .gesture-guide__print { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; }
   .gesture-guide__print p { grid-column: 1; }
   .gesture-guide__watch { grid-column: 2; grid-row: 1 / 3; }
 }
 @media (max-height: 680px) {
-  .guided-setup[data-step="0"] .guided-content { padding-block: 14px 8px; }
-  .guided-setup[data-step="0"] .guided-kicker { display: none; }
-  .guided-setup[data-step="0"] .guided-hero h2 { margin-bottom: 0; }
-  .guided-setup[data-step="0"] .guided-intro { font-size: var(--fs-secondary); margin-block: 6px 10px; }
   .gesture-guide { padding-top: 8px; }
   .gesture-score { margin-top: 4px; }
   .gesture-score__keys, .gesture-score__voice { height: 28px; }
   .gesture-guide p.gesture-guide__instruction { margin: 5px 0 8px; }
   .gesture-guide__print { padding-block: 7px; }
-  .guided-setup[data-step="0"] .guided-steps { margin-top: 12px; }
 }

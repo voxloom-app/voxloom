@@ -1,15 +1,8 @@
-import { comboKeys, Kbd } from '../../components/KeyCombo';
 import { HudPreview } from '../../components/HudPreview';
 
-/**
- * The setup loom line (ui-iter-07). On the welcome a voice thread leaves the setup rail,
- * runs under the heading into your shortcut's key caps, which press as it arrives, and on
- * into the recording indicator; the bars swell and the text thread leaves the far end. The finish step closes on the same line, already woven. Plays once; reduced
- * motion shows the finished line. Decorative: the copy around it says the same in words.
- */
-export function LoomLine({ shortcut }: { shortcut?: string }) {
+/** The finish step ties off the same indicator the welcome cover introduced. */
+export function LoomLine() {
   return <div aria-hidden="true" className="loom-line">
-    {shortcut && <span className="loom-line__keys">{comboKeys(shortcut).map((key, index) => <Kbd key={`${key}-${index}`}>{key}</Kbd>)}</span>}
     <span className="loom-line__shuttle"><HudPreview /></span>
   </div>;
 }

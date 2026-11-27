@@ -20,7 +20,7 @@ function SetShortcut({ value }: { value: string }) {
 }
 
 describe('guided setup welcome (step 0)', () => {
-  it('lists the three steps under the heading, titled like the spine, without the preview card', () => {
+  it('shows one setup outline on the cover, before the progress rail is needed', () => {
     renderWithApp(<Onboarding boundary={setupBoundary()} onClose={vi.fn()} progressStorage={storage()} />);
     const list = screen.getByRole('list', { name: 'Setup steps' });
     expect(list.tagName).toBe('OL');
@@ -29,9 +29,9 @@ describe('guided setup welcome (step 0)', () => {
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
     const titles = within(list).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent);
-    const spine = within(screen.getByRole('complementary', { name: 'Setup progress' })).getAllByRole('listitem').map((item) => item.querySelector('span')?.textContent);
+    expect(screen.queryByRole('complementary', { name: 'Setup progress' })).not.toBeInTheDocument();
     expect(titles).toEqual(['Get connected', 'Your shortcut', 'First words']);
-    expect(titles).toEqual(spine);
+    expect(screen.getAllByRole('list')).toHaveLength(1);
     expect(rows[0]).toHaveTextContent('Allow Microphone and Accessibility.');
     expect(rows[2]).toHaveTextContent('Try a short dictation both ways.');
     for (const [index, row] of rows.entries()) {
@@ -50,6 +50,11 @@ describe('guided setup welcome (step 0)', () => {
     const user = userEvent.setup();
     const io = setupBoundary();
     renderWithApp(<Onboarding boundary={io} onClose={vi.fn()} progressStorage={storage()} />);
+    const preview = screen.getByRole('button', { name: 'Preview the gestures' });
+    expect(preview).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('region', { name: 'Gesture guide' })).not.toBeInTheDocument();
+    await user.click(preview);
+    expect(preview).toHaveAttribute('aria-expanded', 'true');
     const guide = screen.getByRole('region', { name: 'Gesture guide' });
     const hold = within(guide).getByRole('radio', { name: 'Hold to talk' });
     const handsFree = within(guide).getByRole('radio', { name: 'Hands-free' });
@@ -65,6 +70,9 @@ describe('guided setup welcome (step 0)', () => {
     expect(hold).toBeChecked();
     expect(guide).toHaveTextContent('Meet me at noon.');
     expect(guide).toHaveTextContent('Hold your shortcut while you speak. Release to finish.');
+    await user.click(screen.getByRole('button', { name: 'Close gesture preview' }));
+    expect(preview).toHaveFocus();
+    expect(screen.queryByRole('region', { name: 'Gesture guide' })).not.toBeInTheDocument();
     expect(io.request).not.toHaveBeenCalled();
     expect(io.download).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /Start setup/ })).toBeEnabled();
@@ -74,7 +82,7 @@ describe('guided setup welcome (step 0)', () => {
     const user = userEvent.setup();
     renderWithApp(<><Onboarding boundary={setupBoundary()} onClose={vi.fn()} progressStorage={storage()} /><SetShortcut value="Alt + D" /></>);
     const row = within(screen.getByRole('list', { name: 'Setup steps' })).getAllByRole('listitem')[1];
-    expect(row).toHaveTextContent(/^2Your shortcutKeep .*Control Shift Space, or pick your own keys\.$/);
+    expect(row).toHaveTextContent(/^02Your shortcutKeep .*Control Shift Space, or pick your own keys\.$/);
     expect(row.querySelectorAll('.kbd')).toHaveLength(3);
     await user.click(screen.getByRole('button', { name: 'Set test shortcut' }));
     expect(row).not.toHaveTextContent('Control Shift Space');

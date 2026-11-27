@@ -1,9 +1,9 @@
 /// ui-iter-07: setup threads the loom. The rail is one thread with a knot per step and live
-/// ties; the welcome and finish steps carry a decorative loom line; the column is the stage.
+/// ties; the cover previews the indicator, and the finish step carries the loom line.
 import { readFileSync } from 'node:fs';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { comboKeys, comboLabel } from '../../src/components/KeyCombo';
+import { comboLabel } from '../../src/components/KeyCombo';
 import { Onboarding } from '../../src/features/onboarding/Onboarding';
 import { SetupThread, setupTies } from '../../src/features/onboarding/SetupThread';
 import type { GuidedState, SetupBoundary } from '../../src/features/onboarding/guidedSetup';
@@ -85,18 +85,18 @@ describe('the rail thread', () => {
 });
 
 describe('the setup stage and loom line', () => {
-  it('opens the welcome on a decorative loom line through the shortcut caps, on the stage', () => {
+  it('opens the welcome on one sample, with the real indicator as decoration', () => {
     renderWithApp(<Onboarding boundary={boundary()} onClose={vi.fn()} progressStorage={resume(null)} />);
     expect(document.querySelector('.guided-main')).toHaveClass('stage');
     expect(document.querySelector('.guided-setup')).toHaveAttribute('data-step', '0');
-    const line = document.querySelector('.guided-hero > .loom-line')!;
-    expect(line).toHaveAttribute('aria-hidden', 'true');
-    expect([...line.querySelectorAll('.kbd')].map((cap) => cap.textContent)).toEqual(comboKeys(SHORTCUT));
-    expect(line.querySelector('.hud-preview')).not.toBeNull();
-    expect(line.querySelector('button, a, input, textarea, [tabindex]')).toBeNull();
-    // The heading keeps its focus target and name; the line adds nothing to read.
+    const proof = screen.getByRole('button', { name: 'Preview the gestures' }).querySelector('.welcome-sample__proof')!;
+    expect(proof).toHaveAttribute('aria-hidden', 'true');
+    expect(proof.querySelector('.hud-preview')).not.toBeNull();
+    expect(proof).toHaveTextContent('Meet me at noon.');
+    expect(document.querySelector('.loom-line')).toBeNull();
+    // The heading keeps its focus target and name; the sample adds no setup action.
     expect(screen.getByRole('heading', { level: 2 })).toHaveAttribute('id', 'guided-heading');
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Less typing.More you.');
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Less typing. More you.');
   });
 
   it.each([1, 2, 3])('leaves step %i to its task, without the loom line', async (step) => {
@@ -147,13 +147,13 @@ describe('setup loom styles', () => {
 
   it('plays the intro once and rests on the finished line', () => {
     const intro = [...stage.matchAll(/animation: (loom-[a-z]+) [^;]*;/g)].map((match) => [match[1], match[0]]);
-    expect(intro.map(([name]) => name).sort()).toEqual(['loom-halo', 'loom-line', 'loom-line', 'loom-press', 'loom-swell']);
+    expect(intro.map(([name]) => name).sort()).toEqual(['loom-halo', 'loom-line', 'loom-line', 'loom-swell']);
     for (const [, rule] of intro) {
       expect(rule).not.toMatch(/infinite/);
       expect(rule).toMatch(/ both;$/);
     }
     // Each keyframe set leaves its end state to the base rule, so the resting frame is the finished design.
-    for (const name of ['loom-line', 'loom-press', 'loom-halo']) {
+    for (const name of ['loom-line', 'loom-halo']) {
       const frames = keyframes(stage, name);
       expect(frames).not.toBe('');
       expect(frames).not.toMatch(/\b(to|100%)\s*[,{]/);

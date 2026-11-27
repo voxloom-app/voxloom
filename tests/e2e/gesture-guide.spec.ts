@@ -8,8 +8,13 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(`/tests/fixtures/guided-preview.html?step=0&theme=${theme}&ready=0`);
     // Model wider fallback fonts as well as the shipped Mac system stack.
     if (theme === 'light') await page.addStyleTag({ content: ':root { --font: Verdana, sans-serif; }' });
+    const preview = page.getByRole('button', { name: 'Preview the gestures' });
     const guide = page.getByRole('region', { name: 'Gesture guide' });
-    await guide.getByRole('radio', { name: 'Hold to talk' }).focus();
+    await expect(guide).toHaveCount(0);
+    await preview.focus();
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    await expect(guide.getByRole('radio', { name: 'Hold to talk' })).toBeFocused();
     await page.keyboard.press('ArrowRight');
     await expect(guide.getByRole('radio', { name: 'Hands-free' })).toBeChecked();
     await expect(guide.getByText(/Double-tap, speak with the keys up/)).toBeVisible();
@@ -23,6 +28,19 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('button', { name: /Start setup/ })).toBeEnabled();
     const fits = await page.locator('.guided-content').evaluate(el => el.scrollHeight <= el.clientHeight && el.scrollWidth <= el.clientWidth);
     expect(fits).toBe(true);
+    // The two digits of each chapter number belong on one line, even at narrow widths.
+    const lineCounts = await page.locator('.guided-steps-badge').evaluateAll(badges => badges.map(badge => {
+      const range = document.createRange();
+      range.selectNodeContents(badge);
+      return new Set(Array.from(range.getClientRects(), rect => rect.top)).size;
+    }));
+    expect(lineCounts).toEqual([1, 1, 1]);
     expect((await new AxeBuilder({ page }).include('.setup-window').analyze()).violations).toEqual([]);
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.getByRole('button', { name: 'Close gesture preview' })).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(preview).toBeFocused();
+    await expect(guide).toHaveCount(0);
   });
 }
