@@ -25,8 +25,8 @@
 @keyframes cloth-pick { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
 @keyframes cloth-beat { from { opacity: 0; } to { opacity: 1; } }
 
-/* ---- The dock: shuttle, its run status, then the shortcut keys ---- */
-.rail-dock { display: grid; gap: var(--s-8); }
+/* ---- The dock: the shuttle, then one line (rail-tag.css) ---- */
+.rail-dock { display: grid; gap: var(--s-4); }
 .rail-capture { display: grid; gap: var(--s-4); position: relative; }
 .rail-shuttle {
   align-items: center;
@@ -107,11 +107,6 @@ button.rail-shuttle:disabled::before { opacity: .3; }
 }
 .rail-capture[data-state="idle"]:has(button.rail-shuttle:is(:hover, :focus-visible)) .rail-capture__tip { opacity: 1; visibility: visible; }
 .rail-capture__cancel { justify-self: center; }
-.rail-capture__note,
-.rail-capture__status { color: var(--mut); font-size: var(--fs-label); line-height: 1.4; margin: 0; text-align: center; }
-.rail-capture__status .icon { margin-right: 2px; vertical-align: -2px; }
-.rail-capture__status[data-phase="success"] { color: var(--ok); }
-.rail-capture__status.form-error { color: var(--err); margin: 0; }
 .rail-capture__copy { justify-self: center; }
 
 /* ---- The shuttle in the run ---- */

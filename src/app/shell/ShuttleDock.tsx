@@ -1,6 +1,8 @@
 import { useId } from 'react';
 import { Icon } from '../../components/Icon';
+import { Knot } from '../../components/Knot';
 import { SHUTTLE_PATH } from '../../components/ShuttleGlyph';
+import { toastTone } from '../../components/Toast';
 import { WAVEFORM_SAMPLES, weaveRuns } from '../../components/Waveform';
 import type { UseDogfoodCaptureResult } from '../../services/stt/useDogfoodCapture';
 
@@ -49,8 +51,8 @@ function Hull() {
  * The docked shuttle (ui-iter-15): dictating from the window moves off Home and into
  * the foot of the warp rail, on every page. It is the same shuttle the HUD floats over
  * other apps, sitting at the fell of today's cloth: press it to start, press again to
- * stop; while Voxloom writes the braid becomes a rope. Status and errors from any run
- * (shortcut or here) hang beneath it.
+ * stop; while Voxloom writes the braid becomes a rope. What the last run (shortcut or
+ * here) did hangs beneath it on one tag, tied off with the HUD's knots (ui-iter-17).
  */
 export function ShuttleDock({ dogfood, isNative, onCopy }: ShuttleDockProps) {
   const tipId = `vx-dock-tip-${useId().replace(/:/g, '')}`;
@@ -58,6 +60,8 @@ export function ShuttleDock({ dogfood, isNative, onCopy }: ShuttleDockProps) {
   const busy = dogfood.phase === 'transcribing' || dogfood.phase === 'cleaning';
   const failed = dogfood.phase === 'error' || dogfood.phase === 'cancelled';
   const state = recording ? 'recording' : busy ? 'busy' : 'idle';
+  // A failed or cancelled run frays; otherwise the words decide, as they do for toasts.
+  const tone = failed ? 'err' : toastTone(dogfood.message ?? '');
   const parts = <><Hull /><i aria-hidden="true" className="rail-shuttle__eye rail-shuttle__eye--in" /><i aria-hidden="true" className="rail-shuttle__eye rail-shuttle__eye--out" /></>;
 
   return (
@@ -88,10 +92,10 @@ export function ShuttleDock({ dogfood, isNative, onCopy }: ShuttleDockProps) {
           Cancel
         </button>
       )}
-      {!isNative && <p className="rail-capture__note">Dictating here needs the Voxloom desktop app.</p>}
       {dogfood.message && (
-        <p className={failed ? 'rail-capture__status form-error' : 'rail-capture__status'} data-phase={dogfood.phase} role="status">
-          <Icon name={failed ? 'warn' : 'check'} size={13} /> {dogfood.message}
+        <p className="rail-tag rail-capture__status" data-phase={dogfood.phase} data-tone={tone} role="status">
+          <Knot className="rail-tag__knot" tone={tone} />
+          <span className="rail-tag__words">{dogfood.message}</span>
         </p>
       )}
       {dogfood.phase === 'error' && dogfood.message?.startsWith('Escape cancellation unavailable [cancel-') && (
@@ -99,6 +103,7 @@ export function ShuttleDock({ dogfood, isNative, onCopy }: ShuttleDockProps) {
           <Icon name="copy" size={13} /> Copy error details
         </button>
       )}
+      {!isNative && <p className="rail-capture__note">Dictating here needs the Voxloom desktop app.</p>}
     </div>
   );
 }

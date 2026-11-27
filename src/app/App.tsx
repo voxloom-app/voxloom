@@ -175,6 +175,7 @@ export function App() {
         capture={{ dogfood, isNative: native, onCopy: copyText }}
         onNavigate={navigate}
         onReset={dev.requestReset}
+        onShowRecord={showRecalled}
         phase={phase}
         screen={state.screen}
         shortcut={state.settings.shortcut}

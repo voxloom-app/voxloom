@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../../src/app/App';
@@ -93,9 +93,10 @@ describe('warp rail (ui-iter-03)', () => {
 
   it('shows the shortcut as key caps in the dock and a fresh day plainly', () => {
     let time = NOON();
+    let page: 'home' | 'history' = 'history';
     const sidebar = () => (
       <AppProvider clock={() => time}>
-        <Sidebar onNavigate={() => {}} onReset={() => {}} screen="home" shortcut="Control+Shift+Space" status="Ready" />
+        <Sidebar onNavigate={() => {}} onReset={() => {}} screen={page} shortcut="Control+Shift+Space" status="Ready" />
       </AppProvider>
     );
     const { rerender } = render(sidebar());
@@ -104,9 +105,57 @@ describe('warp rail (ui-iter-03)', () => {
     time += 2 * 24 * 60 * 60 * 1000;
     rerender(sidebar());
     expect(document.querySelectorAll('.rail-key .kbd').length).toBe(3);
+    // ui-iter-17: Home's stage shows the keys already; the rail doesn't repeat them there.
+    page = 'home';
+    rerender(sidebar());
+    expect(document.querySelector('.rail-key')).toBeNull();
+    page = 'history';
+    rerender(sidebar());
     const card = screen.getByRole('button', { name: 'Today: no dictations yet' });
     expect(card).toHaveTextContent('Nothing woven yet');
     expect(document.querySelector('.rail-cloth')).toBeNull();
+  });
+});
+
+describe('reading the cloth (ui-iter-17)', () => {
+  const todays = (api: ReturnType<typeof useApp>) => [...api.state.records]
+    .filter((record) => new Date(record.createdAt).toDateString() === new Date(NOON()).toDateString())
+    .sort((a, b) => a.createdAt - b.createdAt);
+
+  it('hangs a pointed pick\'s words and time above it, inside the hidden warp', () => {
+    let api: ReturnType<typeof useApp> | null = null;
+    function Probe() { api = useApp(); return null; }
+    renderWithApp(<><Probe /><RailWarp onShow={() => {}} /></>, NOON);
+    const hits = [...document.querySelectorAll('.rail-cloth__hit')];
+    expect(hits).toHaveLength(6);
+    expect(document.querySelector('.rail-cloth__read')).toBeNull();
+    const newest = todays(api!).at(-1)!;
+    fireEvent.pointerEnter(hits.at(-1)!);
+    const read = document.querySelector('.rail-warp[aria-hidden="true"] .rail-cloth__read')!;
+    expect(read).toHaveTextContent(newest.text);
+    expect(read.querySelector('time')).toHaveAttribute('dateTime', new Date(newest.createdAt).toISOString());
+    expect(hits.at(-1)!.closest('.rail-cloth__row')).toHaveAttribute('data-lit');
+    fireEvent.pointerLeave(document.querySelector('svg.rail-cloth')!);
+    expect(document.querySelector('.rail-cloth__read')).toBeNull();
+    expect(document.querySelector('[data-lit]')).toBeNull();
+  });
+
+  it('lays no hit lines without somewhere to open them', () => {
+    renderWithApp(<RailWarp />, NOON);
+    expect(document.querySelectorAll('.rail-cloth__row')).toHaveLength(6);
+    expect(document.querySelector('.rail-cloth__hit')).toBeNull();
+  });
+
+  it('opens a pressed pick in History, focused on that dictation', async () => {
+    let api: ReturnType<typeof useApp> | null = null;
+    function Probe() { api = useApp(); return null; }
+    const user = userEvent.setup();
+    renderWithApp(<><Probe /><App /></>, NOON);
+    await user.click(screen.getByRole('button', { name: 'Set up later' }));
+    const oldest = todays(api!)[0];
+    fireEvent.click(document.querySelectorAll('.rail-cloth__hit')[0]);
+    expect(current()).toBe('History');
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('data-record', oldest.id));
   });
 });
 
@@ -148,6 +197,16 @@ describe('the docked shuttle styles (ui-iter-15)', () => {
     const reduced = clothCss.slice(clothCss.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toContain('.rail-cloth__row[data-fresh] :is(.rail-cloth__pick, .rail-cloth__over) { animation: none; }');
     expect(reduced).toContain('.rail-shuttle__braid { animation: none !important; }');
+  });
+
+  it('loads the cloth read-out and the outcome tag after the cloth, still under reduced motion (ui-iter-17)', () => {
+    expect(css('index.css')).toMatch(/@import "\.\/rail-cloth\.css";\n@import "\.\/rail-tag\.css";/);
+    const tagCss = css('rail-tag.css');
+    const reduced = tagCss.slice(tagCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('.rail-cloth__read { animation: none; }');
+    expect(reduced).toContain('.sidebar[data-phase] .rail-key .kbd { transform: none; }');
+    // The read-out never takes the pointer from the pick beneath it.
+    expect(tagCss).toMatch(/\.rail-cloth__read \{[^}]*pointer-events: none;/);
   });
 
   it('keeps the shuttle\'s words on solid glass at AA in both themes', () => {

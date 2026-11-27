@@ -1,6 +1,7 @@
 import { AppTile } from '../../components/AppTile';
 import { Icon } from '../../components/Icon';
 import { isMacPlatform, KeyCombo } from '../../components/KeyCombo';
+import { Knot } from '../../components/Knot';
 import { ScenarioPanel } from '../../dev/ScenarioPanel';
 import type { Screen } from '../../domain/types';
 import type { StagePhase } from '../../features/home/stagePhase';
@@ -19,6 +20,8 @@ type Props = {
   phase?: StagePhase;
   onNavigate: (screen: Screen) => void;
   onReset: () => void;
+  /** Opens one of today's dictations in History, from its pick in the cloth. */
+  onShowRecord?: (id: string) => void;
   /** Dictating from the window: the shuttle docked at the fell (ui-iter-15). */
   capture?: ShuttleDockProps;
 };
@@ -27,10 +30,13 @@ type Props = {
  * The warp rail (ui-iter-03): the window's frame, in the Home stage's dark
  * material in both themes. It stays put while pages scroll. Since ui-iter-15 it
  * is a working loom: today's dictations are woven across its warp, and the
- * shuttle docked at the fell starts a dictation from any page. The threads move
- * only while you speak or Voxloom writes.
+ * shuttle docked at the fell starts a dictation from any page. Since ui-iter-17
+ * it hangs as one loom: Today is the beam the warp hangs from, the cloth can be
+ * read pick by pick, and one line under the shuttle says what just happened or,
+ * away from Home (whose stage already shows it), which keys to hold. The threads
+ * move only while you speak or Voxloom writes.
  */
-export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset }: Props) {
+export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onNavigate, onReset, onShowRecord }: Props) {
   const active = useShortcutActive();
   return (
     <aside className="sidebar" data-phase={phase}>
@@ -59,18 +65,17 @@ export function Sidebar({ capture, screen, shortcut, status, phase = 'idle', onN
         ))}
       </nav>
       <RailToday onOpen={() => onNavigate('history')} />
-      <RailWarp />
+      <RailWarp onShow={onShowRecord} />
       <div className="rail-dock">
         {capture && <ShuttleDock {...capture} />}
-        <div className="rail-key">
-          {active && <span className="rail-key__caps"><KeyCombo combo={shortcut} /></span>}
-          <p className="sidebar__hint">
-            {active ? <>
-              Hold the shortcut in any app to dictate. Release to insert, or it
-              copies if insertion isn’t safe.
-            </> : NO_SHORTCUT}
+        {!active ? (
+          <p className="rail-tag" data-tone="warn">
+            <Knot className="rail-tag__knot" tone="warn" />
+            <span className="rail-tag__words">{NO_SHORTCUT}</span>
           </p>
-        </div>
+        ) : screen !== 'home' && !capture?.dogfood.message && (
+          <p className="rail-key">Hold <KeyCombo combo={shortcut} /> in any app to dictate</p>
+        )}
       </div>
       {import.meta.env.DEV && (
         <details className="dev-panel">

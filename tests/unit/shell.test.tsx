@@ -32,18 +32,23 @@ afterEach(() => vi.mocked(isTauriEnv).mockReturnValue(false));
 
 describe('App shell (UI PR 3)', () => {
   it('has three sidebar screens, the brand status line and the short hint', async () => {
-    await renderShell();
+    const user = await renderShell();
     const nav = screen.getByRole('navigation', { name: 'Voxloom screens' });
     expect(within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label')))
       .toEqual(['Home', 'History', 'Dictionary']);
     const status = document.querySelector('.brand__status')!;
     expect(status).toHaveTextContent('Setup incomplete');
     expect(status).not.toHaveAttribute('aria-label');
+    // ui-iter-17: Home's stage already shows the keys, so the rail says them only on other pages.
+    const rail = document.querySelector('aside.sidebar')!;
+    expect(rail.querySelector('.rail-key')).toBeNull();
+    expect(within(nav).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    await user.click(within(nav).getByRole('button', { name: 'History' }));
     // ui-iter-03: the shortcut lives in the rail's dock as key caps, spoken for screen readers.
-    const dock = document.querySelector('.rail-key')!;
+    const dock = rail.querySelector('.rail-key')!;
     expect([...dock.querySelectorAll('.kbd')].map((k) => k.textContent)).toEqual(['⌃', '⇧', 'Space']);
     expect(dock).toHaveTextContent('Control Shift Space');
-    expect(screen.getByText(/Hold the shortcut in any app to dictate/)).toBeInTheDocument();
+    expect(dock).toHaveTextContent(/^Hold .* in any app to dictate$/);
     expect(screen.queryByText(/Global hold\/latch snapshots/)).not.toBeInTheDocument();
   });
 
@@ -203,6 +208,33 @@ describe('Docked shuttle (ui-iter-15)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
   });
 
+  it('ties the outcome tag off with the HUD\'s knot for what happened (ui-iter-17)', () => {
+    const tag = () => screen.getByRole('status');
+    const knot = () => tag().querySelector('svg.rail-tag__knot')!;
+    dock({ message: 'Inserted into the focused app.', phase: 'success' });
+    expect(tag()).toHaveAttribute('data-tone', 'ok');
+    expect(knot()).toHaveAttribute('aria-hidden', 'true');
+    expect(knot().querySelector('.knot__core')).not.toBeNull();
+    cleanup();
+    dock({ message: 'Copied — paste it where you need it.', phase: 'success' });
+    expect(tag()).toHaveAttribute('data-tone', 'warn');
+    cleanup();
+    // A cancelled run frays, and the words are spoken exactly as written.
+    dock({ message: 'Capture cancelled — nothing transcribed.', phase: 'cancelled' });
+    expect(tag()).toHaveAttribute('data-tone', 'err');
+    expect(knot().querySelector('.knot__fray')).not.toBeNull();
+    expect(tag().textContent).toBe('Capture cancelled — nothing transcribed.');
+  });
+
+  it('lets the outcome tag stand in for the keys hint on other pages (ui-iter-17)', () => {
+    const run = dogfood({ message: 'Inserted into the focused app.', phase: 'success' });
+    renderWithApp(
+      <Sidebar capture={{ dogfood: run, isNative: true, onCopy: vi.fn() }} onNavigate={() => {}} onReset={() => {}} screen="history" shortcut="Control+Shift+Space" status="Ready" />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Inserted into the focused app.');
+    expect(document.querySelector('.rail-key')).toBeNull();
+  });
+
   it('docks on the rail of every page', async () => {
     const user = await renderShell();
     const rail = () => document.querySelector('.sidebar') as HTMLElement;
@@ -232,7 +264,7 @@ describe('off-Mac shell labels (QA #45)', () => {
       render(<TitleBar onHelp={() => {}} onSettings={() => {}} settingsOpen={false} />);
       expect(screen.getByRole('button', { name: 'Settings' })).toHaveTextContent('Settings… Ctrl+,');
       renderWithApp(
-        <Sidebar onNavigate={() => {}} onReset={() => {}} screen="home" shortcut="Control+Shift+Space" status="Ready" />,
+        <Sidebar onNavigate={() => {}} onReset={() => {}} screen="history" shortcut="Control+Shift+Space" status="Ready" />,
       );
       expect(document.querySelector('.brand__status')).toHaveTextContent('Ready');
       expect([...document.querySelectorAll('.rail-key .kbd')].map((k) => k.textContent)).toEqual(['Ctrl', 'Shift', 'Space']);

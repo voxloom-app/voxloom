@@ -7,7 +7,8 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /**
  * Today in words, on every screen: how many dictations, words and minutes so far,
  * and a count of loose threads (failed or unverified) worth a look. Opens History.
- * The picture of the day is the cloth woven below it on the warp (RailWarp).
+ * Since ui-iter-17 it is the rail's warp beam: the numbers sit on a lit rod and the
+ * warp hangs from it, carrying the picture of the day, the cloth (RailWarp).
  */
 export function RailToday({ onOpen }: { onOpen: () => void }) {
   const { now, state } = useApp();
